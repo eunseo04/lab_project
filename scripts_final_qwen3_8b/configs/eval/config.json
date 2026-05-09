@@ -1,0 +1,91 @@
+{
+    "general": {
+        "iteration": 4,
+        "seed": 42,
+        "model_path": "checkpoints_last_qwen3_8b/3/eval/eval-20251220170120/checkpoint-50",
+        "prompt_fname": "prompts/prompt_red_20250626.yaml",
+        "policy_fname": "prompts/safety_spec_en.txt",
+        "special_issue": "prompts/special_issue_en.txt",
+        "traindataset_path": "output/response_last_qwen3_8b/4/query_and_response.jsonl",
+        "response_save_dir": "output/response_last_qwen3_8b",
+        "save_prompts_dir": "output/red_prompts_last_qwen3_8b"
+    },
+    "gen_data": {
+        "use_existing_dataset_for_training": "",
+        "save_dir": "temp_data",
+        "red": {
+            "model_path": "checkpoints_last_qwen3_8b/4/red/red-20251220170120/checkpoint-200",
+            "gpus": 4,
+            "url": "0.0.0.0",
+            "port": 9000,
+            "max_model_len": 8192,
+            "gpu_mem": 0.9,
+            "allocated_gpus": "0,1,2,3"
+        },
+        "qa": {
+            "model_path": "checkpoints_last_qwen3_8b/4/qa-positive/qa-positive-20251220170120/checkpoint-50",
+            "gpus": 4,
+            "url": "0.0.0.0",
+            "port": 9001,
+            "max_model_len": 8192,
+            "gpu_mem": 0.9,
+            "allocated_gpus": "4,5,6,7"
+        }
+    },
+    "reward": {
+        "qa": [
+            {
+                "gpus": 1,
+                "url": "0.0.0.0",
+                "port": 9002,
+                "model_path": "checkpoints_wosft/9/qa-positive/qa-positive-20251018112826/checkpoint-100",
+                "max_model_len": 8192,
+                "gpu_mem": 0.9,
+                "max_tokens": 4000
+            }
+        ],
+        "eval": [
+            {
+                "gpus": 1,
+                "url": "0.0.0.0",
+                "port": 9003,
+                "model_path": "models/qwen/Qwen3-14B",
+                "max_model_len": 20000,
+                "gpu_mem": 0.9,
+                "max_tokens": 4096
+            }
+        ],
+        "bleu_reward_coef": -2.0,
+        "cossimemb_reward_coef": -4.0
+    },
+    "rollout": {
+        "use_vllm": true,
+        "gpus": 1,
+        "url": "0.0.0.0",
+        "port": 9004,
+        "max_model_len": 8192,
+        "gpu_mem": 0.9,
+        "vllm_server_timeout": 60,
+        "allocated_gpus": "0"
+    },
+    "train": {
+        "deepspeed": true,
+        "fsdp": false,
+        "per_device_train_batch_size": 8,
+        "gradient_accumulation_steps": 8,
+        "num_train_epochs": -1,
+        "learning_rate": 1e-06,
+        "weight_decay": 0.01,
+        "warmup_steps": 10,
+        "how_to_save": "steps",
+        "save_steps": 10,
+        "output_dir": "checkpoints_last_qwen3_8b",
+        "logging_dir": "selfrl_logs_last_qwen3_8b",
+        "logging_steps": 1,
+        "save_total_limit": 20,
+        "max_prompt_length": 3200,
+        "max_completion_length": 400,
+        "max_steps": 50,
+        "allocated_gpus": "1,2,3,4,5,6,7"
+    }
+}
