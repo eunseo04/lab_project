@@ -18,6 +18,7 @@ selfrl_logs_final_qwen3_8b/
 
 # Generated artifacts and temporary data
 eval-multiexpert/
+models/
 debug/
 output/
 temp_data/

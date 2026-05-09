@@ -62,9 +62,14 @@ If your local model directories are different, update the model paths in:
 
 ```text
 scripts_final_qwen3_8b/train_loop.py
+eval.py
 ```
 
 In `train_loop.py`, the most important fields are `last_model_path` for the initial Red/Blue/Eval models and `model_paths_config` for fixed reward or judge model overrides.
+
+In `eval.py`, you can also directly change evaluator model paths in:
+- `safety_models` (e.g. GPT-OSS Safeguard, SEval, Llama Guard)
+- `helpful_models` (e.g. Qwen/QwQ/GPT-OSS helpfulness evaluators)
 
 ### Run Training Loop
 
