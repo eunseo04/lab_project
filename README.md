@@ -22,7 +22,7 @@
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/Qihoo360/TriPlay-RL.git
 cd TriPlay-RL
 
 # Create and activate the conda environment
@@ -71,6 +71,12 @@ In `train_loop.py`, the most important fields are `last_model_path` for the init
 In `eval.py`, you can also directly change evaluator model paths in:
 - `safety_models` (e.g. GPT-OSS Safeguard, SEval, Llama Guard)
 - `helpful_models` (e.g. Qwen/QwQ/GPT-OSS helpfulness evaluators)
+
+### Red corpus data (format example)
+
+The file [`prompts/red_corpus_instances.jsonl`](prompts/red_corpus_instances.jsonl) is **only an illustration of the expected JSONL layout** (field shapes and how instances are organized). It is **not** meant to be sufficient or domain-complete for every deployment.
+
+You should **generate or curate your own corpus** that matches your scenario (language, risk taxonomy, application domain, etc.), then point the pipeline at that file—for example by setting `general.traindataset_path` in the mode configs under `scripts_qwen3_8b/configs/`, or the corresponding override in `scripts_qwen3_8b/train_loop.py` (where paths like `prompts/red_corpus.jsonl` are wired for convenience).
 
 ### Run Training Loop
 
