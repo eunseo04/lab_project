@@ -8,14 +8,15 @@
 
 ## 🚀 Quick Start
 
-### Prerequisites
+### Computing Infrastructure
 
-- Conda
-- Python 3.10
-- CUDA-compatible NVIDIA GPUs
-- 8× NVIDIA H800 GPUs with 80 GB memory each, recommended
-- NVIDIA driver 550.54.15
-- CUDA 12.4
+| Component | Specification |
+|-----------|---------------|
+| GPU | 8× NVIDIA H800 |
+| GPU memory | 81,559 MiB per GPU |
+| NVIDIA-SMI | 550.54.15 |
+| Driver | 550.54.15 |
+| CUDA | 12.4 |
 
 ### Installation
 
@@ -61,7 +62,7 @@ models/qwen/Qwen3-30B-A3B-Thinking-2507
 If your local model directories are different, update the model paths in:
 
 ```text
-scripts_final_qwen3_8b/train_loop.py
+scripts_qwen3_8b/train_loop.py
 eval.py
 ```
 
@@ -74,12 +75,12 @@ In `eval.py`, you can also directly change evaluator model paths in:
 ### Run Training Loop
 
 ```bash
-python scripts_final_qwen3_8b/train_loop.py <begin_iteration> <max_iteration>
+python scripts_qwen3_8b/train_loop.py <begin_iteration> <max_iteration>
 ```
 
 **Example:**
 ```bash
-python scripts_final_qwen3_8b/train_loop.py 1 100
+python scripts_qwen3_8b/train_loop.py 1 100
 ```
 
 The first argument is the starting iteration. The second argument is the final/max iteration. For example, `1 100` runs the loop from iteration 1 through iteration 100.
@@ -89,7 +90,7 @@ Each full tri-role co-evolution iteration consists of:
 2. QA-positive mode training
 3. Eval mode training
 
-The number of training steps for each role is controlled by `steps_config` in `scripts_final_qwen3_8b/train_loop.py`.
+The number of training steps for each role is controlled by `steps_config` in `scripts_qwen3_8b/train_loop.py`.
 
 
 ## 🧩 Framework Architecture
@@ -131,18 +132,6 @@ The number of training steps for each role is controlled by `steps_config` in `s
 
 ---
 
-
-### Computing Infrastructure
-
-| Component | Specification |
-|-----------|---------------|
-| Host | h-tanzhewen-tri-m-0 |
-| GPU | 8× NVIDIA H800 |
-| GPU memory | 81,559 MiB per GPU |
-| NVIDIA-SMI | 550.54.15 |
-| Driver | 550.54.15 |
-| CUDA | 12.4 |
-| Python | 3.10 |
 
 ## 📖 Citation
 

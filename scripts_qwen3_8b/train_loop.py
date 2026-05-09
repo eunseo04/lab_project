@@ -202,10 +202,10 @@ for iteration in range(begin_iters, max_iters + 1):
         
         # Set directory paths (relative to project root)
         project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        config['general']['save_prompts_dir'] = os.path.join(project_root, 'output', 'red_prompts_final_qwen3_8b')
-        config['general']['response_save_dir'] = os.path.join(project_root, 'output', 'response_final_qwen3_8b')
-        config['train']['output_dir'] = 'checkpoints_final_qwen3_8b'
-        config['general']['traindataset_path'] = os.path.join(project_root, 'prompts', 'red_corpus_all_wosft.jsonl')
+        config['general']['save_prompts_dir'] = os.path.join(project_root, 'output', 'red_prompts_qwen3_8b')
+        config['general']['response_save_dir'] = os.path.join(project_root, 'output', 'response_qwen3_8b')
+        config['train']['output_dir'] = 'checkpoints_qwen3_8b'
+        config['general']['traindataset_path'] = os.path.join(project_root, 'prompts', 'red_corpus.jsonl')
         
         # Set semantic reward GPU configuration
         if 'semantic' in config['reward']:
@@ -217,7 +217,7 @@ for iteration in range(begin_iters, max_iters + 1):
         
         # Set training hyperparameters
         config['train']['learning_rate'] = 1e-6
-        config['train']['logging_dir'] = f'selfrl_logs_final_qwen3_8b'
+        config['train']['logging_dir'] = f'selfrl_logs_qwen3_8b'
         
         # Set training dataset path for eval mode
         if mode == 'eval':

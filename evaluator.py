@@ -1,4 +1,10 @@
 # evaluators_vllm.py
+import os
+
+# 在 import torch / vLLM 之前设置，子进程继承；减轻 c10d 使用 localhost→::1 时的 errno 97。
+os.environ.setdefault("MASTER_ADDR", "127.0.0.1")
+os.environ.setdefault("VLLM_HOST_IP", "127.0.0.1")
+
 from abc import ABC, abstractmethod
 from typing import Any, List, Optional, Tuple
 import json
@@ -8,10 +14,70 @@ import re
 import logging
 from tqdm import tqdm
 from my_utils import extract_xml_text
-from transformers import AutoTokenizer, AutoProcessor
+from transformers import AutoConfig, AutoTokenizer, AutoProcessor
 from vllm import LLM, SamplingParams
 
 logger = logging.getLogger("eval")
+
+
+def _num_attention_heads(model_name_or_path: str) -> int | None:
+    try:
+        cfg = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=True)
+        n = getattr(cfg, "num_attention_heads", None)
+        if n is None and getattr(cfg, "text_config", None) is not None:
+            n = getattr(cfg.text_config, "num_attention_heads", None)
+        return int(n) if n is not None else None
+    except Exception as exc:
+        logger.warning("无法读取 %s 的 num_attention_heads: %s", model_name_or_path, exc)
+        return None
+
+
+def tensor_parallel_size_for_vllm(model_name_or_path: str) -> int:
+    """
+    vLLM 要求 num_attention_heads % tensor_parallel_size == 0。
+    在可见 GPU 数以内取能整除 head 的最大 TP；若设 TRIPLAY_VLLM_TENSOR_PARALLEL_SIZE 则校验后采用或回退。
+    """
+    max_tp = max(1, torch.cuda.device_count() or 1)
+    raw = os.environ.get("TRIPLAY_VLLM_TENSOR_PARALLEL_SIZE")
+    forced: int | None = None
+    if raw is not None and str(raw).strip() != "":
+        try:
+            forced = max(1, min(int(raw), max_tp))
+        except ValueError:
+            forced = None
+
+    n_heads = _num_attention_heads(model_name_or_path)
+
+    def largest_valid_tp(cap: int) -> int:
+        cap = max(1, min(cap, max_tp))
+        if not n_heads or n_heads < 1:
+            return 1
+        for tp in range(cap, 0, -1):
+            if n_heads % tp == 0:
+                return tp
+        return 1
+
+    if forced is not None and n_heads and n_heads % forced != 0:
+        fallback = largest_valid_tp(max_tp)
+        logger.warning(
+            "TRIPLAY_VLLM_TENSOR_PARALLEL_SIZE=%s 与 num_attention_heads=%s 不整除，改用 tensor_parallel_size=%s",
+            forced,
+            n_heads,
+            fallback,
+        )
+        return fallback
+    if forced is not None:
+        return forced
+    chosen = largest_valid_tp(max_tp)
+    if chosen != max_tp and n_heads:
+        logger.info(
+            "tensor_parallel_size=%s（可见 GPU=%s，num_attention_heads=%s 须整除 TP）",
+            chosen,
+            max_tp,
+            n_heads,
+        )
+    return chosen
+
 
 # ================== Base Abstract Class ==================
 class Evaluator(ABC):
@@ -21,7 +87,6 @@ class Evaluator(ABC):
 
 # ================== Unified vLLM Parameters ==================
 GPU_MEM_UTIL = 0.7
-TP_SIZE       = torch.cuda.device_count() or 1
 SAMPLING_PARAMS = SamplingParams(
     temperature=0,
     top_p=1.0,
@@ -40,7 +105,7 @@ class SEvalSafetyEvaluator(Evaluator):
         self.model = LLM(
             model=model_name_or_path,
             gpu_memory_utilization=GPU_MEM_UTIL,
-            tensor_parallel_size=TP_SIZE,
+            tensor_parallel_size=tensor_parallel_size_for_vllm(model_name_or_path),
             trust_remote_code=True,
         )
         self.batch_size = batch_size
@@ -114,7 +179,7 @@ class LlamaGuardEvaluator:
         self.model = LLM(
             model=model_name_or_path,
             gpu_memory_utilization=GPU_MEM_UTIL,
-            tensor_parallel_size=TP_SIZE,
+            tensor_parallel_size=tensor_parallel_size_for_vllm(model_name_or_path),
             trust_remote_code=True,
         )
         self.batch_size = batch_size
@@ -271,7 +336,7 @@ class GPTOSSSafeguardEvaluator(Evaluator):
         self.model = LLM(
             model=model_name_or_path,
             gpu_memory_utilization=GPU_MEM_UTIL,
-            tensor_parallel_size=TP_SIZE,
+            tensor_parallel_size=tensor_parallel_size_for_vllm(model_name_or_path),
             trust_remote_code=True,
         )
 
@@ -382,7 +447,7 @@ class HelpfulnessEvaluator(Evaluator):
         self.model = LLM(
             model=model_name_or_path,
             gpu_memory_utilization=GPU_MEM_UTIL,
-            tensor_parallel_size=TP_SIZE,
+            tensor_parallel_size=tensor_parallel_size_for_vllm(model_name_or_path),
             trust_remote_code=True,
         )
 

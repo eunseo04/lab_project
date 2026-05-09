@@ -3,6 +3,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from datetime import datetime
 
 import torch
@@ -45,6 +46,29 @@ def _pipeline_debug(phase: str, **info) -> None:
 def _hf_dir_ok(path: str) -> bool:
     ap = _abs_project_path(path)
     return os.path.isfile(os.path.join(ap, "config.json"))
+
+
+def _eval_subprocess_env() -> dict:
+    """eval.py 内嵌 vLLM 多进程/c10d 本机通信用 IPv4，减轻 errno 97。"""
+    e = os.environ.copy()
+    e.setdefault("MASTER_ADDR", "127.0.0.1")
+    e.setdefault("VLLM_HOST_IP", "127.0.0.1")
+    return e
+
+
+def _pre_embedded_eval_gpu_release() -> None:
+    """父进程在停 vLLM 后尽量让驱动回收显存，供 eval 子进程独占起 TP。"""
+    try:
+        sec = float(os.environ.get("TRIPLAY_PRE_EVAL_GPU_SLEEP_SEC", "5"))
+    except ValueError:
+        sec = 5.0
+    time.sleep(max(0.0, sec))
+    if torch.cuda.is_available():
+        try:
+            torch.cuda.synchronize()
+            torch.cuda.empty_cache()
+        except Exception:
+            pass
 
 
 def _guess_recent_run_dirs(train_output_root: str, mode: str, limit: int = 8) -> list[str]:
@@ -194,6 +218,7 @@ def training_mode(mode: str, skip_for_vllm: bool = False, kill_vllm: bool = True
     last_ckpt = None
     env = os.environ.copy()
     red_vllm_process = None
+    gen_data_qa_vllm_process = None
     rollout_vllm_process = None
     semantic_vllm_process = None
     save_dir = None
@@ -242,7 +267,29 @@ def training_mode(mode: str, skip_for_vllm: bool = False, kill_vllm: bool = True
                             gpu_mem=config['gen_data']['red']['gpu_mem'],
                             env=env
                         )
-                        
+                        # eval 模式 gen_data 会调 QA HTTP；与红队并列的 QA vLLM 若未起则占卡/冲突由别进程造成，这里补齐并在 eval.py 前统一停掉。
+                        _qa_gpus = int(config.get("gen_data", {}).get("qa", {}).get("gpus", 0) or 0)
+                        if mode == "eval" and _qa_gpus > 0:
+                            _qa_ckpt = config["gen_data"]["qa"]["model_path"]
+                            if not _hf_dir_ok(_qa_ckpt):
+                                raise FileNotFoundError(
+                                    f"gen_data QA vLLM 路径不是有效 HF 目录（缺少 config.json）: "
+                                    f"{_abs_project_path(_qa_ckpt)}"
+                                )
+                            env_qa = env.copy()
+                            env_qa["CUDA_VISIBLE_DEVICES"] = str(
+                                config["gen_data"]["qa"]["allocated_gpus"]
+                            )
+                            gen_data_qa_vllm_process = start_vllm_server(
+                                model_path=_qa_ckpt,
+                                host=config["gen_data"]["qa"]["url"],
+                                port=config["gen_data"]["qa"]["port"],
+                                tp_size=config["gen_data"]["qa"]["gpus"],
+                                max_model_len=config["gen_data"]["qa"]["max_model_len"],
+                                gpu_mem=config["gen_data"]["qa"]["gpu_mem"],
+                                env=env_qa,
+                            )
+
                         gen_data_cmd = [
                             'python', os.path.join(project_root, 'gen_data.py'),
                             '--mode', mode,
@@ -270,19 +317,36 @@ def training_mode(mode: str, skip_for_vllm: bool = False, kill_vllm: bool = True
                         subprocess.run(gen_data_cmd, check=True, cwd=project_root)
                     
                     if mode == 'eval':
+                        # gen_data 的 vLLM 与 eval.py 内 evaluator 再起 vLLM 不能并存，否则会单卡仅剩数 GiB 而 TP worker 起不来。
+                        if kill_vllm:
+                            if gen_data_qa_vllm_process is not None:
+                                stop_vllm_server(gen_data_qa_vllm_process)
+                                gen_data_qa_vllm_process = None
+                            if red_vllm_process is not None:
+                                stop_vllm_server(red_vllm_process)
+                                red_vllm_process = None
+                        _pre_embedded_eval_gpu_release()
                         file_name = os.path.join(
                             config['general']['response_save_dir'], 
                             str(iteration), 
                             'query_and_response.jsonl'
                         )
-                        # Use eval.py directly without environment switching
                         eval_cmd = ['python', os.path.join(project_root, 'eval.py'), '--file_name', file_name]
-                        subprocess.run(eval_cmd, check=True, cwd=project_root)
+                        subprocess.run(
+                            eval_cmd,
+                            check=True,
+                            cwd=project_root,
+                            env=_eval_subprocess_env(),
+                        )
                 
                 finally:
-                    if kill_vllm and red_vllm_process is not None:
-                        if mode != 'eval' or not config['gen_data'].get('skip_red_when_generating_eval', False):
+                    if kill_vllm:
+                        if gen_data_qa_vllm_process is not None:
+                            stop_vllm_server(gen_data_qa_vllm_process)
+                            gen_data_qa_vllm_process = None
+                        if red_vllm_process is not None:
                             stop_vllm_server(red_vllm_process)
+                            red_vllm_process = None
 
             # ==================== Reward Models ====================
             if mode == 'eval':

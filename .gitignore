@@ -13,19 +13,19 @@ venv/
 .vscode/
 
 # Training checkpoints and logs
-checkpoints_final_qwen3_8b/
-selfrl_logs_final_qwen3_8b/
+/checkpoints_final_qwen3_8b/
+/selfrl_logs_final_qwen3_8b/
 
 # Generated artifacts and temporary data
-eval-multiexpert/
-models/
-debug/
-output/
-temp_data/
-conda/
-scripts_final_qwen3_8b/fenbushi.sh
+/model/
+/eval-multiexpert/
+/debug/
+/output/
+/temp_data/
+/conda/
+/scripts_final_qwen3_8b/fenbushi.sh
 
 # Vendored TRL source local metadata
-source_code/trl/.git/
-source_code/trl/trl.egg-info/
+/source_code/trl/.git/
+/source_code/trl/trl.egg-info/
 
