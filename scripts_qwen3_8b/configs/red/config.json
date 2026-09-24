@@ -1,0 +1,132 @@
+{
+    "general": {
+        "iteration": 5,
+        "seed": 42,
+        "model_path": "checkpoints_last_qwen3_8b/4/red/red-20251220170120/checkpoint-200",
+        "prompt_fname": "prompts/prompt_red_20250626.yaml",
+        "policy_fname": "prompts/safety_spec_en.txt",
+        "special_issue": "prompts/special_issue_en.txt",
+        "repetition_penalty": 1.0,
+        "traindataset_path": "prompts/red_corpus_all_wosft.jsonl",
+        "temperature": 1.0,
+        "save_prompts_dir": "output/red_prompts_last_qwen3_8b",
+        "chunks": 10,
+        "response_save_dir": "output/response_last_qwen3_8b"
+    },
+    "gen_data": {
+        "use_existing_dataset_for_training": "",
+        "save_dir": "temp_data",
+        "red": {
+            "model_path": "checkpoints_last_qwen3_8b/4/red/red-20251220170120/checkpoint-200",
+            "gpus": 8,
+            "url": "127.0.0.1",
+            "port": 1000,
+            "max_model_len": 8192,
+            "gpu_mem": 0.9
+        },
+        "qa": {
+            "model_path": "checkpoints/20/eval/eval-20251010150349/checkpoint-50",
+            "gpus": 8,
+            "url": "127.0.0.1",
+            "port": 1001,
+            "max_model_len": 8192,
+            "gpu_mem": 0.9
+        }
+    },
+    "reward": {
+        "qa": [
+            {
+                "gpus": 1,
+                "url": "127.0.0.1",
+                "weight": 0.6,
+                "port": 1002,
+                "model_path": "checkpoints_last_qwen3_8b/4/qa-positive/qa-positive-20251220170120/checkpoint-50",
+                "max_model_len": 8192,
+                "gpu_mem": 0.45,
+                "max_tokens": 4000,
+                "is_training": true,
+                "allocated_gpus": "0"
+            },
+            {
+                "gpus": 1,
+                "url": "127.0.0.1",
+                "weight": 0.2,
+                "port": 1006,
+                "model_path": "models/glm/glm-4-9b",
+                "max_model_len": 8192,
+                "gpu_mem": 0.45,
+                "max_tokens": 4000,
+                "is_training": false,
+                "allocated_gpus": "0"
+            },
+            {
+                "gpus": 1,
+                "url": "127.0.0.1",
+                "weight": 0.2,
+                "port": 1007,
+                "model_path": "models/llama3/Meta-Llama-3.1-8B-Instruct",
+                "max_model_len": 8192,
+                "gpu_mem": 0.45,
+                "max_tokens": 4000,
+                "is_training": false,
+                "allocated_gpus": "1"
+            }
+        ],
+        "eval": [
+            {
+                "gpus": 1,
+                "url": "127.0.0.1",
+                "port": 1009,
+                "model_path": "checkpoints_last_qwen3_8b/4/eval/eval-20251220170120/checkpoint-50",
+                "max_model_len": 12000,
+                "gpu_mem": 0.45,
+                "max_tokens": 4096,
+                "is_training": true,
+                "allocated_gpus": "1"
+            }
+        ],
+        "semantic": {
+            "gpus": 1,
+            "url": "127.0.0.1",
+            "port": 1005,
+            "model_path": "models/qwen/Qwen3-14B",
+            "max_model_len": 8000,
+            "gpu_mem": 0.45,
+            "max_tokens": 2048,
+            "allocated_gpus": "2"
+        },
+        "bleu_reward_coef": -2.0,
+        "cossimemb_reward_coef": -4.0
+    },
+    "rollout": {
+        "use_vllm": true,
+        "gpus": 1,
+        "url": "127.0.0.1",
+        "port": 1004,
+        "max_model_len": 8192,
+        "max_tokens": 3000,
+        "gpu_mem": 0.45,
+        "vllm_server_timeout": 60,
+        "allocated_gpus": "2"
+    },
+    "train": {
+        "deepspeed": true,
+        "fsdp": false,
+        "per_device_train_batch_size": 8,
+        "gradient_accumulation_steps": 8,
+        "num_train_epochs": -1,
+        "learning_rate": 1e-06,
+        "weight_decay": 0.01,
+        "warmup_steps": 10,
+        "how_to_save": "steps",
+        "save_steps": 25,
+        "output_dir": "checkpoints_last_qwen3_8b",
+        "logging_dir": "selfrl_logs_last_qwen3_8b",
+        "logging_steps": 1,
+        "save_total_limit": 100,
+        "max_prompt_length": 2000,
+        "max_completion_length": 3000,
+        "max_steps": 200,
+        "allocated_gpus": "3,4,5,6,7"
+    }
+}
