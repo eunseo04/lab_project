@@ -337,7 +337,7 @@ def get_supported_models_count():
 
             # Try to get Ollama models count
             try:
-                from cai.util import get_ollama_api_base
+                from .util import get_ollama_api_base
                 ollama_api_base = get_ollama_api_base()
                 
                 # Add authentication headers for Ollama Cloud if using OPENAI_BASE_URL

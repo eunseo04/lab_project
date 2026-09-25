@@ -1,0 +1,80 @@
+services:
+  bank-web:
+    build: ./bank-web
+    container_name: financial-bank-web
+    environment:
+      DB_HOST: bank-db
+      DB_PORT: "5432"
+      DB_NAME: bank
+      DB_USER: bankapp
+      DB_PASSWORD: bankpass
+    depends_on:
+      bank-db:
+        condition: service_healthy
+    networks:
+      financial_dmz:
+        ipv4_address: 172.30.10.10
+      financial_backend:
+        ipv4_address: 172.30.20.10
+    ports:
+      - "5000:5000"
+    restart: unless-stopped
+
+  bank-db:
+    image: postgres:16-alpine
+    container_name: financial-bank-db
+    environment:
+      POSTGRES_DB: bank
+      POSTGRES_USER: bankapp
+      POSTGRES_PASSWORD: bankpass
+    volumes:
+      - bank_db_data:/var/lib/postgresql/data
+      - ./bank-db/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
+    networks:
+      financial_backend:
+        ipv4_address: 172.30.20.20
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bankapp -d bank"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  internal-ops:
+    build: ./internal-ops
+    container_name: financial-internal-ops
+    networks:
+      financial_backend:
+        ipv4_address: 172.30.20.30
+    restart: unless-stopped
+
+  attacker:
+    build: ./attacker
+    container_name: financial-attacker
+    networks:
+      financial_dmz:
+        ipv4_address: 172.30.10.100
+    stdin_open: true
+    tty: true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+
+networks:
+  financial_dmz:
+    name: financial_dmz
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.10.0/24
+
+  financial_backend:
+    name: financial_backend
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.30.20.0/24
+
+volumes:
+  bank_db_data:

@@ -1,0 +1,3 @@
+FROM kalilinux/kali-rolling
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y curl nmap netcat-openbsd iproute2 dnsutils openssh-client && rm -rf /var/lib/apt/lists/*
+CMD ["/bin/bash"]

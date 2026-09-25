@@ -1,14 +1,9 @@
-FROM kalilinux/kali-rolling
+FROM python:3.12-slim
 
-ENV DEBIAN_FRONTEND=noninteractive
-
-RUN printf 'Types: deb\nURIs: http://mirror2.keiminem.com/kali/\nSuites: kali-rolling\nComponents: main contrib non-free non-free-firmware\nSigned-By: /usr/share/keyrings/kali-archive-keyring.gpg\n' > /etc/apt/sources.list.d/kali.sources
+WORKDIR /workspace
 
 RUN apt-get update \
     && apt-get install -y \
-        python3 \
-        python3-pip \
-        python3-venv \
         git \
         curl \
         wget \
@@ -18,6 +13,6 @@ RUN apt-get update \
         openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /workspace
+RUN python -m pip install --no-cache-dir cai-framework==0.5.10
 
 CMD ["/bin/bash"]

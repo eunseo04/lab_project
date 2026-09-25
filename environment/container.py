@@ -13,7 +13,7 @@ import uuid
 
 from wasabi import color  # pylint: disable=import-error
 
-from cai.util import (
+from util import (
     start_active_timer,
     stop_active_timer,
     start_idle_timer,
@@ -135,7 +135,7 @@ async def _run_docker_async(
         ]
 
         if stream:
-            from cai.util import start_tool_streaming, update_tool_streaming, finish_tool_streaming
+            from util import start_tool_streaming, update_tool_streaming, finish_tool_streaming
 
             # If args were provided (e.g., from execute_code), use them as base
             # Otherwise create tool args for display
@@ -335,7 +335,7 @@ async def _run_docker_async(
 
             token_info = _get_agent_token_info()
 
-            from cai.util.session import is_parallel_session
+            from util.session import is_parallel_session
 
             is_parallel = False
             if token_info and token_info.get("agent_id"):
@@ -348,7 +348,7 @@ async def _run_docker_async(
             streaming_enabled = is_tool_streaming_enabled()
 
             if in_tui_mode or (streaming_enabled and is_parallel):
-                from cai.util import cli_print_tool_output
+                from util import cli_print_tool_output
 
                 execution_time = time.time() - start_time
                 parts = command.strip().split(" ", 1)

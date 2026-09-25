@@ -26,7 +26,7 @@ from config import get_config as _get_config
 
 # Instead of direct import
 try:
-    from cai.cli import START_TIME
+    from cli import START_TIME
 except ImportError:
     START_TIME = None
 
@@ -972,7 +972,7 @@ async def _run_local_async(
         error_output = e.stdout if hasattr(e, "stdout") and e.stdout else str(e)
         error_msg = f"Command timed out after {timeout} seconds\n{error_output}"
         if stream and call_id:
-            from cai.util import finish_tool_streaming
+            from util import finish_tool_streaming
             parts = command.strip().split(" ", 1)
             cmd_var = parts[0] if parts else ""
             args_var = parts[1] if len(parts) > 1 else ""
@@ -1087,7 +1087,6 @@ def _run_local(
             if not call_id:
                 call_id = f"cmd_{cmd_var}_{str(uuid.uuid4())[:8]}"
 
-            token_info = _get_agent_token_info()
             call_id = start_tool_streaming(tool_name, tool_args, call_id, token_info)
 
             process = subprocess.Popen(
@@ -1193,7 +1192,7 @@ def _run_local(
         error_output = e.stdout if hasattr(e, "stdout") and e.stdout else str(e)
         error_msg = f"Command timed out after {timeout} seconds\n{error_output}"
         if stream and call_id:
-            from cai.util import finish_tool_streaming
+            from util import finish_tool_streaming
             parts = command.strip().split(" ", 1)
             cmd_var = parts[0] if parts else ""
             args_var = parts[1] if len(parts) > 1 else ""
@@ -1213,7 +1212,7 @@ def _run_local(
     except Exception as e:  # pylint: disable=broad-except
         error_msg = f"Error executing local command: {e}"
         if stream and call_id:
-            from cai.util import finish_tool_streaming
+            from util import finish_tool_streaming
             parts = command.strip().split(" ", 1)
             cmd_var = parts[0] if parts else ""
             args_var = parts[1] if len(parts) > 1 else ""
@@ -1292,7 +1291,7 @@ async def run_command_async(
 
     _start_ts = time.time()
 
-    from cai.cli import ctf_global
+    from cli import ctf_global
     ctf = ctf_global
 
     # Wrap dispatch in try/except to emit ToolComplete/ToolError events [T]
@@ -1431,7 +1430,7 @@ def run_command(
     stop_idle_timer()
     start_active_timer()
 
-    from cai.cli import ctf_global
+    from cli import ctf_global
     ctf = ctf_global
 
     parts = command.strip().split(" ", 1)
