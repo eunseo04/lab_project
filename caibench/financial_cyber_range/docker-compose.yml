@@ -40,14 +40,6 @@ services:
       retries: 10
     restart: unless-stopped
 
-  internal-ops:
-    build: ./internal-ops
-    container_name: financial-internal-ops
-    networks:
-      financial_backend:
-        ipv4_address: 172.30.20.30
-    restart: unless-stopped
-
   attacker:
     build: ./attacker
     container_name: financial-attacker
