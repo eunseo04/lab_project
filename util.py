@@ -29,7 +29,7 @@ from rich.traceback import install  # pylint: disable=import-error
 from rich.tree import Tree
 from wasabi import color
 
-from cai import is_pentestperf_available
+from environment.__init__ import is_pentestperf_available
 
 # Import caibench (pentestperf) if available
 if is_pentestperf_available():
@@ -382,7 +382,7 @@ start_idle_timer()
 
 # Instead of direct import
 try:
-    from cai.cli import START_TIME
+    from .cli import START_TIME
 except ImportError:
     START_TIME = None
 
@@ -417,7 +417,7 @@ class CostTracker:
         """Check if adding the new cost would exceed the price limit."""
         import os
 
-        from cai.sdk.agents.exceptions import PriceLimitExceeded
+        from .sdk.exceptions import PriceLimitExceeded
 
         price_limit_env = os.getenv("CAI_PRICE_LIMIT")
         try:
@@ -429,24 +429,6 @@ class CostTracker:
             total_cost = self.session_total_cost + new_cost
             if total_cost > price_limit:
                 raise PriceLimitExceeded(total_cost, price_limit)
-
-    def update_session_cost(self, new_cost: float) -> None:
-        """Add cost to session total and log the update"""
-        # Check price limit before updating
-        self.check_price_limit(new_cost)
-
-        old_total = self.session_total_cost
-        self.session_total_cost += new_cost
-        
-        # Also update the global usage tracker when session cost changes
-        # This ensures consistency between COST_TRACKER and GLOBAL_USAGE_TRACKER
-        try:
-            from cai.sdk.agents.global_usage_tracker import GLOBAL_USAGE_TRACKER
-            # We don't have model/token details here, so just update the cost
-            # The tokens should have been tracked separately
-            # This is just a safety net to ensure costs are consistent
-        except ImportError:
-            pass
 
     def add_interaction_cost(self, new_cost: float) -> None:
         """
@@ -975,8 +957,7 @@ def visualize_agent_graph(start_agent):
         all_tools = getattr(agent, "tools", [])
         
         # Import necessary modules for MCP checking
-        from cai.repl.commands.mcp import get_mcp_tools_for_agent, _GLOBAL_MCP_SERVERS
-        from cai.sdk.agents.tool import FunctionTool
+        from .sdk.tool import FunctionTool
         
         # Separate regular tools from MCP tools
         regular_tools = []
@@ -985,19 +966,12 @@ def visualize_agent_graph(start_agent):
         # Get the agent's name for MCP association lookup
         agent_name = getattr(agent, "name", "")
         
-        # Get MCP tools from the associations
-        try:
-            associated_mcp_tools = get_mcp_tools_for_agent(agent_name)
-            mcp_tool_names = {tool.name for tool in associated_mcp_tools}
-        except Exception:
-            mcp_tool_names = set()
-        
         # Categorize tools
         for tool in all_tools:
             tool_name = getattr(tool, "name", None) or getattr(tool, "__name__", "")
             # Check if this tool is an MCP tool by checking if it's in the MCP associations
             # or if it has certain MCP-related attributes
-            if tool_name in mcp_tool_names or (hasattr(tool, "_is_mcp_tool") and tool._is_mcp_tool):
+            if tool_name in (hasattr(tool, "_is_mcp_tool") and tool._is_mcp_tool):
                 mcp_tools.append(tool)
             else:
                 regular_tools.append(tool)
@@ -1901,8 +1875,7 @@ def cli_print_agent_messages(
     # This happens when parallel results are added to message history
     if (isinstance(parsed_message, str) and 
         hasattr(start_tool_streaming, "_parallel_execute_code_agents") and
-        any(parallel_agent in parsed_message for parallel_agent in start_tool_streaming._parallel_execute_code_agents if parallel_agent) and
-        token_info and token_info.get("agent_name") not in start_tool_streaming._parallel_execute_code_agents):
+        any(parallel_agent in parsed_message for parallel_agent in start_tool_streaming._parallel_execute_code_agents if parallel_agent)):
         # This is the main agent displaying output from a parallel agent that used execute_code
         # Check if it contains execute_code output patterns (code blocks)
         if "```" in parsed_message and any(pattern in parsed_message.lower() for pattern in ["package main", "def ", "function", "import ", "class "]):
@@ -3644,7 +3617,7 @@ def _get_timing_info(execution_info=None):
 
     # Get session timing information
     try:
-        from cai.cli import START_TIME
+        from .cli import START_TIME
 
         total_time = time.time() - START_TIME if START_TIME else None
     except ImportError:

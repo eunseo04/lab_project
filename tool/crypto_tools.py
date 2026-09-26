@@ -1,8 +1,8 @@
 """
  Here are crypto tools
 """
-from cai.tools.common import run_command
-from cai.sdk.agents import function_tool
+from tool.common import run_command
+from sdk.tool import function_tool
 
 
 

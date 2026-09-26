@@ -5,8 +5,7 @@ This is used to create and execute a script in python
 # run_command is used in other parts of the codebase that import this module
 
 # pylint: disable=too-many-locals,too-many-branches
-from cai.sdk.agents import function_tool
-
+from sdk.tool import function_tool
 
 @function_tool
 def scripting_tool(

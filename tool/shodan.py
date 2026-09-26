@@ -8,7 +8,7 @@ import os
 import requests
 from typing import Dict, List, Optional, Any
 from dotenv import load_dotenv
-from cai.sdk.agents import function_tool
+from sdk.tool import function_tool
 
 
 @function_tool

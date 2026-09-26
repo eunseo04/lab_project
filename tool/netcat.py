@@ -1,8 +1,8 @@
 """
  Here are the tools for netcat command
 """
-from cai.tools.common import run_command   # pylint: disable=import-error
-from cai.sdk.agents import function_tool
+from tool.common import run_command   # pylint: disable=import-error
+from sdk.tool import function_tool
 
 @function_tool
 def netcat(host: str, port: int, data: str = '',

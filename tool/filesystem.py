@@ -2,8 +2,8 @@
 Here are the CLI tools for executing commands.
 """
 
-from cai.tools.common import run_command  # pylint: disable=E0401
-from cai.sdk.agents import function_tool
+from tool.common import run_command  # pylint: disable=E0401
+from sdk.tool import function_tool
 
 @function_tool
 def list_dir(path: str, args: str = "", ctf=None) -> str:

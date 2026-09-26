@@ -5,7 +5,7 @@ querying and adding data to vector databases.
 import os
 import uuid
 from cai.rag.vector_db import QdrantConnector
-from cai.sdk.agents import function_tool
+from sdk.tool import function_tool
 
 # CTF BASED MEMORY
 collection_name = os.getenv('CAI_MEMORY_COLLECTION', "default")

@@ -7,7 +7,7 @@ import time
 import socket
 import sys
 from contextlib import contextmanager 
-from cai.sdk.agents import function_tool
+from sdk.tool import function_tool
 
 @function_tool
 def capture_remote_traffic(ip, username, password, interface, capture_filter="", port=22, timeout=10):

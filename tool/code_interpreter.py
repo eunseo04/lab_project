@@ -5,7 +5,7 @@ Module for executing Python code and capturing its output.
 import io
 import sys
 from typing import Dict
-from cai.sdk.agents import function_tool
+from sdk.tool import function_tool
 
 
 @function_tool

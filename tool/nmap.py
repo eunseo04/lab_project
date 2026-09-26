@@ -2,8 +2,8 @@
 Here are the nmap tools.
 """
 
-from cai.tools.common import run_command  # pylint: disable=E0401
-from cai.sdk.agents import function_tool
+from tool.common import run_command  # pylint: disable=E0401
+from sdk.tool import function_tool
 
 @function_tool
 def nmap(args: str, target: str, ctf=None) -> str:

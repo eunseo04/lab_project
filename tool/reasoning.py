@@ -3,7 +3,7 @@ Reasoning tools module for tracking thoughts, findings and analysis
 Provides utilities for recording and retrieving key information discovered
 during CTF progression.
 """
-from cai.sdk.agents import function_tool
+from sdk.tool import function_tool
 
 
 @function_tool

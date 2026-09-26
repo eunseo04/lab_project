@@ -8,11 +8,11 @@ import subprocess
 import sys
 import re
 import unicodedata
-from cai.tools.common import (run_command, run_command_async,
+from tool.common import (run_command, run_command_async,
                               list_shell_sessions,
                               get_session_output,
                               terminate_session)  # pylint: disable=import-error # noqa E501
-from cai.sdk.agents import function_tool
+from sdk.tool import function_tool
 from wasabi import color  # pylint: disable=import-error
 
 
@@ -179,7 +179,7 @@ async def generic_linux_command(command: str = "",
         
         # Check CTF environment
         try:
-            from cai.cli import ctf_global
+            from cli import ctf_global
             if ctf_global and hasattr(ctf_global, 'get_shell'):
                 env_info.append("🎯 CTF Environment: Active")
             else:
@@ -204,7 +204,7 @@ async def generic_linux_command(command: str = "",
         
         # Check workspace
         try:
-            from cai.tools.common import _get_workspace_dir
+            from tool.common import _get_workspace_dir
             workspace = _get_workspace_dir()
             env_info.append(f"📁 Workspace: {workspace}")
         except:
