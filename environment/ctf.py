@@ -232,32 +232,34 @@ class CTF(ABC):
         except Exception as e:
             print(f"Error executing init command: {e}")
 
+# 입력한 CTF Target을 Docker에 띄우는 함수
     def start_ctf(self):
-        # Execute init_command first (outside Docker container)
+        # 초기화
         self._execute_init_command()
         
         max_retries = 3
         for attempt in range(max_retries):
             try:
-                # Authenticate and pull the image
+                # Docker 이미지 준비
                 self._authenticate_and_pull_image()
-
+                
+                # Docker 네트워크 설정
+                # Red Agent가 접근할 수 있는 격리된 네트워크 환경
                 network_config = self.network_manager.client.api.create_networking_config({
                     self.network_manager.network_name: self.network_manager.client.api.create_endpoint_config(
                         ipv4_address=self.ip_address
                     ) if self.ip_address else self.network_manager.client.api.create_endpoint_config()
                 })
 
-                # # debug
-                # print(f"Starting CTF with network name: {self.network_name}")
-
+                # 컨테이너 실행 옵션
                 host_config = self.network_manager.client.api.create_host_config(
                     port_bindings=self.port_bindings,
                     privileged=True,
                     network_mode=self.network_name,
                     publish_all_ports=True
                 )
-    
+
+                # 컨테이너 설정
                 container_config = {
                     'image': self.image,
                     'name': self.container_name,
@@ -269,24 +271,27 @@ class CTF(ABC):
                     'detach': True
                 }
                 
-                # Add entrypoint if specified
+                # 컨테이너 내부에서 계속 실행하도록 설정
+                # entrypoint가 tail을 실행
                 if self.entrypoint:
                     container_config['entrypoint'] = self.entrypoint
                     print(f"Setting entrypoint to: {self.entrypoint}")
-                    # When using a custom entrypoint, we need to pass the command as arguments
                     container_config['command'] = ["-c", "tail -f /dev/null"]
                 else:
-                    # Default command when no custom entrypoint
+                    # tail 직접 실행
                     container_config['command'] = "tail -f /dev/null"
                 
                 # Add mac_address if specified
                 if self.mac_address:
                     container_config['mac_address'] = self.mac_address
                 
+                # Docker 컨테이너 생성
                 container = self.network_manager.client.api.create_container(**container_config)
 
+                # 컨테이너 실행
                 self.network_manager.client.api.start(container=container.get('Id'))
                 try:
+                    # 실행된 컨테이너 객체 찾기
                     self.container = self.client.containers.get(container.get('Id'))
                 except docker.errors.NotFound:
                     print(f"Container ID {container.get('Id')} not found. Attempting to locate by name '{self.container_name}'.")
@@ -300,13 +305,14 @@ class CTF(ABC):
                         print("Max retries reached. Failed to start container.")
                         return
                     
-                self._get_flags()  # populate self.flags
+                self._get_flags()  # CTF flag 평가/채점 정보 가져오기 (수정 필요)
 
                 # Start command if defined
                 if self.command and self.latent.lower() == "true":
                     print(f"Starting command: {self.command}")
                     self.get_shell(self.command, detach=True)
                 
+                # JSON에 command가 있으면 초기화 명령 실행
                 elif self.command:
                     print(f"Executing initial command: {self.command}")
                     try:
@@ -338,7 +344,7 @@ class CTF(ABC):
                     print("Max retries reached. Failed to start container.")
                     
     def _authenticate_and_pull_image(self):
-        # First check if image exists locally
+        # Docker 이미지가 로컬에 있는지 확인
         try:
             self.client.images.get(self.image)
             print(color(f"Image {self.image} found locally", fg="green"))
@@ -346,27 +352,7 @@ class CTF(ABC):
         except docker.errors.ImageNotFound:
             pass
 
-        if not self.registry_username or not self.registry_password:
-            raise CTFSetupError("GitLab registry credentials not found in environment variables.")
-
-        max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                self.client.login(
-                    username=self.registry_username,
-                    password=self.registry_password,
-                    registry=self.registry_url
-                )
-                self.client.images.pull(self.image)
-                break  # Exit the loop if successful
-            except docker.errors.APIError as e:
-                print(color(f"Attempt {attempt + 1} - Failed to authenticate or pull image: {e}", fg="yellow"))
-                if attempt < max_retries - 1:
-                    print(color("Retrying...", fg="yellow"))
-                else:
-                    raise CTFSetupError(f"Max retries reached. Failed to authenticate or pull image: {e}")
-            except Exception as e:
-                raise CTFSetupError(f"An unexpected error occurred while pulling image: {e}")
+    # container를 종료하고 제거        
     def stop_ctf(self):
         try:
             if self.container:

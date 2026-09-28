@@ -3,8 +3,7 @@ from pathlib import Path
 import time
 from environment.ctf import CTF
 
-
-
+# 원하는 CTF 이름을 찾아서 CTF 객체로 만들어 반환
 def ctf(name=None, list=None, **kwargs):
     """
     Initialize a CTF object and report execution time.
@@ -14,20 +13,23 @@ def ctf(name=None, list=None, **kwargs):
     start_time = time.time()  # Start timing
 
     if list or name:
+        # ctf_configs.jsonl 불러오기
         package_dir = Path(__file__).parent
         config_file = package_dir / 'ctf-jsons' / 'ctf_configs.jsonl'
 
         with config_file.open('r') as file:
             configs = json.load(file)
+            # name이 같은 환경 찾기
             if name:
                 for config in configs:
                     if config['name'].lower() == name.lower():
                         if 'container_name' in config:
                             config['container_name'] = config['container_name'].lower()
-                        # Update the config with any provided kwargs
+                        # 기존 json 설정에 추가 설정 더하기 가능
                         config = {**config, **kwargs}
                         end_time = time.time()  # End timing
                         print(f"CAIBench, time it took to find CTF: {end_time - start_time:.4f} seconds")
+                        # CTF 객체 생성
                         return CTF(config)
                 raise ValueError(f"No CTF configuration found for '{name}'")
 
