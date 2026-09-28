@@ -1,18 +1,18 @@
+from strategist.CTF.engine import CTFState
 from strategist.searchlightimprove.headers import *
 from strategist.searchlight.headers import *
 from strategist.searchlightimprove.llm_utils.llm_api_models import GPT35Multi
 from strategist.searchlight.datastructures.graphs import *
-
-# TODO: deprecated
+from proposers import LLMImprovementProposer
 
 class SelfImprovementInitialInferencer(InitialInferencer2):
-    def __init__(self, improvement_proposer: ImprovementProposer, evaluator: Evaluator, graph: ValueGraph2):
+    def __init__(self, improvement_proposer: LLMImprovementProposer, evaluator: Evaluator, graph: ValueGraph):
         super().__init__()
         self.improvement_proposer = improvement_proposer
         self.evaluator = evaluator
         self.graph = graph # NOTE: this is a temporary fix, we should not need to pass the graph
 
-    def predict(self, state: State) -> tuple[dict, dict, dict[tuple[tuple[Any, Any],...],Any], dict[tuple[tuple[Any, Any],...],Any], dict]:
+    def predict(self, state: CTFState) -> tuple[dict, dict, dict[tuple[tuple[Any, Any],...],Any], dict[tuple[tuple[Any, Any],...],Any], dict]:
         # if terminal state, return empty sets of everything
         if state.notes['done']:
             return dict(), dict(), dict(), dict(), dict()
@@ -45,7 +45,7 @@ class SelfImprovementInitialInferencer(InitialInferencer2):
         next_states = set()
         # create a state for each improved function
         for i, improved_function in enumerate(improved_functions):
-            next_state = State(improved_function)
+            next_state = CTFState(improved_function)
             next_state.notes = {'score': scores[i], 'done': False}
             # append notes[i] to next_state.notes
             for key, value in notes[i].items():
@@ -54,7 +54,7 @@ class SelfImprovementInitialInferencer(InitialInferencer2):
         
 
         # create a terminal state corresponding to ending at current state
-        terminal_state = State(state.id + '_terminal')
+        terminal_state = CTFState(state.id + '_terminal')
         terminal_state.notes = {'score': state.notes['score'], 'done': True} # TODO: check if correct
         next_states.add(terminal_state)
         scores.append(state.notes['score'])

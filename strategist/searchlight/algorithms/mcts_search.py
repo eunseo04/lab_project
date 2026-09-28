@@ -5,6 +5,7 @@ from ..datastructures.beliefs import *
 from ..datastructures.adjusters import *
 from ..datastructures.graphs import ValueGraph2
 from ..algorithms.best_first_search import InferenceSearch2
+from baseline import CTFState
 
 class SMMonteCarlo(InferenceSearch2):
     '''
@@ -33,7 +34,7 @@ class SMMonteCarlo(InferenceSearch2):
         self.node_budget = node_budget
         self.early_stopping_threshold = early_stopping_threshold
         
-    def _expand(self, datastructure: ValueGraph2, state: State,):
+    def _expand(self, datastructure: ValueGraph2, state: CTFState,):
         '''
         Expand starting from a node
         
@@ -66,7 +67,7 @@ class SMMonteCarlo(InferenceSearch2):
             self.mc_simulate(graph, state)
             num_rollout -= 1
             
-    def initial_inference(self, state: State):
+    def initial_inference(self, state: CTFState):
         '''
         Conducts initial inference on a state
         '''
@@ -74,7 +75,7 @@ class SMMonteCarlo(InferenceSearch2):
         # print('initial_inferencer', self.initial_inferencer)
         return self.initial_inferencer.predict(state)
     
-    def get_best_action(self, graph: ValueGraph2, state: State, actor=0):
+    def get_best_action(self, graph: ValueGraph2, state: CTFState, actor=0):
         '''
         Get the best action to take for the given state
         '''
@@ -83,7 +84,7 @@ class SMMonteCarlo(InferenceSearch2):
             return None
         return dict(graph.select_action(node))[actor]
 
-    def mc_simulate(self, graph: ValueGraph2, state: State, prev_node = None, threshold = None) -> bool:
+    def mc_simulate(self, graph: ValueGraph2, state: CTFState, prev_node = None, threshold = None) -> bool:
         '''
         Runs one simulation (rollout) from the given state
 

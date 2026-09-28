@@ -1,3 +1,4 @@
+from strategist.baseline import CTFState
 from ..datastructures.adjusters import Search
 from ..headers import *
 from ..datastructures.estimators import *
@@ -14,7 +15,7 @@ class InferenceSearch2(Search):
     '''
     Abstract class for inference search algorithms that use an initial inferencer
     '''
-    def __init__(self, initial_inferencer: InitialInferencer2, 
+    def __init__(self, initial_inferencer, 
                  cut_cycles: bool = False, record_notes: bool = True):
         '''
         Args:
@@ -29,13 +30,13 @@ class InferenceSearch2(Search):
         self.record_notes = record_notes
         
 
-    def initial_inference(self, state: State):
+    def initial_inference(self, state: CTFState):
         '''
         Conducts initial inference on a state
         '''
         return self.initial_inferencer.predict(state)
     
-    def infer_node(self, graph: ValueGraph2, state: State):
+    def infer_node(self, graph: ValueGraph2, state: CTFState):
         '''
         Conducts initial inference on a state
 
@@ -131,7 +132,7 @@ class BestFirstSearch(InferenceSearch2):
         def __lt__(self, other):
             return self.priority < other.priority
 
-    def __init__(self, initial_inferencer: InitialInferencer2, rng: np.random.Generator = np.random.default_rng(), node_budget:int = 100, cut_cycles: bool = False, best_player: int = 0, early_stopping_threshold: Optional[dict] = None,):
+    def __init__(self, initial_inferencer, rng: np.random.Generator = np.random.default_rng(), node_budget:int = 100, cut_cycles: bool = False, best_player: int = 0, early_stopping_threshold: Optional[dict] = None,):
         self.rng = rng
         self.node_budget = node_budget
         self.unexpanded_states = []
@@ -145,7 +146,7 @@ class BestFirstSearch(InferenceSearch2):
     def pop_from_unexpanded_states(self):
         return heapq.heappop(self.unexpanded_states).state
 
-    def _expand(self, datastructure: ValueGraph2, state: State):
+    def _expand(self, datastructure: ValueGraph2, state: CTFState):
         '''
         Expand starting from a node
         '''

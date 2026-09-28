@@ -1,81 +1,58 @@
-from .improvement_prompts import *
+from .prompts import *
 from strategist.searchlight.utils import AbstractLogged
 import re
 
-
+#아이디어 프롬프트 생성
 class PromptGenerator(AbstractLogged):
-    '''
-    Class that contains all the generation methods for all LLM prompts for self improvement
-
-    With all the prompts in one place, it is easier to make changes to the prompts and to keep track of the prompts and prompt tuning
-    '''
-    def __init__(self, environment_rules, function_signature, sys_prompt = SYS_PROMPT, seed_heuristic_thought_prompt = 0):
-        self.game_rules = environment_rules
+    #초기화
+    def __init__(self, environment_state, function_signature, attacker_prompt = ATTACKER_PROMPT, seed_heuristic_thought_prompt = HEURISTICS_SEED_THOUGHT_PROMPT):
+        self.environment_state = environment_state #가상 환경 정보
         self.function_signature = function_signature
-        self.sys_prompt = sys_prompt
+        self.attacker_prompt = attacker_prompt
         self.seed_heuristic_thought_prompt = seed_heuristic_thought_prompt
         super().__init__()
-
+        
+    #초기 전략/아이디어를 생각하도록 하는 프롬프트 생성
     def gen_seed_thought_prompt(self):
-        # combine SYS_PROMPT, GOPS_RULES, HEURISTICS_SEED_PROMPT, and GOPS_FUNCTION_SIGNATURE
-        return self.sys_prompt + self.game_rules + HEURISTICS_SEED_THOUGHT_PROMPTS[self.seed_heuristic_thought_prompt]
+        return self.attacker_prompt + self.environment_state + self.seed_heuristic_thought_prompt
     
+    #생성된 평가 함수를 1~10점으로 평가하도록 하는 프롬프트 생성
     def gen_critic_score_prompt(self, func: str):
-        return self.sys_prompt + self.game_rules + "\n Previously you generated the following function: \n" + func + """\n \n On a scale of 1 to 10, how well do you think this function will perform in evaluating the value of a state in the game? Please provide a brief explanation for your score. 
-        
+        return self.attacker_prompt + self.environment_state + "\n Previously you generated the following function: \n" + func + """\n \n On a scale of 1 to 10, how well do you think this function will perform in evaluating the value of a state in the game? Please provide a brief explanation for your score. 
         You should use the following format for your score and explanation:
-        
         Explanation: <your explanation here>
-        
         Score: <float, your score here>"""
     
+    #LLM 응답에서 설명과 점수 추출
     @staticmethod
     def parse_critic_score(string: str) -> tuple[str, float]:
-        # Regular expression to find patterns of "Explanation: <explanation here>"
         explanation_pattern = re.compile(r"Explanation: (.+)")
-        
-        # Regular expression to find patterns of "Score: <score here>"
         score_pattern = re.compile(r"Score: (\d+\.\d+)")
         
-        # Find all matches of the pattern in the input string
         explanation = explanation_pattern.findall(string)[0]
         score = float(score_pattern.findall(string)[0])
         
         return explanation, score
-
-    # def gen_seed_function_prompt(self, seed_thought_prompt):
-    #     # combine seed_thought_prompt and function
-    #     return seed_thought_prompt + "Implement the function you just described into python code." + self.function_signature
     
+    #생각해둔 아이디어를 바탕으로 평가 함수 코드 생성 프롬프트
     def gen_seed_function_prompt_with_thought(self, thought):
-        # combine seed_thought_prompt and function
-        return self.sys_prompt + self.game_rules + "You previously came up with the following thoughts and pseudocode: \n" + thought + "\n \n Implement the function you just described into python code. \n" + self.function_signature 
+        return self.attacker_prompt + self.environment_state + "You previously came up with the following thoughts and pseudocode: \n" + thought + "\n \n Implement the function you just described into python code. \n" + self.function_signature 
     
+    #아이디어 없이 평가 함수 코드 생성 프롬프트
     def gen_seed_function_prompt_without_thought(self):
-        # combine seed_thought_prompt and function
-        return self.sys_prompt + self.game_rules + "Given the rules of the game, come up with a function that can be used to evaluate the value of a state in the game." + self.function_signature
-
+        return self.attacker_prompt + self.environment_state + "Given the rules of the game, come up with a function that can be used to evaluate the value of a state in the game." + self.function_signature
+    
+    #실행 결과/피드백을 보고 문제점 분석
     def gen_feedback_analyze_prompt(self, function, feedback):
-        '''
-        tells the LLM to analyze the feedback
-        '''
-        # combine FEEDBACK_PROMPTS, function, feedback, and thoughts
-        return self.sys_prompt + self.game_rules + PREVIOUS_FUNCTION_INTRO + function + FEEDBACK_INTRO + feedback + CONCLUSION_FROM_FEEDBACK 
-
+        return self.attacker_prompt + self.environment_state + PREVIOUS_FUNCTION_INTRO + function + FEEDBACK_INTRO + feedback + CONCLUSION_FROM_FEEDBACK 
+    
+    #기존 생각을 바탕으로 개선 방향을 다시 생각
     def gen_improvement_thought_prompt(self, previous, prev_thoughts):
-        '''
-        tells the LLM to improve upon previous thoughts
-        '''
-        # combine FEEDBACK_PROMPTS, function, feedback, and thoughts
         return previous + MODIFY_ABSTRACT + prev_thoughts 
-
+    
+    #구체적으로 어떤 부분을 개선할지 아이디어 생성
     def gen_specific_improvement_prompt(self, previous_prompt, conclusions, num_ideas = 1):
-        '''
-        tells the LLM to improve upon previous thoughts
-        '''
-        # combine FEEDBACK_PROMPTS, function, feedback, and thoughts
         return previous_prompt + conclusions + f'''\n \n Based on the function, feedback, and conclusions you drew, what are {num_ideas} improvements that you can make to the function that you think will have the most impact? Be as specific and concrete as possible, mentioning specific code pieces or helper functions that you can add. If the game has different phases, you can also mention what specific phase the idea applies to. Write them out in the following format:
-        
         
         Thoughts: <your thoughts here>
 
@@ -87,51 +64,40 @@ class PromptGenerator(AbstractLogged):
 
         Here's an example of what this might look like for 3 improvement ideas:
 
-        Thoughts: The feedback suggests that the main problem is that function is not taking into account the cards in either player's hand, which leads to inaccurate value estimates.
+        Thoughts: The feedback suggests that the main problem is that the attack prompt does not sufficiently account for the available vulnerabilities and the current state of the target environment, which can lead to ineffective attack strategies.
 
-        Idea 1: I can calculate the difference in the number of cards in each player's hand, increasing the estimated value of players with more cards in their hand.
+        Idea 1: I can make the prompt explicitly identify the available attack surface and prioritize vulnerabilities that are most relevant to the current target state.
 
-        Idea 2: I can write a helper function that compares the sum of the values of the cards in each player's hand, increasing the estimated value of players with higher total card values.
+        Idea 2: I can add instructions to analyze the available information and evidence before selecting an attack approach, so that the generated strategy is better aligned with the specific challenge environment.
 
-        Idea 3: During the draw phase, I can also calculate the expected values of the cards that the players will draw, increasing the estimated value of players with higher expected card values.
+        Idea 3: I can make the prompt consider the current stage of the attack and the information obtained from previous attempts, allowing the strategy to adapt when an attempted approach does not produce the expected result.
+
         '''
     
+    #LLM 응답에서 idea (n):의 내용만 추출
     @staticmethod
     def parse_improvement_ideas(string: str, num_ideas: int) -> list[str]:
-        # Regular expression to find patterns of "Idea X: <idea here>"
         idea_pattern = re.compile(r"Idea \d+: (.+)")
-        
-        # Find all matches of the pattern in the input string
-        matches = idea_pattern.findall(string)
-        
-        # Return the first num_ideas ideas from the matches
+        matches = idea_pattern.findall(string) #패턴에 해당하는 것을 찾아서 리스트로 반환
         return matches[:num_ideas]
-
-
+    
+    #피드백으로부터 개선에 필요한 결론 도출
     def gen_draw_conclusions_from_feedback_prompt(self, function, feedback):
-        '''
-        tells the LLM to draw conclusions from feedback
-        '''
-        # combine FEEDBACK_PROMPTS, function, feedback, and thoughts
-        return self.sys_prompt + self.game_rules + PREVIOUS_FUNCTION_INTRO + function + FEEDBACK_INTRO + feedback + CONCLUSION_FROM_FEEDBACK 
-
+        return self.attacker_prompt + self.environment_state + PREVIOUS_FUNCTION_INTRO + function + FEEDBACK_INTRO + feedback + CONCLUSION_FROM_FEEDBACK 
+    
+    #개선 아이디어를 실제 함수 코드에 반영하도록 요청
     def gen_implement_function_from_improvement_prompt(self, function, idea):
-        '''
-        tells the LLM to implement the function from the improvement
-        '''
-        # combine FEEDBACK_PROMPTS, function, feedback, and thoughts
-        return self.sys_prompt + self.game_rules + PREVIOUS_FUNCTION_INTRO + function + "\n \n Here is a possible way to improve this function: \n" + idea + "\n \n Implement this improvement into the function as best as you can. Make sure not to change the function signature, which we reproduce below: \n" + self.function_signature
-
+        return self.attacker_prompt + self.environment_state + PREVIOUS_FUNCTION_INTRO + function + "\n \n Here is a possible way to improve this function: \n" + idea + "\n \n Implement this improvement into the function as best as you can. Make sure not to change the function signature, which we reproduce below: \n" + self.function_signature
+    
+    #기존 함수를 개선된 버전으로 다시 생성
     def gen_improved_function_prompt(self, previous):
-        '''
-        tells the LLM to generate improved function
-        '''
-        # combine new_improvements_prompt and new_improvements
         return previous +  '''\n \n Now modify the function you generated previously to improve it based on the feedback given and your thoughts, and output the new function.\n''' + self.function_signature 
-
+    
+    #코드 실행 오류를 LLM에게 전달해서 수정하도록 요청
     def gen_execution_error_feedback(self, previous, function, execution_error):
         return previous + f"You previously generated the following improved function based on your thoughts and analysis of the feedback: \n {function} \n However, it ran into the following error when running: {execution_error} \n Please fix the error and output your function again." 
-
+    
+    #실행 오류 메시지만 전달해 수정하도록 요청
     def gen_execution_error_feedback_2(self, error_message):
         string = f'''There was an execution error when running the function you generated on test states. 
         The error message was:
@@ -139,7 +105,8 @@ class PromptGenerator(AbstractLogged):
         Please fix the error and try again.
         '''
         return string
-
+    
+    #특정 게임 상태에서 예측값 vs 실제 결과를 보여주는 피드백 생성
     def gen_single_state_example_feedback(self, i, state_description, estimated_score, intermediate_values, search_score, actual_score): 
         string = f'''---
         Example {i}:
@@ -162,6 +129,7 @@ class PromptGenerator(AbstractLogged):
         '''
         return string
     
+    #특정 상태의 예측 결과와 실제 결과를 비교하는 피드백 생성
     def gen_outcome_single_state_example_feedback(self, i, state_description, estimated_score, intermediate_values, search_score, actual_score): 
         string = f'''---
         Example {i}:
@@ -180,136 +148,89 @@ class PromptGenerator(AbstractLogged):
         ---
         '''
         return string
-
-    @staticmethod
-    def gen_state_description(state):
-        return str(state)
     
+    
+#전략 생성
 class StrategyPromptGenerator(PromptGenerator):
-    '''
-    Class that contains all the generation methods for all LLM prompts for self improvement on high level `strategies` (i.e. tips)
-    '''
-
     PREVIOUS_GUIDE_INTRO = '''You previously generated the following section of the strategy guide: \n'''
-
-    def __init__(self, environment_rules, role_name:str):
-        function_signature = StrategyPromptGenerator.strategy_guide_signature(role_name)
-        sys_prompt = StrategyPromptGenerator.gen_sys_prompt(role_name)
-        super().__init__(environment_rules, function_signature, sys_prompt)
+    
+    #초기화
+    def __init__(self, environment_rules):
+        function_signature = StrategyPromptGenerator.strategy_guide_signature()
+        attacker_prompt = StrategyPromptGenerator.gen_attacker_prompt()
+        super().__init__(environment_rules, function_signature, attacker_prompt)
 
     def gen_critic_score_prompt(self, func: str):
-        return self.sys_prompt + self.game_rules + "\n Previously you generated the following guide: \n" + func + """\n \n On a scale of 1 to 10, how well do you think this guide will perform in generating dialogue? Please provide a brief explanation for your score. 
-        
+        return self.attacker_prompt + self.environment_state + "\n Previously you generated the following attack prompt: \n" + func + """\n \n On a scale of 1 to 10, how effectively do you think this attack prompt will perform in achieving its intended objective? Please provide a brief explanation for your score.
+        You should consider how well the prompt guides the player to make effective decisions, exploit opportunities, and achieve the desired outcome during the game.
         You should use the following format for your score and explanation:
-        
         Explanation: <your explanation here>
-        
-        Score: <float, your score here>"""
+        Score: <float, your score here>
+        """
     
     @staticmethod
     def parse_critic_score(string: str) -> tuple[str, float]:
-        # Regular expression to find patterns of "Explanation: <explanation here>"
         explanation_pattern = re.compile(r"Explanation: (.+)")
-        
-        # Regular expression to find patterns of "Score: <score here>"
         score_pattern = re.compile(r"Score: (\d+\.\d+)")
         
-        # Find all matches of the pattern in the input string
         explanation = explanation_pattern.findall(string)[0]
         score = float(score_pattern.findall(string)[0])
         
         return explanation, score
 
     @staticmethod
-    def strategy_guide_signature(role_name: str):
-        out = f'''Your guide should be in the form of a worksheet that the student can use to build their speech. You should order the worksheet questions in a way that makes logical sense, and you should have no more than six questions. Your questions should instruct the reader to write parts of their speech. The title of your section should be "Six questions to fill out before speaking as the {role_name} role". Below is an example of how your worksheet should look like:
+    #전략 가이드 생성 전 질문
+    def strategy_guide_signature():
+        out = f'''Your guide should be in the form of a worksheet that the strategist can use
+        to evaluate the current cyber attack state and construct a high-level strategy.
 
-        Six questions to fill out before speaking as the {role_name} role
+        The worksheet should contain no more than six questions.
+        The questions should be ordered from understanding the current state
+        to identifying the strategic objective, prioritizing intermediate goals,
+        evaluating risks, and estimating long-term reward.
 
-        Q1: Which player seems the most suspicious of you and why?
+        The questions must remain at the STRATEGIC level.
+        They must NOT ask the reader to generate specific commands,
+        exact attack steps, exploit instructions, or a predetermined action sequence.
 
-        Q2: For the player that seems the most suspicious of you, produce a statement addressing their suspicious.
+        The title of your section should be:
+        "Six questions to fill out before planning".
 
-        Q3: Which player is the quest leader?
+        Below is an example of how your worksheet should look like:
 
-        Q4: Produce a statement addressing the quest leader to convince them to support your intended course of action/ desired team.
+        Six questions to fill out before planning
 
-        Q5: Which player is the most supportive of you?
+        Q1: What is the current security state of the environment,
+        and which characteristics of the state are most favorable or unfavorable
+        for achieving the attack objective?
 
-        Q6: Produce a statement addressing the supportive player to convince them to support your intended course of action/ desired team.
+        Q2: What is the primary strategic objective,
+        and what intermediate objectives should be prioritized to make progress toward it?
+
+        Q3: Which general attack direction is most promising given the current state,
+        and what evidence from the attack dataset or previous observations supports this direction?
+
+        Q4: What characteristics should a future state have for the strategy
+        to be considered successful, and how would progress toward that state
+        be reflected in the expected reward?
+
+        Q5: What risks, uncertainties, or potential dead ends could make the strategy ineffective,
+        and what alternative strategic direction should be considered if those conditions arise?
+
+        Q6: Based on the observed state, previous outcomes, and expected long-term reward,
+        should the current strategy be maintained, modified, or abandoned, and why?
         '''
         return out
-    # @staticmethod
-    # def strategy_guide_signature(role_name: str):
-    #     out = f'''Your guide should be in the form of a questionaire that the student can use to think through their approach to the current discussion phase. You should order the questions in a way that makes logical sense, and you should have no more than six questions. Try to make your questions as specific as possible. The title of your section should be "Questions to think about to play the {role_name} role effectively during the discussion phase". Below is an example of how your questionaire should look like:
 
-    #     Questions to think about to play the {role_name} role effectively during the discussion phase:
-
-    #     Q1: Which player seems the most suspicious of you and why?
-
-    #     Q2: For the player that seems the most suspicious of you, is it worth convincing them that you are on their side? Why or why not?
-
-    #     Q3: For the player that seems the most suspicious of you, what can you say to convince them that you are on their side?
-
-    #     Q4: What are some conclusions that you can draw from your answers to the previous questions?
-    #     '''
-    #     return out
-    
-    # @staticmethod
-    # def strategy_guide_signature(role_name: str):
-    #     out = f'''Your guide should be in the form of a questionaire that the student can use to think through their approach to the current discussion phase. You should order the questions in a way that makes logical sense, and you should have no more than six questions. Try to make your questions as specific as possible. The title of your section should be "Questions to think about to play the {role_name} role effectively during the discussion phase". Below is an example of how your questionaire should look like:
-
-    #     Questions to think about to play the {role_name} role effectively during the discussion phase:
-
-    #     Q1: Which player seems the most suspicious of you and why?
-
-    #     Q2: For the player that seems the most suspicious of you, is it worth convincing them that you are on their side? Why or why not?
-
-    #     Q3: For the player that seems the most suspicious of you, what can you say to convince them that you are on their side?
-
-    #     Q4: What are some conclusions that you can draw from your answers to the previous questions?
-
-    #     Example of how to fill out this questionaire:
-
-    #     Q1: Which player seems the most suspicious of you and why?
-    #     A1: Player 3 seems the most suspicious of me because they have been asking me a lot of questions about my role.
-
-    #     Q2: For the player that seems the most suspicious of you, is it worth convincing them that you are on their side? Why or why not?
-    #     A2: It is worth convincing Player 3 that I am on their side because they are a key player in the game and I need their support to win.
-
-    #     Q3: For the player that seems the most suspicious of you, what can you say to convince them that you are on their side?
-    #     A3: I can say that I have never been on a failed quest and that I have been trying to reason with the other players to figure out who the Evil players are.
-
-    #     Q4: What are some conclusions that you can draw from your answers to the previous questions?
-    #     A4: I should focus on convincing Player 3 that I am on their side and try to get them to support me in the game.
-    #     '''
-    #     return out
-
-    # @staticmethod
-    # def strategy_guide_signature(role_name: str):
-    #     out = f'''Your writing should be concise yet informative, providing players with the key strategies and tactics that they can use during the discussion phase in Avalon. You should include examples where necessary to help explain the concepts. Since this is only a section of the guide, it should focus on what things the {role_name} role should say during discussion phase only and should not include information about the game mechanics or the rules of the game.The title of your section should be "How to play the {role_name} role effectively during the discussion phase". 
-    #     '''
-    #     return out
-    
     @staticmethod
-    def gen_sys_prompt(role_name: str):
+    def gen_attacker_prompt():
         goal = ""
-        # if role_name == "Merlin":
-        #     goal = "Specifically, you want to teach the Merlin player how to avoid revealing their identity to the Evil players in this section of the guide.\n"
-        # elif role_name == "Assassin" or "Minion":
-        #     goal = "Specifically, you want to teach the Evil players how to deceive the Good players into thinking they are Good in this section of the guide.\n"
-        # else:
-        #     raise ValueError(f"Role name {role_name} not recognized")
-
-        out = f'''You are a coach trying to write a section of a strategy guide on how to play a game well. 
-        
-        The specific section of the strategy guide you are writing right now is on how to play the {role_name} role effectively during the discussion phase so that they can win the game. Recall that players often use the discussion phase to (1) gather information about other players, (2) try to convince other players of their innocence or guilt, and (3) try to persuade other players of a particular course of action.
-        ''' + goal
+        out = ATTACKER_PROMPT + goal
         return out
 
     def gen_seed_thought_prompt(self):
-        # combine SYS_PROMPT, GOPS_RULES, HEURISTICS_SEED_PROMPT, and GOPS_FUNCTION_SIGNATURE
-        return self.sys_prompt + self.game_rules + '''Given the rules of the game, write down your thoughts on how to write the strategy guide. Here's an example:
+        # combine attacker_prompt, GOPS_RULES, HEURISTICS_SEED_PROMPT, and GOPS_FUNCTION_SIGNATURE
+        return self.attacker_prompt + self.game_rules + '''Given the rules of the game, write down your thoughts on how to write the strategy guide. Here's an example:
         
         Thought:
         I should first ask the player to consider which other player is most suspicious of them and why. This will help the player understand the dynamics of the game and how they are perceived by others.
@@ -322,21 +243,18 @@ class StrategyPromptGenerator(PromptGenerator):
     
     def gen_seed_function_prompt_with_thought(self, thought):
         # combine seed_thought_prompt and function
-        return self.sys_prompt + self.game_rules + "\n You previously came up with the following thoughts: \n" + thought + "\n \n Write out the guide based on your thoughts.\n" + self.function_signature 
+        return self.attacker_prompt + self.game_rules + "\n You previously came up with the following thoughts: \n" + thought + "\n \n Write out the guide based on your thoughts.\n" + self.function_signature 
     
     def gen_seed_function_prompt_without_thought(self):
         # combine seed_thought_prompt and function
-        return self.sys_prompt + self.game_rules + "\n Given the rules of the game, write out the guide.\n" + self.function_signature
-    
-
-    
+        return self.attacker_prompt + self.game_rules + "\n Given the rules of the game, write out the guide.\n" + self.function_signature
     
     def gen_feedback_analyze_prompt(self, function, feedback):
         '''
         tells the LLM to analyze the feedback
         '''
         # combine FEEDBACK_PROMPTS, function, feedback, and thoughts
-        out = self.sys_prompt + self.game_rules + self.PREVIOUS_GUIDE_INTRO + function + '\n Below is some feedback on how your guide performed when a student used it to play the game: \n' + feedback + '''\n \n Based on the feedback given and the guide section you generated previously, what are some conclusions you can draw from the feedback? Make sure to cite the specific examples in the feedback to justify your analysis.\n '''
+        out = self.attacker_prompt + self.game_rules + self.PREVIOUS_GUIDE_INTRO + function + '\n Below is some feedback on how your guide performed when a student used it to play the game: \n' + feedback + '''\n \n Based on the feedback given and the guide section you generated previously, what are some conclusions you can draw from the feedback? Make sure to cite the specific examples in the feedback to justify your analysis.\n '''
 
         # self.logger.info(out)
         return out
@@ -349,42 +267,6 @@ class StrategyPromptGenerator(PromptGenerator):
         out = previous + '''\n \n Given the conclusions you drew from the feedback, modify your previous thoughts accordingly. We reproduce your previous thoughts below for your reference. \n''' + prev_thoughts 
         # self.logger.info(out)
         return out
-
-    # def gen_specific_improvement_prompt(self, previous_prompt, conclusions):
-    #     '''
-    #     tells the LLM to improve upon previous thoughts
-    #     '''
-    #     # combine FEEDBACK_PROMPTS, function, feedback, and thoughts
-    #     out = previous_prompt + conclusions + '''Based on the function, feedback, and conclusions you drew, what is one improvement that you can make to the guide that you think will have the most impact? Be as specific and concrete as possible.\n '''
-    #     self.logger.info(out)
-    #     return out
-
-    # def gen_specific_improvement_prompt(self, previous_prompt, conclusions, num_ideas = 1):
-    #     '''
-    #     tells the LLM to improve upon previous thoughts
-    #     '''
-    #     # combine FEEDBACK_PROMPTS, function, feedback, and thoughts
-    #     return previous_prompt + conclusions + f'''\n \n Based on the questionaire, feedback, and conclusions you drew, what are {num_ideas} improvements that you can make to the questionaire that you think will have the most impact? Be as specific and concrete as possible, including what questions to add, edit, or remove, and write them out in the following format:
-        
-        
-    #     Thoughts: <your thoughts here>
-
-    #     Idea 1: <your idea here>
-
-    #     Idea 2: <your idea here>
-
-    #     ...
-
-    #     Here's an example of what this might look like for 3 improvement ideas:
-
-    #     Thoughts: I should tell the reader to consider how the other players feel about them before speaking in the guide.
-
-    #     Idea 1: Add a question asking the reader to consider which other player is most suspicious of them and why.
-
-    #     Idea 2: Add a question asking the reader to consider which other player is most supportive of them and why.
-
-    #     Idea 3: Add a question asking the reader to consider which other player is most on the fence about them and why.
-    #     '''
     
     def gen_specific_improvement_prompt(self, previous_prompt, conclusions, num_ideas = 1):
         '''
@@ -414,34 +296,7 @@ class StrategyPromptGenerator(PromptGenerator):
 
         Recall that the goal of Merlin is to convince the Good players that they are Good without revealing that they are Merlin to the Evil players.
         '''
-    
-    # def gen_specific_improvement_prompt(self, previous_prompt, conclusions, num_ideas = 1):
-    #     '''
-    #     tells the LLM to improve upon previous thoughts
-    #     '''
-    #     # combine FEEDBACK_PROMPTS, function, feedback, and thoughts
-    #     return previous_prompt + conclusions + f'''\n \n Based on the questionaire, feedback, and conclusions you drew, what are {num_ideas} improvements that you can make to the questionaire that you think will have the most impact? Be as specific and concrete as possible, and write them out in the following format:
         
-        
-    #     Thoughts: <your thoughts here>
-
-    #     Idea 1: <your idea here>
-
-    #     Idea 2: <your idea here>
-
-    #     ...
-
-    #     Here's an example of what this might look like for 3 improvement ideas:
-
-    #     Thoughts: I should tell the reader to consider how the other players feel about them before speaking in the guide.
-
-    #     Idea 1: I should tell the reader to consider which other player is most suspicious of them and why.
-
-    #     Idea 2: I should tell the reader to consider which other player is most supportive of them and why.
-
-    #     Idea 3: I should tell the reader to consider which other player is most on the fence about them and why.
-    #     '''
-
     def gen_draw_conclusions_from_feedback_prompt(self, function, feedback):
         '''
         tells the LLM to draw conclusions from feedback
@@ -454,18 +309,9 @@ class StrategyPromptGenerator(PromptGenerator):
         tells the LLM to implement the function from the improvement
         '''
         # combine FEEDBACK_PROMPTS, function, feedback, and thoughts
-        out =  self.sys_prompt + self.game_rules + self.PREVIOUS_GUIDE_INTRO + function + "\n \n Here is a possible way to improve your guide: \n" + idea + "\n\n Implement this improvement into the guide section as best as you can, but do not change the original guide too much. Make sure to stay within the scope of the guide section, which we reiterate below: \n" + self.function_signature
+        out =  self.attacker_prompt + self.game_rules + self.PREVIOUS_GUIDE_INTRO + function + "\n \n Here is a possible way to improve your guide: \n" + idea + "\n\n Implement this improvement into the guide section as best as you can, but do not change the original guide too much. Make sure to stay within the scope of the guide section, which we reiterate below: \n" + self.function_signature
         # self.logger.info(out)
         return out
-    
-    # def gen_implement_function_thought_from_improvement_prompt(self, function, idea):
-    #     '''
-    #     tells the LLM to implement the function from the improvement
-    #     '''
-    #     # combine FEEDBACK_PROMPTS, function, feedback, and thoughts
-    #     out =  self.sys_prompt + self.game_rules + self.PREVIOUS_GUIDE_INTRO + function + "\n \n Here is a possible way to improve your guide: \n" + idea + "\n Reflect on how you can use the 
-    #     # self.logger.info(out)
-    #     return out
 
     def gen_improved_function_prompt(self, previous):
         '''

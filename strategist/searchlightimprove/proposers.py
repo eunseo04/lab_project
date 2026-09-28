@@ -1,8 +1,7 @@
 from .headers import *
 from .llm_utils.llm_api_models import GPT35Multi
-# from .prompts.improvement_prompts import *
+from .prompts.prompts import *
 from .prompts.prompt_generators import PromptGenerator
-from strategist.GOPS.baseline_models_GOPS import LLMFunctionalValueHeuristic
 
 class LLMImprovementProposer(ImprovementProposer):
 

@@ -327,9 +327,9 @@ class ValueGraph(Graph):
         action_to_prob = self.get_joint_action_probabilities(node)
         # get the qvalues for the actor
         if adjusted_q:
-            action_to_qvalue = self.get_adjusted_qvalues(node, actor, action_to_prob)
+            action_to_qvalue = self.get_adjusted_qvalues(node, action_to_prob)
         else:
-            action_to_qvalue = self.get_qvalues(node, actor, action_to_prob)
+            action_to_qvalue = self.get_qvalues(node, action_to_prob)
         # calculate the boltzmann distribution
         policy = dict()
         for action in action_to_qvalue:
@@ -401,7 +401,6 @@ class ValueGraph(Graph):
         '''
         return max(self.id_to_node.values(), key=lambda node: self.get_estimated_value(node, actor)).state
 
-    
 
     def backpropagate(self, state: Hashable, action, next_state: Hashable):
         '''

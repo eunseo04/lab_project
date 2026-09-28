@@ -117,4 +117,3 @@ class UtilityEstimatorLast(UtilityEstimator):
             return 0.0
         else:
             return value_estimates[-1]
-

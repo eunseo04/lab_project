@@ -5,7 +5,7 @@ from typing import Dict, List, Union
 from strategist.searchlight.headers import *
 # from search_src.Search.prompts import *
 import strategist.searchlight.utils as utils
-from strategist.searchlightimprove.prompts.improvement_prompts import *
+from strategist.searchlightimprove.prompts.prompts import *
 
 # import dataclasses
 from dataclasses import dataclass

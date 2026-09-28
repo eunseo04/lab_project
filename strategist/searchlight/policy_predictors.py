@@ -1,3 +1,4 @@
+from strategist.CTF.engine import CTFState
 from .headers import *
 from .datastructures.graphs import ValueGraph2
 
@@ -8,7 +9,7 @@ class ValueGraphBoltzmannPolicyPredictor(PolicyPredictor):
         self.graph = graph
         self.adjusted_q = adjusted_q
 
-    def _predict(self, state: State, actions, actor=None)-> dict:
+    def _predict(self, state: CTFState, actions, actor=None)-> dict:
         '''
         Predicts the policy probabilities across actions given the current state and actor
 
