@@ -286,7 +286,7 @@ suppress_aiohttp_warnings()
 from openai import AsyncOpenAI
 from rich.console import Console
 
-from cai import is_pentestperf_available
+from environment.__init__ import is_pentestperf_available
 
 # CAI agents and metrics imports
 from cai.agents import get_agent_by_name
@@ -295,32 +295,26 @@ from cai.internal.components.metrics import process_metrics
 # CAI REPL imports
 from cai.repl.commands import FuzzyCommandCompleter, handle_command as commands_handle_command
 
-# Add import for parallel configs at the top of the file
-from cai.repl.commands.parallel import PARALLEL_CONFIGS, ParallelConfig, PARALLEL_AGENT_INSTANCES
-
 # Global storage for shared message histories (keyed by a unique identifier)
 UNIFIED_MESSAGE_HISTORIES = {}
-from cai.repl.ui.banner import display_banner, display_quick_guide
 from cai.repl.ui.keybindings import create_key_bindings
 from cai.repl.ui.logging import setup_session_logging
 from cai.repl.ui.prompt import get_user_input
 from cai.repl.ui.toolbar import get_toolbar_with_refresh
 
 # CAI SDK imports
-from cai.sdk.agents import Agent, OpenAIChatCompletionsModel, Runner, set_tracing_disabled
-from cai.sdk.agents.items import ToolCallOutputItem
-from cai.sdk.agents.exceptions import OutputGuardrailTripwireTriggered, InputGuardrailTripwireTriggered
-from cai.sdk.agents.models.openai_chatcompletions import (
+from .sdk.agents import Agent, OpenAIChatCompletionsModel, Runner, set_tracing_disabled
+from .sdk.items import ToolCallOutputItem
+from .sdk.exceptions import OutputGuardrailTripwireTriggered, InputGuardrailTripwireTriggered
+from .models.openai_chatcompletions import (
     get_agent_message_history,
     get_all_agent_histories,
 )
 # Import handled where needed to avoid circular imports
-from cai.sdk.agents.run_to_jsonl import get_session_recorder
-from cai.sdk.agents.global_usage_tracker import GLOBAL_USAGE_TRACKER
-from cai.sdk.agents.stream_events import RunItemStreamEvent
+from .sdk.stream_events import RunItemStreamEvent
 
 # CAI utility imports
-from cai.util import (
+from .util import (
     color,
     fix_litellm_transcription_annotations,
     setup_ctf,
@@ -449,11 +443,11 @@ def run_cai_cli(
     use_initial_prompt = initial_prompt is not None
     
     # Reset cost tracking at the start
-    from cai.util import COST_TRACKER
+    from .util import COST_TRACKER
     COST_TRACKER.reset_agent_costs()
     
     # Reset simple agent manager for clean start
-    from cai.sdk.agents.simple_agent_manager import AGENT_MANAGER
+    from .sdk.simple_agent_manager import AGENT_MANAGER
     AGENT_MANAGER.reset_registry()
     
     # Register the starting agent with AGENT_MANAGER
@@ -470,17 +464,6 @@ def run_cai_cli(
 
     # Initialize session logger and display the filename
     session_logger = get_session_recorder()
-    
-    # Start global usage tracking session
-    GLOBAL_USAGE_TRACKER.start_session(
-        session_id=session_logger.session_id,
-        agent_name=None  # Will be updated when agent is selected
-    )
-
-    # Display banner
-    display_banner(console)
-    print("\n")
-    display_quick_guide(console)
 
     # Function to get the short name of the agent for display
     def get_agent_short_name(agent):
@@ -574,7 +557,7 @@ def run_cai_cli(
                     os.environ["CAI_AGENT_SWITCH_HANDLED"] = "0"  # Reset flag
                     
                     # Just get the existing agent that was already switched
-                    from cai.sdk.agents.simple_agent_manager import AGENT_MANAGER
+                    from .sdk.simple_agent_manager import AGENT_MANAGER
                     
                     # First try to get the strong reference if available
                     if hasattr(AGENT_MANAGER, '_current_agent_strong_ref'):
@@ -597,7 +580,7 @@ def run_cai_cli(
                 
                 try:
                     # CRITICAL: Set up history transfer BEFORE creating the new agent
-                    from cai.sdk.agents.simple_agent_manager import AGENT_MANAGER
+                    from .sdk.simple_agent_manager import AGENT_MANAGER
                     
                     # Get the current agent's history before switching
                     if hasattr(agent, "name"):
@@ -611,7 +594,7 @@ def run_cai_cli(
                     last_agent_type = current_agent_type
                     
                     # Reset cost tracking for the new agent
-                    from cai.util import COST_TRACKER
+                    from .util import COST_TRACKER
                     COST_TRACKER.reset_agent_costs()
                     
                     # Use the new switch_to_single_agent method for proper cleanup
@@ -837,7 +820,7 @@ def run_cai_cli(
 
                 # Apply message list fixes to ensure consistency
                 if pending_calls:
-                    from cai.util import fix_message_list
+                    from .util import fix_message_list
 
                     agent.model.message_history[:] = fix_message_list(agent.model.message_history)
             except Exception:
@@ -845,7 +828,7 @@ def run_cai_cli(
 
             try:
                 # Get more accurate active and idle time measurements from the timer functions
-                from cai.util import COST_TRACKER, get_active_time_seconds, get_idle_time_seconds
+                from .util import COST_TRACKER, get_active_time_seconds, get_idle_time_seconds
 
                 # Use the precise measurements from our timers
                 active_time_seconds = get_active_time_seconds()
@@ -985,30 +968,13 @@ def run_cai_cli(
                 # This prevents agents from disappearing from history when not selected
                 from cai.agents import get_available_agents
                 
-                # Setup parallel isolation for these agents
-                from cai.sdk.agents.parallel_isolation import PARALLEL_ISOLATION
-                
-                # Get agent IDs
-                agent_ids = [config.id or f"P{idx}" for idx, config in enumerate(PARALLEL_CONFIGS, 1)]
-                
-                # Check if we already have isolated histories (e.g., from /load parallel)
-                # If not, transfer the current agent's history to all parallel agents
-                already_has_histories = False
-                if PARALLEL_ISOLATION.is_parallel_mode():
-                    # Check if at least one agent has a non-empty isolated history
-                    for agent_id in agent_ids:
-                        isolated_history = PARALLEL_ISOLATION.get_isolated_history(agent_id)
-                        if isolated_history:
-                            already_has_histories = True
-                            break
-                
                 if not already_has_histories:
                     # Get the current agent's history to transfer
                     current_history = []
                     if hasattr(agent, 'model') and hasattr(agent.model, 'message_history'):
                         current_history = agent.model.message_history
                     elif hasattr(agent, 'name'):
-                        from cai.sdk.agents.simple_agent_manager import AGENT_MANAGER
+                        from .sdk.simple_agent_manager import AGENT_MANAGER
                         current_history = AGENT_MANAGER.get_message_history(agent.name)
                     
                     # Check if we should transfer history to all agents or just the first one
@@ -1020,21 +986,7 @@ def run_cai_cli(
                     pattern_description = os.getenv("CAI_PATTERN_DESCRIPTION", "")
                     if "different contexts" in pattern_description.lower():
                         transfer_to_all = False
-                    
-                    if transfer_to_all:
-                        # Transfer to parallel mode - creates isolated copies for each agent
-                        PARALLEL_ISOLATION.transfer_to_parallel(current_history, len(PARALLEL_CONFIGS), agent_ids)
-                    else:
-                        # Only transfer to the first agent (P1)
-                        PARALLEL_ISOLATION._parallel_mode = True
-                        if current_history and agent_ids:
-                            # Clear any existing histories first
-                            PARALLEL_ISOLATION.clear_all_histories()
-                            # Set history only for the first agent
-                            PARALLEL_ISOLATION.replace_isolated_history(agent_ids[0], current_history.copy())
-                            # Initialize empty histories for other agents
-                            for agent_id in agent_ids[1:]:
-                                PARALLEL_ISOLATION.replace_isolated_history(agent_id, [])
+            
                 else:
                     # Already have isolated histories, just ensure we're in parallel mode
                     PARALLEL_ISOLATION._parallel_mode = True
@@ -1064,7 +1016,7 @@ def run_cai_cli(
                 
 
                 async def run_agent_instance(
-                    config: ParallelConfig, input_text: str
+                    input_text: str
                 ):
                     """Run a single agent instance with its own configuration."""
                     instance_agent = None
@@ -1122,7 +1074,7 @@ def run_cai_cli(
                         
                         # Register the agent with AGENT_MANAGER for parallel mode
                         # This ensures it shows up in /history
-                        from cai.sdk.agents.simple_agent_manager import AGENT_MANAGER
+                        from .sdk.simple_agent_manager import AGENT_MANAGER
                         agent_display_name = getattr(instance_agent, 'name', config.agent_name)
                         AGENT_MANAGER.set_parallel_agent(agent_id, instance_agent, agent_display_name)
 
@@ -1145,7 +1097,7 @@ def run_cai_cli(
                         
                         # Clean up any streaming resources created by this agent's tools
                         try:
-                            from cai.util import finish_tool_streaming, cli_print_tool_output, _LIVE_STREAMING_PANELS
+                            from .util import finish_tool_streaming, cli_print_tool_output, _LIVE_STREAMING_PANELS
                             
                             # In parallel mode, we need to update the final status of panels
                             if hasattr(cli_print_tool_output, "_streaming_sessions"):
@@ -1175,17 +1127,12 @@ def run_cai_cli(
                             # Silently ignore cleanup errors
                             pass
                         
-                        # Save the agent's history after successful completion
-                        if instance_agent and agent_id:
-                            if hasattr(instance_agent, 'model') and hasattr(instance_agent.model, 'message_history'):
-                                PARALLEL_ISOLATION.replace_isolated_history(agent_id, instance_agent.model.message_history)
-
                         return (config, result)
                     except asyncio.CancelledError:
                         # Task was cancelled (e.g., by Ctrl+C)
                         # Clean up any streaming resources before propagating cancellation
                         try:
-                            from cai.util import cleanup_agent_streaming_resources
+                            from .util import cleanup_agent_streaming_resources
                             
                             # Clean up streaming sessions for this specific agent
                             if instance_agent:
@@ -1202,7 +1149,7 @@ def run_cai_cli(
                     except Exception as e:
                         # Clean up any streaming resources before handling exception
                         try:
-                            from cai.util import cleanup_agent_streaming_resources
+                            from .util import cleanup_agent_streaming_resources
                             
                             # Clean up streaming sessions for this specific agent
                             if instance_agent:
@@ -1211,11 +1158,6 @@ def run_cai_cli(
                         except Exception:
                             pass
                             
-                        # Also save history on other exceptions
-                        if instance_agent and agent_id:
-                            if hasattr(instance_agent, 'model') and hasattr(instance_agent.model, 'message_history'):
-                                PARALLEL_ISOLATION.replace_isolated_history(agent_id, instance_agent.model.message_history)
-                        
                         # Log error details for debugging
                         logger = logging.getLogger(__name__)
                         error_details = f"Error in {config.agent_name}"
@@ -1228,27 +1170,6 @@ def run_cai_cli(
                         if os.getenv("CAI_DEBUG", "1") == "2":
                             console.print(f"[bold red]{error_details}[/bold red]")
                         return (config, None)
-
-                async def run_parallel_agents():
-                    """Run all configured agents in parallel."""
-                    # Create tasks for each agent with their own isolated contexts
-                    # Note: If a config has a custom prompt, it will be used instead of user_input
-                    tasks = []
-                    for config in PARALLEL_CONFIGS:
-                        # Determine what input to use for this config
-                        input_for_config = config.prompt if config.prompt else user_input
-                        tasks.append(run_agent_instance(config, input_for_config))
-
-                    # Wait for all to complete
-                    results = await asyncio.gather(*tasks, return_exceptions=True)
-
-                    # Filter out exceptions and failed results
-                    valid_results = []
-                    for item in results:
-                        if isinstance(item, tuple) and len(item) == 2 and item[1] is not None:
-                            valid_results.append(item)
-
-                    return valid_results
 
                 # Run in asyncio event loop
                 try:
@@ -1373,7 +1294,7 @@ def run_cai_cli(
 
             # Fix message list structure BEFORE sending to the model to prevent errors
             try:
-                from cai.util import fix_message_list
+                from .util import fix_message_list
 
                 history_context = fix_message_list(history_context)
             except Exception:
@@ -1445,46 +1366,6 @@ def run_cai_cli(
                                 f"[bold red]Error in instance {instance_number}: {str(e)}[/bold red]"
                             )
                         return (instance_number, None)
-
-                async def process_parallel_responses():
-                    """Process multiple parallel agent executions"""
-                    # Create tasks for each instance
-                    tasks = [
-                        run_agent_instance(i, conversation_input) for i in range(parallel_count)
-                    ]
-
-                    # Wait for all to complete, no matter if some fail
-                    results = await asyncio.gather(*tasks, return_exceptions=True)
-
-                    # Filter out exceptions and failed results
-                    valid_results = []
-                    for result in results:
-                        if isinstance(result, tuple) and len(result) == 2:
-                            idx, res = result
-                            if res is not None and not isinstance(res, Exception):
-                                valid_results.append((idx, res))
-
-                    return valid_results
-
-                # Execute all parallel instances
-                results = asyncio.run(process_parallel_responses())
-
-                # Print summary info about the results
-
-                # Display the results
-                for idx, result in results:
-                    if result and hasattr(result, "final_output") and result.final_output:
-                        # Add to main message history for context
-                        agent.model.add_to_message_history(
-                            {"role": "assistant", "content": f"{result.final_output}"}
-                        )
-            else:
-                # Disable streaming by default, unless specifically enabled
-                cai_stream = os.getenv("CAI_STREAM", "false")
-                # Handle empty string or None values
-                if not cai_stream or cai_stream.strip() == "":
-                    cai_stream = "false"
-                stream = cai_stream.lower() == "true"
 
                 # Single agent execution (original behavior)
                 if stream:
@@ -1706,7 +1587,7 @@ def run_cai_cli(
 
                 # Final validation to ensure message history follows OpenAI's requirements
                 # Ensure every tool message has a preceding assistant message with matching tool_call_id
-                from cai.util import fix_message_list
+                from .util import fix_message_list
 
                 agent.model.message_history[:] = fix_message_list(agent.model.message_history)
             turn_count += 1
@@ -1721,7 +1602,7 @@ def run_cai_cli(
 
             # Clean up any active streaming panels
             try:
-                from cai.util import cleanup_all_streaming_resources
+                from .util import cleanup_all_streaming_resources
                 cleanup_all_streaming_resources()
             except Exception:
                 pass
@@ -1754,7 +1635,7 @@ def run_cai_cli(
                         agent.model.add_to_message_history(tool_response_msg)
 
                     # Apply message list fixes to ensure consistency
-                    from cai.util import fix_message_list
+                    from util import fix_message_list
 
                     agent.model.message_history[:] = fix_message_list(agent.model.message_history)
                     
@@ -1858,7 +1739,7 @@ def main():
     agent = get_agent_by_name(agent_type, agent_id="P1")
     
     # Use the switch_to_single_agent method for proper initialization
-    from cai.sdk.agents.simple_agent_manager import AGENT_MANAGER
+    from .sdk.simple_agent_manager import AGENT_MANAGER
     # IMPORTANT: Always use the agent's proper name, not the agent key
     agent_name = agent.name if hasattr(agent, "name") else agent_type
     AGENT_MANAGER.switch_to_single_agent(agent, agent_name)
