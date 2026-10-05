@@ -1,0 +1,1225 @@
+[
+  {
+    "steps": [
+      {
+        "role": "red",
+        "state": {
+          "executed": [],
+          "detected": [],
+          "defended": [],
+          "foothold": 0,
+          "step": 0
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1595",
+          "name": "Active Scanning",
+          "tactics": [
+            "reconnaissance"
+          ],
+          "winrate": 0.643
+        },
+        "result": {
+          "success": false,
+          "stdout": "[sim] executed T1595 (Active Scanning) -> blocked"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Active Scanning (T1595)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1595"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": false,
+        "defense": null,
+        "reward": 0.0
+      },
+      {
+        "role": "red",
+        "state": {
+          "executed": [
+            "T1595"
+          ],
+          "detected": [],
+          "defended": [],
+          "foothold": 0,
+          "step": 1
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1190",
+          "name": "Exploit Public-Facing Application",
+          "tactics": [
+            "initial-access"
+          ],
+          "winrate": 0.712
+        },
+        "result": {
+          "success": true,
+          "stdout": "[sim] executed T1190 (Exploit Public-Facing Application) -> ok"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Exploit Public-Facing Application (T1190)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1190"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": true,
+        "defense": {
+          "tech_id": "T1190",
+          "defense": "WAF / app log monitoring"
+        },
+        "reward": 0.3
+      },
+      {
+        "role": "blue",
+        "state": {
+          "executed": [
+            "T1190",
+            "T1595"
+          ],
+          "detected": [
+            "T1190"
+          ],
+          "defended": [
+            "T1190"
+          ],
+          "foothold": 0,
+          "step": 2
+        },
+        "action": {
+          "tech_id": "T1190",
+          "defense": "WAF / app log monitoring"
+        },
+        "reward": 1.5
+      },
+      {
+        "role": "red",
+        "state": {
+          "executed": [
+            "T1190",
+            "T1595"
+          ],
+          "detected": [
+            "T1190"
+          ],
+          "defended": [
+            "T1190"
+          ],
+          "foothold": 0,
+          "step": 2
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1548",
+          "name": "Abuse Elevation Control Mechanism",
+          "tactics": [
+            "privilege-escalation"
+          ],
+          "winrate": 0.61
+        },
+        "result": {
+          "success": true,
+          "stdout": "[sim] executed T1548 (Abuse Elevation Control Mechanism) -> ok"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Abuse Elevation Control Mechanism (T1548)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1548"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": true,
+        "defense": {
+          "tech_id": "T1548",
+          "defense": "Audit sudo/suid usage"
+        },
+        "reward": 0.3
+      },
+      {
+        "role": "blue",
+        "state": {
+          "executed": [
+            "T1190",
+            "T1548",
+            "T1595"
+          ],
+          "detected": [
+            "T1190",
+            "T1548"
+          ],
+          "defended": [
+            "T1190",
+            "T1548"
+          ],
+          "foothold": 0,
+          "step": 3
+        },
+        "action": {
+          "tech_id": "T1548",
+          "defense": "Audit sudo/suid usage"
+        },
+        "reward": 1.5
+      },
+      {
+        "role": "red",
+        "state": {
+          "executed": [
+            "T1190",
+            "T1548",
+            "T1595"
+          ],
+          "detected": [
+            "T1190",
+            "T1548"
+          ],
+          "defended": [
+            "T1190",
+            "T1548"
+          ],
+          "foothold": 0,
+          "step": 3
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1005",
+          "name": "Data from Local System",
+          "tactics": [
+            "collection"
+          ],
+          "winrate": 0.688
+        },
+        "result": {
+          "success": false,
+          "stdout": "[sim] executed T1005 (Data from Local System) -> blocked"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Data from Local System (T1005)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1005"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": true,
+        "defense": {
+          "tech_id": "T1005",
+          "defense": "File access auditing"
+        },
+        "reward": -0.7
+      },
+      {
+        "role": "blue",
+        "state": {
+          "executed": [
+            "T1005",
+            "T1190",
+            "T1548",
+            "T1595"
+          ],
+          "detected": [
+            "T1005",
+            "T1190",
+            "T1548"
+          ],
+          "defended": [
+            "T1005",
+            "T1190",
+            "T1548"
+          ],
+          "foothold": 0,
+          "step": 4
+        },
+        "action": {
+          "tech_id": "T1005",
+          "defense": "File access auditing"
+        },
+        "reward": 1.5
+      },
+      {
+        "role": "red",
+        "state": {
+          "executed": [
+            "T1005",
+            "T1190",
+            "T1548",
+            "T1595"
+          ],
+          "detected": [
+            "T1005",
+            "T1190",
+            "T1548"
+          ],
+          "defended": [
+            "T1005",
+            "T1190",
+            "T1548"
+          ],
+          "foothold": 0,
+          "step": 4
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1059",
+          "name": "Command and Scripting Interpreter",
+          "tactics": [
+            "execution"
+          ],
+          "winrate": 0.606
+        },
+        "result": {
+          "success": true,
+          "stdout": "[sim] executed T1059 (Command and Scripting Interpreter) -> ok"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Command and Scripting Interpreter (T1059)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1059"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": true,
+        "defense": {
+          "tech_id": "T1059",
+          "defense": "Process command-line monitoring"
+        },
+        "reward": 0.3
+      },
+      {
+        "role": "blue",
+        "state": {
+          "executed": [
+            "T1005",
+            "T1059",
+            "T1190",
+            "T1548",
+            "T1595"
+          ],
+          "detected": [
+            "T1005",
+            "T1059",
+            "T1190",
+            "T1548"
+          ],
+          "defended": [
+            "T1005",
+            "T1059",
+            "T1190",
+            "T1548"
+          ],
+          "foothold": 0,
+          "step": 5
+        },
+        "action": {
+          "tech_id": "T1059",
+          "defense": "Process command-line monitoring"
+        },
+        "reward": 1.5
+      },
+      {
+        "role": "red",
+        "state": {
+          "executed": [
+            "T1005",
+            "T1059",
+            "T1190",
+            "T1548",
+            "T1595"
+          ],
+          "detected": [
+            "T1005",
+            "T1059",
+            "T1190",
+            "T1548"
+          ],
+          "defended": [
+            "T1005",
+            "T1059",
+            "T1190",
+            "T1548"
+          ],
+          "foothold": 0,
+          "step": 5
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1041",
+          "name": "Exfiltration Over C2 Channel",
+          "tactics": [
+            "exfiltration"
+          ],
+          "winrate": 0.592
+        },
+        "result": {
+          "success": false,
+          "stdout": "[sim] executed T1041 (Exfiltration Over C2 Channel) -> blocked"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Exfiltration Over C2 Channel (T1041)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1041"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": true,
+        "defense": {
+          "tech_id": "T1041",
+          "defense": "Egress / DNS monitoring"
+        },
+        "reward": -0.7
+      },
+      {
+        "role": "blue",
+        "state": {
+          "executed": [
+            "T1005",
+            "T1041",
+            "T1059",
+            "T1190",
+            "T1548",
+            "T1595"
+          ],
+          "detected": [
+            "T1005",
+            "T1041",
+            "T1059",
+            "T1190",
+            "T1548"
+          ],
+          "defended": [
+            "T1005",
+            "T1041",
+            "T1059",
+            "T1190",
+            "T1548"
+          ],
+          "foothold": 0,
+          "step": 6
+        },
+        "action": {
+          "tech_id": "T1041",
+          "defense": "Egress / DNS monitoring"
+        },
+        "reward": 1.5
+      }
+    ],
+    "red_return": -0.4999999999999998,
+    "blue_return": 7.5
+  },
+  {
+    "steps": [
+      {
+        "role": "red",
+        "state": {
+          "executed": [],
+          "detected": [],
+          "defended": [],
+          "foothold": 0,
+          "step": 0
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1005",
+          "name": "Data from Local System",
+          "tactics": [
+            "collection"
+          ],
+          "winrate": 0.65
+        },
+        "result": {
+          "success": true,
+          "stdout": "[sim] executed T1005 (Data from Local System) -> ok"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Data from Local System (T1005)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1005"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": false,
+        "defense": null,
+        "reward": 1.0
+      },
+      {
+        "role": "red",
+        "state": {
+          "executed": [
+            "T1005"
+          ],
+          "detected": [],
+          "defended": [],
+          "foothold": 1,
+          "step": 1
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1190",
+          "name": "Exploit Public-Facing Application",
+          "tactics": [
+            "initial-access"
+          ],
+          "winrate": 0.714
+        },
+        "result": {
+          "success": true,
+          "stdout": "[sim] executed T1190 (Exploit Public-Facing Application) -> ok"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Exploit Public-Facing Application (T1190)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1190"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": true,
+        "defense": {
+          "tech_id": "T1190",
+          "defense": "WAF / app log monitoring"
+        },
+        "reward": 0.3
+      },
+      {
+        "role": "blue",
+        "state": {
+          "executed": [
+            "T1005",
+            "T1190"
+          ],
+          "detected": [
+            "T1190"
+          ],
+          "defended": [
+            "T1190"
+          ],
+          "foothold": 1,
+          "step": 2
+        },
+        "action": {
+          "tech_id": "T1190",
+          "defense": "WAF / app log monitoring"
+        },
+        "reward": 1.5
+      },
+      {
+        "role": "red",
+        "state": {
+          "executed": [
+            "T1005",
+            "T1190"
+          ],
+          "detected": [
+            "T1190"
+          ],
+          "defended": [
+            "T1190"
+          ],
+          "foothold": 1,
+          "step": 2
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1041",
+          "name": "Exfiltration Over C2 Channel",
+          "tactics": [
+            "exfiltration"
+          ],
+          "winrate": 0.685
+        },
+        "result": {
+          "success": false,
+          "stdout": "[sim] executed T1041 (Exfiltration Over C2 Channel) -> blocked"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Exfiltration Over C2 Channel (T1041)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1041"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": false,
+        "defense": null,
+        "reward": 0.0
+      },
+      {
+        "role": "red",
+        "state": {
+          "executed": [
+            "T1005",
+            "T1041",
+            "T1190"
+          ],
+          "detected": [
+            "T1190"
+          ],
+          "defended": [
+            "T1190"
+          ],
+          "foothold": 1,
+          "step": 3
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1548",
+          "name": "Abuse Elevation Control Mechanism",
+          "tactics": [
+            "privilege-escalation"
+          ],
+          "winrate": 0.662
+        },
+        "result": {
+          "success": false,
+          "stdout": "[sim] executed T1548 (Abuse Elevation Control Mechanism) -> blocked"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Abuse Elevation Control Mechanism (T1548)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1548"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": false,
+        "defense": null,
+        "reward": 0.0
+      },
+      {
+        "role": "red",
+        "state": {
+          "executed": [
+            "T1005",
+            "T1041",
+            "T1190",
+            "T1548"
+          ],
+          "detected": [
+            "T1190"
+          ],
+          "defended": [
+            "T1190"
+          ],
+          "foothold": 1,
+          "step": 4
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1059",
+          "name": "Command and Scripting Interpreter",
+          "tactics": [
+            "execution"
+          ],
+          "winrate": 0.631
+        },
+        "result": {
+          "success": true,
+          "stdout": "[sim] executed T1059 (Command and Scripting Interpreter) -> ok"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Command and Scripting Interpreter (T1059)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1059"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": false,
+        "defense": null,
+        "reward": 1.0
+      },
+      {
+        "role": "red",
+        "state": {
+          "executed": [
+            "T1005",
+            "T1041",
+            "T1059",
+            "T1190",
+            "T1548"
+          ],
+          "detected": [
+            "T1190"
+          ],
+          "defended": [
+            "T1190"
+          ],
+          "foothold": 2,
+          "step": 5
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1595",
+          "name": "Active Scanning",
+          "tactics": [
+            "reconnaissance"
+          ],
+          "winrate": 0.602
+        },
+        "result": {
+          "success": false,
+          "stdout": "[sim] executed T1595 (Active Scanning) -> blocked"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Active Scanning (T1595)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1595"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": false,
+        "defense": null,
+        "reward": 0.0
+      }
+    ],
+    "red_return": 2.3,
+    "blue_return": 1.5
+  },
+  {
+    "steps": [
+      {
+        "role": "red",
+        "state": {
+          "executed": [],
+          "detected": [],
+          "defended": [],
+          "foothold": 0,
+          "step": 0
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1005",
+          "name": "Data from Local System",
+          "tactics": [
+            "collection"
+          ],
+          "winrate": 0.635
+        },
+        "result": {
+          "success": true,
+          "stdout": "[sim] executed T1005 (Data from Local System) -> ok"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Data from Local System (T1005)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1005"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": true,
+        "defense": {
+          "tech_id": "T1005",
+          "defense": "File access auditing"
+        },
+        "reward": 0.3
+      },
+      {
+        "role": "blue",
+        "state": {
+          "executed": [
+            "T1005"
+          ],
+          "detected": [
+            "T1005"
+          ],
+          "defended": [
+            "T1005"
+          ],
+          "foothold": 0,
+          "step": 1
+        },
+        "action": {
+          "tech_id": "T1005",
+          "defense": "File access auditing"
+        },
+        "reward": 1.5
+      },
+      {
+        "role": "red",
+        "state": {
+          "executed": [
+            "T1005"
+          ],
+          "detected": [
+            "T1005"
+          ],
+          "defended": [
+            "T1005"
+          ],
+          "foothold": 0,
+          "step": 1
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1041",
+          "name": "Exfiltration Over C2 Channel",
+          "tactics": [
+            "exfiltration"
+          ],
+          "winrate": 0.7
+        },
+        "result": {
+          "success": true,
+          "stdout": "[sim] executed T1041 (Exfiltration Over C2 Channel) -> ok"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Exfiltration Over C2 Channel (T1041)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1041"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": false,
+        "defense": null,
+        "reward": 1.0
+      },
+      {
+        "role": "red",
+        "state": {
+          "executed": [
+            "T1005",
+            "T1041"
+          ],
+          "detected": [
+            "T1005"
+          ],
+          "defended": [
+            "T1005"
+          ],
+          "foothold": 1,
+          "step": 2
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1190",
+          "name": "Exploit Public-Facing Application",
+          "tactics": [
+            "initial-access"
+          ],
+          "winrate": 0.782
+        },
+        "result": {
+          "success": false,
+          "stdout": "[sim] executed T1190 (Exploit Public-Facing Application) -> blocked"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Exploit Public-Facing Application (T1190)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1190"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": false,
+        "defense": null,
+        "reward": 0.0
+      },
+      {
+        "role": "red",
+        "state": {
+          "executed": [
+            "T1005",
+            "T1041",
+            "T1190"
+          ],
+          "detected": [
+            "T1005"
+          ],
+          "defended": [
+            "T1005"
+          ],
+          "foothold": 1,
+          "step": 3
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1548",
+          "name": "Abuse Elevation Control Mechanism",
+          "tactics": [
+            "privilege-escalation"
+          ],
+          "winrate": 0.675
+        },
+        "result": {
+          "success": true,
+          "stdout": "[sim] executed T1548 (Abuse Elevation Control Mechanism) -> ok"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Abuse Elevation Control Mechanism (T1548)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1548"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": false,
+        "defense": null,
+        "reward": 1.0
+      },
+      {
+        "role": "red",
+        "state": {
+          "executed": [
+            "T1005",
+            "T1041",
+            "T1190",
+            "T1548"
+          ],
+          "detected": [
+            "T1005"
+          ],
+          "defended": [
+            "T1005"
+          ],
+          "foothold": 2,
+          "step": 4
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1059",
+          "name": "Command and Scripting Interpreter",
+          "tactics": [
+            "execution"
+          ],
+          "winrate": 0.705
+        },
+        "result": {
+          "success": true,
+          "stdout": "[sim] executed T1059 (Command and Scripting Interpreter) -> ok"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Command and Scripting Interpreter (T1059)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1059"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": false,
+        "defense": null,
+        "reward": 1.0
+      },
+      {
+        "role": "red",
+        "state": {
+          "executed": [
+            "T1005",
+            "T1041",
+            "T1059",
+            "T1190",
+            "T1548"
+          ],
+          "detected": [
+            "T1005"
+          ],
+          "defended": [
+            "T1005"
+          ],
+          "foothold": 3,
+          "step": 5
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1595",
+          "name": "Active Scanning",
+          "tactics": [
+            "reconnaissance"
+          ],
+          "winrate": 0.527
+        },
+        "result": {
+          "success": false,
+          "stdout": "[sim] executed T1595 (Active Scanning) -> blocked"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Active Scanning (T1595)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1595"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": true,
+        "defense": {
+          "tech_id": "T1595",
+          "defense": "Network traffic analysis"
+        },
+        "reward": -0.7
+      },
+      {
+        "role": "blue",
+        "state": {
+          "executed": [
+            "T1005",
+            "T1041",
+            "T1059",
+            "T1190",
+            "T1548",
+            "T1595"
+          ],
+          "detected": [
+            "T1005",
+            "T1595"
+          ],
+          "defended": [
+            "T1005",
+            "T1595"
+          ],
+          "foothold": 3,
+          "step": 6
+        },
+        "action": {
+          "tech_id": "T1595",
+          "defense": "Network traffic analysis"
+        },
+        "reward": 1.5
+      }
+    ],
+    "red_return": 2.5999999999999996,
+    "blue_return": 3.0
+  }
+]
