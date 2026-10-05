@@ -1,0 +1,17 @@
+services:
+  red-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.redcontainer
+    container_name: cai-red-agent
+
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+    environment:
+      CAI_ACTIVE_CONTAINER: financial-attacker
+
+    stdin_open: true
+    tty: true
+
+    restart: unless-stopped
