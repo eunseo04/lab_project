@@ -18,3 +18,5 @@ src/server/tasks/card_game/result
 .dockerfile-cache
 analysis
 Search/output
+# secrets
+.env

@@ -1,4 +1,0 @@
-defaults:
-  - env_preset: gops_four_card
-  - base
-  - preset_batch_evaluate: test

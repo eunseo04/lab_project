@@ -26,9 +26,9 @@ def parse_args():
     parser.add_argument('--deepspeed_config', type=str, default=None, help='Use DeepSpeed for distributed training.')
 
     # Model related parameters
-    parser.add_argument('--model_path', type=str, default='../model/qwen/Qwen3-8B', help='Base model path or name')
-    parser.add_argument('--qa_model_name', type=str, nargs='+', default='../model/qwen/Qwen3-8B', help='QA model name')
-    parser.add_argument('--eval_model_name', type=str, nargs='+', default='../model/qwen/Qwen3-8B', help='Evaluation model name')
+    parser.add_argument('--model_path', type=str, default='Qwen/Qwen2.5-0.5B-Instruct', help='Base model path or name')
+    parser.add_argument('--qa_model_name', type=str, nargs='+', default='Qwen/Qwen2.5-0.5B-Instruct', help='QA model name')
+    parser.add_argument('--eval_model_name', type=str, nargs='+', default='Qwen/Qwen2.5-0.5B-Instruct', help='Evaluation model name')
 
     # Data related parameters
     parser.add_argument("--prompt_fname", type=str, default="prompts/prompt_red_20250626.yaml", help="Prompt file path")

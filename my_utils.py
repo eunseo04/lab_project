@@ -234,7 +234,15 @@ def call_llm(
     """
     if not prompts:
         return [""]
-    endpoint = f"{url.rstrip('/')}/v1/completions"
+    # Accept either a bare host (vLLM: http://host:port) or a full OpenAI-style base
+    # URL already ending in /v1. Auth header is sent when OPENAI_API_KEY is set so
+    # the same path works for local vLLM (no key) and OpenAI-compatible endpoints.
+    base = url.rstrip('/')
+    endpoint = base + "/completions" if base.endswith("/v1") else base + "/v1/completions"
+    headers = {}
+    _api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    if _api_key:
+        headers["Authorization"] = f"Bearer {_api_key}"
     payload = {
         "model": model_name,
         "prompt": prompts,
@@ -246,7 +254,7 @@ def call_llm(
 
     for attempt in range(1, max_retries + 1):
         try:
-            resp = requests.post(endpoint, json=payload, timeout=timeout)
+            resp = requests.post(endpoint, json=payload, headers=headers, timeout=timeout)
             resp.raise_for_status()  # Raise exception for HTTP errors
             data = resp.json()
             # KeyError / TypeError are caught in try block, will trigger retry
