@@ -611,6 +611,7 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
             "role": "red", "state": asdict(state), "action": red_action,
             "result": {"success": result["success"], "stdout": result["stdout"][:120]},
             "wazuh": ctx, "detected": bool(detected), "covered": bool(covered),
+            "mitigated": bool(mitigated),  # was this successful attack contained by blue?
             "reward": round(red_reward, 3),
         })
         if defense_action and defense_action.get("tech_id") is not None:
@@ -755,9 +756,9 @@ def run_closed_loop(iterations: int = 3, ctf_name: Optional[str] = None,
         m = _metrics.compute_metrics([asdict(t) for t in all_traj])
         _metrics.write_metrics(m, out_dir)
         s = m["summary"]
-        print(f"[pipeline] metrics: attack_success={s['attack_success_rate']*100:.1f}% "
-              f"detection={s['detection_rate']*100:.1f}% "
-              f"containment={s['containment_rate']*100:.1f}% -> {out_dir}/metrics.json")
+        print(f"[pipeline] metrics: breach(net)={s['breach_rate']*100:.1f}% "
+              f"containment={s['containment_rate']*100:.1f}% block={s['block_rate']*100:.1f}% "
+              f"detection={s['detection_rate']*100:.1f}% -> {out_dir}/metrics.json")
     except Exception as e:  # pragma: no cover
         print(f"[pipeline] metrics computation skipped: {e}")
 

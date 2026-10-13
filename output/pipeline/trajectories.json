@@ -47,6 +47,7 @@
         },
         "detected": true,
         "covered": true,
+        "mitigated": true,
         "reward": -1.2
       },
       {
@@ -68,1203 +69,6 @@
           "deploy_rule": false,
           "name": "Contain Gather Victim Identity Information",
           "defense": "Detection of Gather Victim Identity Information",
-          "winrate": 0.95,
-          "command": "echo defend T1589"
-        },
-        "applied": true,
-        "mitigated": true,
-        "rule_deployed": false,
-        "reward": 1.7
-      },
-      {
-        "role": "red",
-        "state": {
-          "executed": [
-            "T1589"
-          ],
-          "detected": [
-            "T1589"
-          ],
-          "defended": [
-            "T1589"
-          ],
-          "foothold": 0,
-          "step": 1
-        },
-        "action": {
-          "role": "red",
-          "tech_id": "T1590",
-          "name": "Gather Victim Network Information",
-          "tactics": [
-            "reconnaissance"
-          ],
-          "winrate": 0.745,
-          "command": "echo run T1590"
-        },
-        "result": {
-          "success": true,
-          "stdout": "[sim] executed T1590 (Gather Victim Network Information) -> ok"
-        },
-        "wazuh": {
-          "timestamp": "2026-10-06T00:00:00.000+0000",
-          "host": {
-            "name": "financial-bank-web",
-            "ip": "172.30.20.10"
-          },
-          "source": {
-            "ip": "172.30.10.100",
-            "user": "www-data"
-          },
-          "event": {
-            "rule_id": "100100",
-            "description": "Possible Gather Victim Network Information (T1590)",
-            "level": 10,
-            "groups": [
-              "attack",
-              "T1590"
-            ],
-            "decoder": "json"
-          }
-        },
-        "detected": false,
-        "covered": false,
-        "reward": 1.0
-      },
-      {
-        "role": "red",
-        "state": {
-          "executed": [
-            "T1589",
-            "T1590"
-          ],
-          "detected": [
-            "T1589"
-          ],
-          "defended": [
-            "T1589"
-          ],
-          "foothold": 1,
-          "step": 2
-        },
-        "action": {
-          "role": "red",
-          "tech_id": "T1078.001",
-          "name": "Default Accounts",
-          "tactics": [
-            "stealth",
-            "persistence",
-            "privilege-escalation",
-            "initial-access"
-          ],
-          "winrate": 0.7,
-          "command": "echo run T1078.001"
-        },
-        "result": {
-          "success": true,
-          "stdout": "[sim] executed T1078.001 (Default Accounts) -> ok"
-        },
-        "wazuh": {
-          "timestamp": "2026-10-06T00:00:00.000+0000",
-          "host": {
-            "name": "financial-bank-web",
-            "ip": "172.30.20.10"
-          },
-          "source": {
-            "ip": "172.30.10.100",
-            "user": "www-data"
-          },
-          "event": {
-            "rule_id": "100100",
-            "description": "Possible Default Accounts (T1078.001)",
-            "level": 10,
-            "groups": [
-              "attack",
-              "T1078.001"
-            ],
-            "decoder": "json"
-          }
-        },
-        "detected": true,
-        "covered": true,
-        "reward": -0.2
-      },
-      {
-        "role": "blue",
-        "state": {
-          "executed": [
-            "T1078.001",
-            "T1589",
-            "T1590"
-          ],
-          "detected": [
-            "T1078.001",
-            "T1589"
-          ],
-          "defended": [
-            "T1589"
-          ],
-          "foothold": 1,
-          "step": 2
-        },
-        "action": {
-          "role": "blue",
-          "tech_id": "T1078.001",
-          "deploy_rule": false,
-          "name": "Contain Default Accounts",
-          "defense": "Detection of Default Account Abuse Across Platforms",
-          "winrate": 0.938,
-          "command": "echo defend T1078.001"
-        },
-        "applied": true,
-        "mitigated": true,
-        "rule_deployed": false,
-        "reward": 1.7
-      },
-      {
-        "role": "red",
-        "state": {
-          "executed": [
-            "T1078.001",
-            "T1589",
-            "T1590"
-          ],
-          "detected": [
-            "T1078.001",
-            "T1589"
-          ],
-          "defended": [
-            "T1078.001",
-            "T1589"
-          ],
-          "foothold": 1,
-          "step": 3
-        },
-        "action": {
-          "role": "red",
-          "tech_id": "T1078.002",
-          "name": "Domain Accounts",
-          "tactics": [
-            "stealth",
-            "persistence",
-            "privilege-escalation",
-            "initial-access"
-          ],
-          "winrate": 0.694,
-          "command": "echo run T1078.002"
-        },
-        "result": {
-          "success": true,
-          "stdout": "[sim] executed T1078.002 (Domain Accounts) -> ok"
-        },
-        "wazuh": {
-          "timestamp": "2026-10-06T00:00:00.000+0000",
-          "host": {
-            "name": "financial-bank-web",
-            "ip": "172.30.20.10"
-          },
-          "source": {
-            "ip": "172.30.10.100",
-            "user": "www-data"
-          },
-          "event": {
-            "rule_id": "100100",
-            "description": "Possible Domain Accounts (T1078.002)",
-            "level": 10,
-            "groups": [
-              "attack",
-              "T1078.002"
-            ],
-            "decoder": "json"
-          }
-        },
-        "detected": true,
-        "covered": true,
-        "reward": 0.3
-      },
-      {
-        "role": "blue",
-        "state": {
-          "executed": [
-            "T1078.001",
-            "T1078.002",
-            "T1589",
-            "T1590"
-          ],
-          "detected": [
-            "T1078.001",
-            "T1078.002",
-            "T1589"
-          ],
-          "defended": [
-            "T1078.001",
-            "T1589"
-          ],
-          "foothold": 1,
-          "step": 3
-        },
-        "action": {
-          "role": "blue",
-          "tech_id": "T1078.002",
-          "deploy_rule": false,
-          "name": "Contain Domain Accounts",
-          "defense": "Abuse of Domain Accounts",
-          "winrate": 0.663,
-          "command": "echo defend T1078.002"
-        },
-        "applied": false,
-        "mitigated": false,
-        "rule_deployed": false,
-        "reward": 1.0
-      },
-      {
-        "role": "red",
-        "state": {
-          "executed": [
-            "T1078.001",
-            "T1078.002",
-            "T1589",
-            "T1590"
-          ],
-          "detected": [
-            "T1078.001",
-            "T1078.002",
-            "T1589"
-          ],
-          "defended": [
-            "T1078.001",
-            "T1589"
-          ],
-          "foothold": 1,
-          "step": 4
-        },
-        "action": {
-          "role": "red",
-          "tech_id": "T1189",
-          "name": "Drive-by Compromise",
-          "tactics": [
-            "initial-access"
-          ],
-          "winrate": 0.67,
-          "command": "echo run T1189"
-        },
-        "result": {
-          "success": true,
-          "stdout": "[sim] executed T1189 (Drive-by Compromise) -> ok"
-        },
-        "wazuh": {
-          "timestamp": "2026-10-06T00:00:00.000+0000",
-          "host": {
-            "name": "financial-bank-web",
-            "ip": "172.30.20.10"
-          },
-          "source": {
-            "ip": "172.30.10.100",
-            "user": "www-data"
-          },
-          "event": {
-            "rule_id": "100100",
-            "description": "Possible Drive-by Compromise (T1189)",
-            "level": 10,
-            "groups": [
-              "attack",
-              "T1189"
-            ],
-            "decoder": "json"
-          }
-        },
-        "detected": false,
-        "covered": false,
-        "reward": 1.0
-      },
-      {
-        "role": "blue",
-        "state": {
-          "executed": [
-            "T1078.001",
-            "T1078.002",
-            "T1189",
-            "T1589",
-            "T1590"
-          ],
-          "detected": [
-            "T1078.001",
-            "T1078.002",
-            "T1589"
-          ],
-          "defended": [
-            "T1078.001",
-            "T1589"
-          ],
-          "foothold": 1,
-          "step": 4
-        },
-        "action": {
-          "role": "blue",
-          "tech_id": "T1078.002",
-          "deploy_rule": false,
-          "name": "Contain Domain Accounts",
-          "defense": "Abuse of Domain Accounts",
-          "winrate": 0.613,
-          "command": "echo defend T1078.002"
-        },
-        "applied": false,
-        "mitigated": false,
-        "rule_deployed": false,
-        "reward": -0.3
-      },
-      {
-        "role": "red",
-        "state": {
-          "executed": [
-            "T1078.001",
-            "T1078.002",
-            "T1189",
-            "T1589",
-            "T1590"
-          ],
-          "detected": [
-            "T1078.001",
-            "T1078.002",
-            "T1589"
-          ],
-          "defended": [
-            "T1078.001",
-            "T1589"
-          ],
-          "foothold": 2,
-          "step": 5
-        },
-        "action": {
-          "role": "red",
-          "tech_id": "T1053.003",
-          "name": "Cron",
-          "tactics": [
-            "execution",
-            "persistence",
-            "privilege-escalation"
-          ],
-          "winrate": 0.616,
-          "command": "echo run T1053.003"
-        },
-        "result": {
-          "success": false,
-          "stdout": "[sim] executed T1053.003 (Cron) -> blocked"
-        },
-        "wazuh": {
-          "timestamp": "2026-10-06T00:00:00.000+0000",
-          "host": {
-            "name": "financial-bank-web",
-            "ip": "172.30.20.10"
-          },
-          "source": {
-            "ip": "172.30.10.100",
-            "user": "www-data"
-          },
-          "event": {
-            "rule_id": "100100",
-            "description": "Possible Cron (T1053.003)",
-            "level": 10,
-            "groups": [
-              "attack",
-              "T1053.003"
-            ],
-            "decoder": "json"
-          }
-        },
-        "detected": true,
-        "covered": true,
-        "reward": -0.7
-      },
-      {
-        "role": "blue",
-        "state": {
-          "executed": [
-            "T1053.003",
-            "T1078.001",
-            "T1078.002",
-            "T1189",
-            "T1589",
-            "T1590"
-          ],
-          "detected": [
-            "T1053.003",
-            "T1078.001",
-            "T1078.002",
-            "T1589"
-          ],
-          "defended": [
-            "T1078.001",
-            "T1589"
-          ],
-          "foothold": 2,
-          "step": 5
-        },
-        "action": {
-          "role": "blue",
-          "tech_id": "T1053.003",
-          "deploy_rule": false,
-          "name": "Contain Cron",
-          "defense": "Cross-Platform Detection of Cron Job Abuse for Persistence and Execution",
-          "winrate": 0.874,
-          "command": "echo defend T1053.003"
-        },
-        "applied": false,
-        "mitigated": false,
-        "rule_deployed": false,
-        "reward": 1.0
-      }
-    ],
-    "red_return": 0.20000000000000018,
-    "blue_return": 4.8
-  },
-  {
-    "steps": [
-      {
-        "role": "red",
-        "state": {
-          "executed": [],
-          "detected": [],
-          "defended": [],
-          "foothold": 0,
-          "step": 0
-        },
-        "action": {
-          "role": "red",
-          "tech_id": "T1589.002",
-          "name": "Email Addresses",
-          "tactics": [
-            "reconnaissance"
-          ],
-          "winrate": 0.576,
-          "command": "echo run T1589.002"
-        },
-        "result": {
-          "success": false,
-          "stdout": "[sim] executed T1589.002 (Email Addresses) -> blocked"
-        },
-        "wazuh": {
-          "timestamp": "2026-10-06T00:00:00.000+0000",
-          "host": {
-            "name": "financial-bank-web",
-            "ip": "172.30.20.10"
-          },
-          "source": {
-            "ip": "172.30.10.100",
-            "user": "www-data"
-          },
-          "event": {
-            "rule_id": "100100",
-            "description": "Possible Email Addresses (T1589.002)",
-            "level": 10,
-            "groups": [
-              "attack",
-              "T1589.002"
-            ],
-            "decoder": "json"
-          }
-        },
-        "detected": true,
-        "covered": true,
-        "reward": -0.7
-      },
-      {
-        "role": "blue",
-        "state": {
-          "executed": [
-            "T1589.002"
-          ],
-          "detected": [
-            "T1589.002"
-          ],
-          "defended": [],
-          "foothold": 0,
-          "step": 0
-        },
-        "action": {
-          "role": "blue",
-          "tech_id": "T1589.002",
-          "deploy_rule": false,
-          "name": "Contain Email Addresses",
-          "defense": "Detection of Email Addresses",
-          "winrate": 0.475,
-          "command": "echo defend T1589.002"
-        },
-        "applied": false,
-        "mitigated": false,
-        "rule_deployed": false,
-        "reward": 1.0
-      },
-      {
-        "role": "red",
-        "state": {
-          "executed": [
-            "T1589.002"
-          ],
-          "detected": [
-            "T1589.002"
-          ],
-          "defended": [],
-          "foothold": 0,
-          "step": 1
-        },
-        "action": {
-          "role": "red",
-          "tech_id": "T1590",
-          "name": "Gather Victim Network Information",
-          "tactics": [
-            "reconnaissance"
-          ],
-          "winrate": 0.753,
-          "command": "echo run T1590"
-        },
-        "result": {
-          "success": true,
-          "stdout": "[sim] executed T1590 (Gather Victim Network Information) -> ok"
-        },
-        "wazuh": {
-          "timestamp": "2026-10-06T00:00:00.000+0000",
-          "host": {
-            "name": "financial-bank-web",
-            "ip": "172.30.20.10"
-          },
-          "source": {
-            "ip": "172.30.10.100",
-            "user": "www-data"
-          },
-          "event": {
-            "rule_id": "100100",
-            "description": "Possible Gather Victim Network Information (T1590)",
-            "level": 10,
-            "groups": [
-              "attack",
-              "T1590"
-            ],
-            "decoder": "json"
-          }
-        },
-        "detected": false,
-        "covered": false,
-        "reward": 1.0
-      },
-      {
-        "role": "blue",
-        "state": {
-          "executed": [
-            "T1589.002",
-            "T1590"
-          ],
-          "detected": [
-            "T1589.002"
-          ],
-          "defended": [],
-          "foothold": 0,
-          "step": 1
-        },
-        "action": {
-          "role": "blue",
-          "tech_id": "T1589.002",
-          "deploy_rule": false,
-          "name": "Contain Email Addresses",
-          "defense": "Detection of Email Addresses",
-          "winrate": 0.625,
-          "command": "echo defend T1589.002"
-        },
-        "applied": false,
-        "mitigated": false,
-        "rule_deployed": false,
-        "reward": -0.3
-      },
-      {
-        "role": "red",
-        "state": {
-          "executed": [
-            "T1589.002",
-            "T1590"
-          ],
-          "detected": [
-            "T1589.002"
-          ],
-          "defended": [],
-          "foothold": 1,
-          "step": 2
-        },
-        "action": {
-          "role": "red",
-          "tech_id": "T1078.001",
-          "name": "Default Accounts",
-          "tactics": [
-            "stealth",
-            "persistence",
-            "privilege-escalation",
-            "initial-access"
-          ],
-          "winrate": 0.7,
-          "command": "echo run T1078.001"
-        },
-        "result": {
-          "success": true,
-          "stdout": "[sim] executed T1078.001 (Default Accounts) -> ok"
-        },
-        "wazuh": {
-          "timestamp": "2026-10-06T00:00:00.000+0000",
-          "host": {
-            "name": "financial-bank-web",
-            "ip": "172.30.20.10"
-          },
-          "source": {
-            "ip": "172.30.10.100",
-            "user": "www-data"
-          },
-          "event": {
-            "rule_id": "100100",
-            "description": "Possible Default Accounts (T1078.001)",
-            "level": 10,
-            "groups": [
-              "attack",
-              "T1078.001"
-            ],
-            "decoder": "json"
-          }
-        },
-        "detected": true,
-        "covered": true,
-        "reward": -0.2
-      },
-      {
-        "role": "blue",
-        "state": {
-          "executed": [
-            "T1078.001",
-            "T1589.002",
-            "T1590"
-          ],
-          "detected": [
-            "T1078.001",
-            "T1589.002"
-          ],
-          "defended": [],
-          "foothold": 1,
-          "step": 2
-        },
-        "action": {
-          "role": "blue",
-          "tech_id": "T1078.001",
-          "deploy_rule": false,
-          "name": "Contain Default Accounts",
-          "defense": "Detection of Default Account Abuse Across Platforms",
-          "winrate": 1.0,
-          "command": "echo defend T1078.001"
-        },
-        "applied": true,
-        "mitigated": true,
-        "rule_deployed": false,
-        "reward": 1.7
-      },
-      {
-        "role": "red",
-        "state": {
-          "executed": [
-            "T1078.001",
-            "T1589.002",
-            "T1590"
-          ],
-          "detected": [
-            "T1078.001",
-            "T1589.002"
-          ],
-          "defended": [
-            "T1078.001"
-          ],
-          "foothold": 1,
-          "step": 3
-        },
-        "action": {
-          "role": "red",
-          "tech_id": "T1078.002",
-          "name": "Domain Accounts",
-          "tactics": [
-            "stealth",
-            "persistence",
-            "privilege-escalation",
-            "initial-access"
-          ],
-          "winrate": 0.63,
-          "command": "echo run T1078.002"
-        },
-        "result": {
-          "success": true,
-          "stdout": "[sim] executed T1078.002 (Domain Accounts) -> ok"
-        },
-        "wazuh": {
-          "timestamp": "2026-10-06T00:00:00.000+0000",
-          "host": {
-            "name": "financial-bank-web",
-            "ip": "172.30.20.10"
-          },
-          "source": {
-            "ip": "172.30.10.100",
-            "user": "www-data"
-          },
-          "event": {
-            "rule_id": "100100",
-            "description": "Possible Domain Accounts (T1078.002)",
-            "level": 10,
-            "groups": [
-              "attack",
-              "T1078.002"
-            ],
-            "decoder": "json"
-          }
-        },
-        "detected": true,
-        "covered": true,
-        "reward": 0.3
-      },
-      {
-        "role": "blue",
-        "state": {
-          "executed": [
-            "T1078.001",
-            "T1078.002",
-            "T1589.002",
-            "T1590"
-          ],
-          "detected": [
-            "T1078.001",
-            "T1078.002",
-            "T1589.002"
-          ],
-          "defended": [
-            "T1078.001"
-          ],
-          "foothold": 1,
-          "step": 3
-        },
-        "action": {
-          "role": "blue",
-          "tech_id": "T1589.002",
-          "deploy_rule": false,
-          "name": "Contain Email Addresses",
-          "defense": "Detection of Email Addresses",
-          "winrate": 0.657,
-          "command": "echo defend T1589.002"
-        },
-        "applied": false,
-        "mitigated": false,
-        "rule_deployed": false,
-        "reward": 1.0
-      },
-      {
-        "role": "red",
-        "state": {
-          "executed": [
-            "T1078.001",
-            "T1078.002",
-            "T1589.002",
-            "T1590"
-          ],
-          "detected": [
-            "T1078.001",
-            "T1078.002",
-            "T1589.002"
-          ],
-          "defended": [
-            "T1078.001"
-          ],
-          "foothold": 1,
-          "step": 4
-        },
-        "action": {
-          "role": "red",
-          "tech_id": "T1078",
-          "name": "Valid Accounts",
-          "tactics": [
-            "stealth",
-            "persistence",
-            "privilege-escalation",
-            "initial-access"
-          ],
-          "winrate": 0.7,
-          "command": "echo run T1078"
-        },
-        "result": {
-          "success": false,
-          "stdout": "[sim] executed T1078 (Valid Accounts) -> blocked"
-        },
-        "wazuh": {
-          "timestamp": "2026-10-06T00:00:00.000+0000",
-          "host": {
-            "name": "financial-bank-web",
-            "ip": "172.30.20.10"
-          },
-          "source": {
-            "ip": "172.30.10.100",
-            "user": "www-data"
-          },
-          "event": {
-            "rule_id": "100100",
-            "description": "Possible Valid Accounts (T1078)",
-            "level": 10,
-            "groups": [
-              "attack",
-              "T1078"
-            ],
-            "decoder": "json"
-          }
-        },
-        "detected": true,
-        "covered": true,
-        "reward": -0.7
-      },
-      {
-        "role": "blue",
-        "state": {
-          "executed": [
-            "T1078",
-            "T1078.001",
-            "T1078.002",
-            "T1589.002",
-            "T1590"
-          ],
-          "detected": [
-            "T1078",
-            "T1078.001",
-            "T1078.002",
-            "T1589.002"
-          ],
-          "defended": [
-            "T1078.001"
-          ],
-          "foothold": 1,
-          "step": 4
-        },
-        "action": {
-          "role": "blue",
-          "tech_id": "T1078",
-          "deploy_rule": false,
-          "name": "Contain Valid Accounts",
-          "defense": "Detection of Valid Account Abuse Across Platforms",
-          "winrate": 0.793,
-          "command": "echo defend T1078"
-        },
-        "applied": false,
-        "mitigated": false,
-        "rule_deployed": false,
-        "reward": 1.0
-      },
-      {
-        "role": "red",
-        "state": {
-          "executed": [
-            "T1078",
-            "T1078.001",
-            "T1078.002",
-            "T1589.002",
-            "T1590"
-          ],
-          "detected": [
-            "T1078",
-            "T1078.001",
-            "T1078.002",
-            "T1589.002"
-          ],
-          "defended": [
-            "T1078.001"
-          ],
-          "foothold": 1,
-          "step": 5
-        },
-        "action": {
-          "role": "red",
-          "tech_id": "T1190",
-          "name": "Exploit Public-Facing Application",
-          "tactics": [
-            "initial-access"
-          ],
-          "winrate": 0.718,
-          "command": "echo run T1190"
-        },
-        "result": {
-          "success": true,
-          "stdout": "[sim] executed T1190 (Exploit Public-Facing Application) -> ok"
-        },
-        "wazuh": {
-          "timestamp": "2026-10-06T00:00:00.000+0000",
-          "host": {
-            "name": "financial-bank-web",
-            "ip": "172.30.20.10"
-          },
-          "source": {
-            "ip": "172.30.10.100",
-            "user": "www-data"
-          },
-          "event": {
-            "rule_id": "100100",
-            "description": "Possible Exploit Public-Facing Application (T1190)",
-            "level": 10,
-            "groups": [
-              "attack",
-              "T1190"
-            ],
-            "decoder": "json"
-          }
-        },
-        "detected": true,
-        "covered": true,
-        "reward": 0.3
-      },
-      {
-        "role": "blue",
-        "state": {
-          "executed": [
-            "T1078",
-            "T1078.001",
-            "T1078.002",
-            "T1190",
-            "T1589.002",
-            "T1590"
-          ],
-          "detected": [
-            "T1078",
-            "T1078.001",
-            "T1078.002",
-            "T1190",
-            "T1589.002"
-          ],
-          "defended": [
-            "T1078.001"
-          ],
-          "foothold": 1,
-          "step": 5
-        },
-        "action": {
-          "role": "blue",
-          "tech_id": "T1078",
-          "deploy_rule": false,
-          "name": "Contain Valid Accounts",
-          "defense": "Detection of Valid Account Abuse Across Platforms",
-          "winrate": 0.796,
-          "command": "echo defend T1078"
-        },
-        "applied": true,
-        "mitigated": false,
-        "rule_deployed": false,
-        "reward": 1.0
-      }
-    ],
-    "red_return": 2.220446049250313e-16,
-    "blue_return": 5.4
-  },
-  {
-    "steps": [
-      {
-        "role": "red",
-        "state": {
-          "executed": [],
-          "detected": [],
-          "defended": [],
-          "foothold": 0,
-          "step": 0
-        },
-        "action": {
-          "role": "red",
-          "tech_id": "T1589.003",
-          "name": "Employee Names",
-          "tactics": [
-            "reconnaissance"
-          ],
-          "winrate": 0.55,
-          "command": "echo run T1589.003"
-        },
-        "result": {
-          "success": true,
-          "stdout": "[sim] executed T1589.003 (Employee Names) -> ok"
-        },
-        "wazuh": {
-          "timestamp": "2026-10-06T00:00:00.000+0000",
-          "host": {
-            "name": "financial-bank-web",
-            "ip": "172.30.20.10"
-          },
-          "source": {
-            "ip": "172.30.10.100",
-            "user": "www-data"
-          },
-          "event": {
-            "rule_id": "100100",
-            "description": "Possible Employee Names (T1589.003)",
-            "level": 10,
-            "groups": [
-              "attack",
-              "T1589.003"
-            ],
-            "decoder": "json"
-          }
-        },
-        "detected": true,
-        "covered": true,
-        "reward": -0.2
-      },
-      {
-        "role": "blue",
-        "state": {
-          "executed": [
-            "T1589.003"
-          ],
-          "detected": [
-            "T1589.003"
-          ],
-          "defended": [],
-          "foothold": 0,
-          "step": 0
-        },
-        "action": {
-          "role": "blue",
-          "tech_id": "T1589.003",
-          "deploy_rule": false,
-          "name": "Contain Employee Names",
-          "defense": "Detection of Employee Names",
-          "winrate": 0.925,
-          "command": "echo defend T1589.003"
-        },
-        "applied": true,
-        "mitigated": true,
-        "rule_deployed": false,
-        "reward": 1.7
-      },
-      {
-        "role": "red",
-        "state": {
-          "executed": [
-            "T1589.003"
-          ],
-          "detected": [
-            "T1589.003"
-          ],
-          "defended": [
-            "T1589.003"
-          ],
-          "foothold": 0,
-          "step": 1
-        },
-        "action": {
-          "role": "red",
-          "tech_id": "T1590",
-          "name": "Gather Victim Network Information",
-          "tactics": [
-            "reconnaissance"
-          ],
-          "winrate": 0.739,
-          "command": "echo run T1590"
-        },
-        "result": {
-          "success": false,
-          "stdout": "[sim] executed T1590 (Gather Victim Network Information) -> blocked"
-        },
-        "wazuh": {
-          "timestamp": "2026-10-06T00:00:00.000+0000",
-          "host": {
-            "name": "financial-bank-web",
-            "ip": "172.30.20.10"
-          },
-          "source": {
-            "ip": "172.30.10.100",
-            "user": "www-data"
-          },
-          "event": {
-            "rule_id": "100100",
-            "description": "Possible Gather Victim Network Information (T1590)",
-            "level": 10,
-            "groups": [
-              "attack",
-              "T1590"
-            ],
-            "decoder": "json"
-          }
-        },
-        "detected": false,
-        "covered": false,
-        "reward": 0.0
-      },
-      {
-        "role": "red",
-        "state": {
-          "executed": [
-            "T1589.003",
-            "T1590"
-          ],
-          "detected": [
-            "T1589.003"
-          ],
-          "defended": [
-            "T1589.003"
-          ],
-          "foothold": 0,
-          "step": 2
-        },
-        "action": {
-          "role": "red",
-          "tech_id": "T1589",
-          "name": "Gather Victim Identity Information",
-          "tactics": [
-            "reconnaissance"
-          ],
-          "winrate": 1.0,
-          "command": "echo run T1589"
-        },
-        "result": {
-          "success": true,
-          "stdout": "[sim] executed T1589 (Gather Victim Identity Information) -> ok"
-        },
-        "wazuh": {
-          "timestamp": "2026-10-06T00:00:00.000+0000",
-          "host": {
-            "name": "financial-bank-web",
-            "ip": "172.30.20.10"
-          },
-          "source": {
-            "ip": "172.30.10.100",
-            "user": "www-data"
-          },
-          "event": {
-            "rule_id": "100100",
-            "description": "Possible Gather Victim Identity Information (T1589)",
-            "level": 10,
-            "groups": [
-              "attack",
-              "T1589"
-            ],
-            "decoder": "json"
-          }
-        },
-        "detected": true,
-        "covered": true,
-        "reward": -0.2
-      },
-      {
-        "role": "blue",
-        "state": {
-          "executed": [
-            "T1589",
-            "T1589.003",
-            "T1590"
-          ],
-          "detected": [
-            "T1589",
-            "T1589.003"
-          ],
-          "defended": [
-            "T1589.003"
-          ],
-          "foothold": 0,
-          "step": 2
-        },
-        "action": {
-          "role": "blue",
-          "tech_id": "T1589",
-          "deploy_rule": false,
-          "name": "Contain Gather Victim Identity Information",
-          "defense": "Detection of Gather Victim Identity Information",
           "winrate": 1.0,
           "command": "echo defend T1589"
         },
@@ -1277,20 +81,16 @@
         "role": "red",
         "state": {
           "executed": [
-            "T1589",
-            "T1589.003",
-            "T1590"
+            "T1589"
           ],
           "detected": [
-            "T1589",
-            "T1589.003"
+            "T1589"
           ],
           "defended": [
-            "T1589",
-            "T1589.003"
+            "T1589"
           ],
           "foothold": 0,
-          "step": 3
+          "step": 1
         },
         "action": {
           "role": "red",
@@ -1299,7 +99,7 @@
           "tactics": [
             "reconnaissance"
           ],
-          "winrate": 1.0,
+          "winrate": 0.7,
           "command": "echo run T1589.001"
         },
         "result": {
@@ -1329,6 +129,7 @@
         },
         "detected": true,
         "covered": true,
+        "mitigated": true,
         "reward": -0.2
       },
       {
@@ -1336,21 +137,17 @@
         "state": {
           "executed": [
             "T1589",
-            "T1589.001",
-            "T1589.003",
-            "T1590"
+            "T1589.001"
           ],
           "detected": [
             "T1589",
-            "T1589.001",
-            "T1589.003"
+            "T1589.001"
           ],
           "defended": [
-            "T1589",
-            "T1589.003"
+            "T1589"
           ],
           "foothold": 0,
-          "step": 3
+          "step": 1
         },
         "action": {
           "role": "blue",
@@ -1358,7 +155,7 @@
           "deploy_rule": false,
           "name": "Contain Credentials",
           "defense": "Detection of Credentials",
-          "winrate": 0.875,
+          "winrate": 1.0,
           "command": "echo defend T1589.001"
         },
         "applied": true,
@@ -1371,141 +168,18 @@
         "state": {
           "executed": [
             "T1589",
-            "T1589.001",
-            "T1589.003",
-            "T1590"
+            "T1589.001"
           ],
           "detected": [
             "T1589",
-            "T1589.001",
-            "T1589.003"
+            "T1589.001"
           ],
           "defended": [
             "T1589",
-            "T1589.001",
-            "T1589.003"
+            "T1589.001"
           ],
           "foothold": 0,
-          "step": 4
-        },
-        "action": {
-          "role": "red",
-          "tech_id": "T1590.001",
-          "name": "Domain Properties",
-          "tactics": [
-            "reconnaissance"
-          ],
-          "winrate": 0.659,
-          "command": "echo run T1590.001"
-        },
-        "result": {
-          "success": true,
-          "stdout": "[sim] executed T1590.001 (Domain Properties) -> ok"
-        },
-        "wazuh": {
-          "timestamp": "2026-10-06T00:00:00.000+0000",
-          "host": {
-            "name": "financial-bank-web",
-            "ip": "172.30.20.10"
-          },
-          "source": {
-            "ip": "172.30.10.100",
-            "user": "www-data"
-          },
-          "event": {
-            "rule_id": "100100",
-            "description": "Possible Domain Properties (T1590.001)",
-            "level": 10,
-            "groups": [
-              "attack",
-              "T1590.001"
-            ],
-            "decoder": "json"
-          }
-        },
-        "detected": false,
-        "covered": false,
-        "reward": 1.0
-      },
-      {
-        "role": "red",
-        "state": {
-          "executed": [
-            "T1589",
-            "T1589.001",
-            "T1589.003",
-            "T1590",
-            "T1590.001"
-          ],
-          "detected": [
-            "T1589",
-            "T1589.001",
-            "T1589.003"
-          ],
-          "defended": [
-            "T1589",
-            "T1589.001",
-            "T1589.003"
-          ],
-          "foothold": 1,
-          "step": 5
-        },
-        "action": {
-          "role": "red",
-          "tech_id": "T1078.002",
-          "name": "Domain Accounts",
-          "tactics": [
-            "stealth",
-            "persistence",
-            "privilege-escalation",
-            "initial-access"
-          ],
-          "winrate": 0.614,
-          "command": "echo run T1078.002"
-        },
-        "result": {
-          "success": true,
-          "stdout": "[sim] executed T1078.002 (Domain Accounts) -> ok"
-        },
-        "wazuh": {
-          "timestamp": "2026-10-06T00:00:00.000+0000",
-          "host": {
-            "name": "financial-bank-web",
-            "ip": "172.30.20.10"
-          },
-          "source": {
-            "ip": "172.30.10.100",
-            "user": "www-data"
-          },
-          "event": {
-            "rule_id": "100100",
-            "description": "Possible Domain Accounts (T1078.002)",
-            "level": 10,
-            "groups": [
-              "attack",
-              "T1078.002"
-            ],
-            "decoder": "json"
-          }
-        },
-        "detected": false,
-        "covered": true,
-        "reward": 1.0
-      }
-    ],
-    "red_return": 1.4000000000000001,
-    "blue_return": 4.2
-  },
-  {
-    "steps": [
-      {
-        "role": "red",
-        "state": {
-          "executed": [],
-          "detected": [],
-          "defended": [],
-          "foothold": 0,
-          "step": 0
+          "step": 2
         },
         "action": {
           "role": "red",
@@ -1514,7 +188,7 @@
           "tactics": [
             "reconnaissance"
           ],
-          "winrate": 0.556,
+          "winrate": 0.7,
           "command": "echo run T1589.002"
         },
         "result": {
@@ -1544,20 +218,28 @@
         },
         "detected": true,
         "covered": true,
+        "mitigated": true,
         "reward": -1.2
       },
       {
         "role": "blue",
         "state": {
           "executed": [
+            "T1589",
+            "T1589.001",
             "T1589.002"
           ],
           "detected": [
+            "T1589",
+            "T1589.001",
             "T1589.002"
           ],
-          "defended": [],
+          "defended": [
+            "T1589",
+            "T1589.001"
+          ],
           "foothold": 0,
-          "step": 0
+          "step": 2
         },
         "action": {
           "role": "blue",
@@ -1565,7 +247,7 @@
           "deploy_rule": false,
           "name": "Contain Email Addresses",
           "defense": "Detection of Email Addresses",
-          "winrate": 0.625,
+          "winrate": 1.0,
           "command": "echo defend T1589.002"
         },
         "applied": true,
@@ -1577,30 +259,36 @@
         "role": "red",
         "state": {
           "executed": [
+            "T1589",
+            "T1589.001",
             "T1589.002"
           ],
           "detected": [
+            "T1589",
+            "T1589.001",
             "T1589.002"
           ],
           "defended": [
+            "T1589",
+            "T1589.001",
             "T1589.002"
           ],
           "foothold": 0,
-          "step": 1
+          "step": 3
         },
         "action": {
           "role": "red",
-          "tech_id": "T1590",
-          "name": "Gather Victim Network Information",
+          "tech_id": "T1590.001",
+          "name": "Domain Properties",
           "tactics": [
             "reconnaissance"
           ],
-          "winrate": 0.666,
-          "command": "echo run T1590"
+          "winrate": 0.733,
+          "command": "echo run T1590.001"
         },
         "result": {
           "success": true,
-          "stdout": "[sim] executed T1590 (Gather Victim Network Information) -> ok"
+          "stdout": "[sim] executed T1590.001 (Domain Properties) -> ok"
         },
         "wazuh": {
           "timestamp": "2026-10-06T00:00:00.000+0000",
@@ -1614,34 +302,411 @@
           },
           "event": {
             "rule_id": "100100",
-            "description": "Possible Gather Victim Network Information (T1590)",
+            "description": "Possible Domain Properties (T1590.001)",
             "level": 10,
             "groups": [
               "attack",
-              "T1590"
+              "T1590.001"
             ],
             "decoder": "json"
           }
         },
         "detected": false,
-        "covered": false,
+        "covered": true,
+        "mitigated": false,
         "reward": 1.0
       },
       {
         "role": "red",
         "state": {
           "executed": [
+            "T1589",
+            "T1589.001",
             "T1589.002",
-            "T1590"
+            "T1590.001"
           ],
           "detected": [
+            "T1589",
+            "T1589.001",
             "T1589.002"
           ],
           "defended": [
+            "T1589",
+            "T1589.001",
             "T1589.002"
           ],
           "foothold": 1,
+          "step": 4
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1078.003",
+          "name": "Local Accounts",
+          "tactics": [
+            "stealth",
+            "persistence",
+            "privilege-escalation",
+            "initial-access"
+          ],
+          "winrate": 0.744,
+          "command": "echo run T1078.003"
+        },
+        "result": {
+          "success": true,
+          "stdout": "[sim] executed T1078.003 (Local Accounts) -> ok"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Local Accounts (T1078.003)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1078.003"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": false,
+        "covered": false,
+        "mitigated": false,
+        "reward": 1.0
+      },
+      {
+        "role": "red",
+        "state": {
+          "executed": [
+            "T1078.003",
+            "T1589",
+            "T1589.001",
+            "T1589.002",
+            "T1590.001"
+          ],
+          "detected": [
+            "T1589",
+            "T1589.001",
+            "T1589.002"
+          ],
+          "defended": [
+            "T1589",
+            "T1589.001",
+            "T1589.002"
+          ],
+          "foothold": 2,
+          "step": 5
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1053.001",
+          "name": "At (Linux)",
+          "tactics": [
+            "execution",
+            "persistence",
+            "privilege-escalation"
+          ],
+          "winrate": 0.738,
+          "command": "echo run T1053.001"
+        },
+        "result": {
+          "success": false,
+          "stdout": "[sim] executed T1053.001 (At (Linux)) -> blocked"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible At (Linux) (T1053.001)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1053.001"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": false,
+        "covered": false,
+        "mitigated": false,
+        "reward": 0.0
+      }
+    ],
+    "red_return": -0.5999999999999996,
+    "blue_return": 4.2
+  },
+  {
+    "steps": [
+      {
+        "role": "red",
+        "state": {
+          "executed": [],
+          "detected": [],
+          "defended": [],
+          "foothold": 0,
+          "step": 0
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1589.003",
+          "name": "Employee Names",
+          "tactics": [
+            "reconnaissance"
+          ],
+          "winrate": 0.522,
+          "command": "echo run T1589.003"
+        },
+        "result": {
+          "success": true,
+          "stdout": "[sim] executed T1589.003 (Employee Names) -> ok"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Employee Names (T1589.003)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1589.003"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": false,
+        "covered": true,
+        "mitigated": false,
+        "reward": 1.0
+      },
+      {
+        "role": "blue",
+        "state": {
+          "executed": [
+            "T1589.003"
+          ],
+          "detected": [],
+          "defended": [],
+          "foothold": 0,
+          "step": 0
+        },
+        "action": {
+          "role": "blue",
+          "tech_id": "T1589.003",
+          "deploy_rule": false,
+          "name": "Contain Employee Names",
+          "defense": "Detection of Employee Names",
+          "winrate": 0.963,
+          "command": "echo defend T1589.003"
+        },
+        "applied": false,
+        "mitigated": false,
+        "rule_deployed": false,
+        "reward": -0.3
+      },
+      {
+        "role": "red",
+        "state": {
+          "executed": [
+            "T1589.003"
+          ],
+          "detected": [],
+          "defended": [],
+          "foothold": 1,
+          "step": 1
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1078.003",
+          "name": "Local Accounts",
+          "tactics": [
+            "stealth",
+            "persistence",
+            "privilege-escalation",
+            "initial-access"
+          ],
+          "winrate": 0.725,
+          "command": "echo run T1078.003"
+        },
+        "result": {
+          "success": false,
+          "stdout": "[sim] executed T1078.003 (Local Accounts) -> blocked"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Local Accounts (T1078.003)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1078.003"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": false,
+        "covered": false,
+        "mitigated": false,
+        "reward": 0.0
+      },
+      {
+        "role": "blue",
+        "state": {
+          "executed": [
+            "T1078.003",
+            "T1589.003"
+          ],
+          "detected": [],
+          "defended": [],
+          "foothold": 1,
+          "step": 1
+        },
+        "action": {
+          "role": "blue",
+          "tech_id": "T1589.003",
+          "deploy_rule": false,
+          "name": "Contain Employee Names",
+          "defense": "Detection of Employee Names",
+          "winrate": 0.902,
+          "command": "echo defend T1589.003"
+        },
+        "applied": true,
+        "mitigated": false,
+        "rule_deployed": false,
+        "reward": -0.3
+      },
+      {
+        "role": "red",
+        "state": {
+          "executed": [
+            "T1078.003",
+            "T1589.003"
+          ],
+          "detected": [],
+          "defended": [
+            "T1589.003"
+          ],
+          "foothold": 1,
           "step": 2
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1078.002",
+          "name": "Domain Accounts",
+          "tactics": [
+            "stealth",
+            "persistence",
+            "privilege-escalation",
+            "initial-access"
+          ],
+          "winrate": 0.64,
+          "command": "echo run T1078.002"
+        },
+        "result": {
+          "success": false,
+          "stdout": "[sim] executed T1078.002 (Domain Accounts) -> blocked"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Domain Accounts (T1078.002)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1078.002"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": false,
+        "covered": true,
+        "mitigated": true,
+        "reward": -0.5
+      },
+      {
+        "role": "blue",
+        "state": {
+          "executed": [
+            "T1078.002",
+            "T1078.003",
+            "T1589.003"
+          ],
+          "detected": [],
+          "defended": [
+            "T1589.003"
+          ],
+          "foothold": 1,
+          "step": 2
+        },
+        "action": {
+          "role": "blue",
+          "tech_id": "T1078.002",
+          "deploy_rule": false,
+          "name": "Contain Domain Accounts",
+          "defense": "Abuse of Domain Accounts",
+          "winrate": 0.856,
+          "command": "echo defend T1078.002"
+        },
+        "applied": true,
+        "mitigated": true,
+        "rule_deployed": false,
+        "reward": 0.4
+      },
+      {
+        "role": "red",
+        "state": {
+          "executed": [
+            "T1078.002",
+            "T1078.003",
+            "T1589.003"
+          ],
+          "detected": [],
+          "defended": [
+            "T1078.002",
+            "T1589.003"
+          ],
+          "foothold": 1,
+          "step": 3
         },
         "action": {
           "role": "red",
@@ -1653,12 +718,12 @@
             "privilege-escalation",
             "initial-access"
           ],
-          "winrate": 0.7,
+          "winrate": 0.69,
           "command": "echo run T1078.001"
         },
         "result": {
-          "success": false,
-          "stdout": "[sim] executed T1078.001 (Default Accounts) -> blocked"
+          "success": true,
+          "stdout": "[sim] executed T1078.001 (Default Accounts) -> ok"
         },
         "wazuh": {
           "timestamp": "2026-10-06T00:00:00.000+0000",
@@ -1683,25 +748,27 @@
         },
         "detected": true,
         "covered": true,
-        "reward": -1.2
+        "mitigated": true,
+        "reward": -0.2
       },
       {
         "role": "blue",
         "state": {
           "executed": [
             "T1078.001",
-            "T1589.002",
-            "T1590"
+            "T1078.002",
+            "T1078.003",
+            "T1589.003"
           ],
           "detected": [
-            "T1078.001",
-            "T1589.002"
+            "T1078.001"
           ],
           "defended": [
-            "T1589.002"
+            "T1078.002",
+            "T1589.003"
           ],
           "foothold": 1,
-          "step": 2
+          "step": 3
         },
         "action": {
           "role": "blue",
@@ -1709,7 +776,7 @@
           "deploy_rule": false,
           "name": "Contain Default Accounts",
           "defense": "Detection of Default Account Abuse Across Platforms",
-          "winrate": 1.0,
+          "winrate": 0.575,
           "command": "echo defend T1078.001"
         },
         "applied": true,
@@ -1722,133 +789,34 @@
         "state": {
           "executed": [
             "T1078.001",
-            "T1589.002",
-            "T1590"
+            "T1078.002",
+            "T1078.003",
+            "T1589.003"
           ],
           "detected": [
-            "T1078.001",
-            "T1589.002"
+            "T1078.001"
           ],
           "defended": [
             "T1078.001",
-            "T1589.002"
-          ],
-          "foothold": 1,
-          "step": 3
-        },
-        "action": {
-          "role": "red",
-          "tech_id": "T1078",
-          "name": "Valid Accounts",
-          "tactics": [
-            "stealth",
-            "persistence",
-            "privilege-escalation",
-            "initial-access"
-          ],
-          "winrate": 0.9,
-          "command": "echo run T1078"
-        },
-        "result": {
-          "success": true,
-          "stdout": "[sim] executed T1078 (Valid Accounts) -> ok"
-        },
-        "wazuh": {
-          "timestamp": "2026-10-06T00:00:00.000+0000",
-          "host": {
-            "name": "financial-bank-web",
-            "ip": "172.30.20.10"
-          },
-          "source": {
-            "ip": "172.30.10.100",
-            "user": "www-data"
-          },
-          "event": {
-            "rule_id": "100100",
-            "description": "Possible Valid Accounts (T1078)",
-            "level": 10,
-            "groups": [
-              "attack",
-              "T1078"
-            ],
-            "decoder": "json"
-          }
-        },
-        "detected": true,
-        "covered": true,
-        "reward": -0.2
-      },
-      {
-        "role": "blue",
-        "state": {
-          "executed": [
-            "T1078",
-            "T1078.001",
-            "T1589.002",
-            "T1590"
-          ],
-          "detected": [
-            "T1078",
-            "T1078.001",
-            "T1589.002"
-          ],
-          "defended": [
-            "T1078.001",
-            "T1589.002"
-          ],
-          "foothold": 1,
-          "step": 3
-        },
-        "action": {
-          "role": "blue",
-          "tech_id": "T1078",
-          "deploy_rule": false,
-          "name": "Contain Valid Accounts",
-          "defense": "Detection of Valid Account Abuse Across Platforms",
-          "winrate": 0.838,
-          "command": "echo defend T1078"
-        },
-        "applied": true,
-        "mitigated": true,
-        "rule_deployed": false,
-        "reward": 1.7
-      },
-      {
-        "role": "red",
-        "state": {
-          "executed": [
-            "T1078",
-            "T1078.001",
-            "T1589.002",
-            "T1590"
-          ],
-          "detected": [
-            "T1078",
-            "T1078.001",
-            "T1589.002"
-          ],
-          "defended": [
-            "T1078",
-            "T1078.001",
-            "T1589.002"
+            "T1078.002",
+            "T1589.003"
           ],
           "foothold": 1,
           "step": 4
         },
         "action": {
           "role": "red",
-          "tech_id": "T1133",
-          "name": "External Remote Services",
+          "tech_id": "T1190",
+          "name": "Exploit Public-Facing Application",
           "tactics": [
-            "persistence",
             "initial-access"
           ],
-          "winrate": 0.7,
-          "command": "echo run T1133"
+          "winrate": 0.691,
+          "command": "echo run T1190"
         },
         "result": {
           "success": true,
-          "stdout": "[sim] executed T1133 (External Remote Services) -> ok"
+          "stdout": "[sim] executed T1190 (Exploit Public-Facing Application) -> ok"
         },
         "wazuh": {
           "timestamp": "2026-10-06T00:00:00.000+0000",
@@ -1862,38 +830,37 @@
           },
           "event": {
             "rule_id": "100100",
-            "description": "Possible External Remote Services (T1133)",
+            "description": "Possible Exploit Public-Facing Application (T1190)",
             "level": 10,
             "groups": [
               "attack",
-              "T1133"
+              "T1190"
             ],
             "decoder": "json"
           }
         },
         "detected": false,
         "covered": true,
+        "mitigated": false,
         "reward": 1.0
       },
       {
         "role": "red",
         "state": {
           "executed": [
-            "T1078",
             "T1078.001",
-            "T1133",
-            "T1589.002",
-            "T1590"
+            "T1078.002",
+            "T1078.003",
+            "T1190",
+            "T1589.003"
           ],
           "detected": [
-            "T1078",
-            "T1078.001",
-            "T1589.002"
+            "T1078.001"
           ],
           "defended": [
-            "T1078",
             "T1078.001",
-            "T1589.002"
+            "T1078.002",
+            "T1589.003"
           ],
           "foothold": 2,
           "step": 5
@@ -1907,7 +874,7 @@
             "persistence",
             "privilege-escalation"
           ],
-          "winrate": 0.7,
+          "winrate": 1.0,
           "command": "echo run T1053.003"
         },
         "result": {
@@ -1937,6 +904,7 @@
         },
         "detected": true,
         "covered": true,
+        "mitigated": true,
         "reward": -0.2
       },
       {
@@ -1944,22 +912,20 @@
         "state": {
           "executed": [
             "T1053.003",
-            "T1078",
             "T1078.001",
-            "T1133",
-            "T1589.002",
-            "T1590"
+            "T1078.002",
+            "T1078.003",
+            "T1190",
+            "T1589.003"
           ],
           "detected": [
             "T1053.003",
-            "T1078",
-            "T1078.001",
-            "T1589.002"
+            "T1078.001"
           ],
           "defended": [
-            "T1078",
             "T1078.001",
-            "T1589.002"
+            "T1078.002",
+            "T1589.003"
           ],
           "foothold": 2,
           "step": 5
@@ -1970,7 +936,7 @@
           "deploy_rule": false,
           "name": "Contain Cron",
           "defense": "Cross-Platform Detection of Cron Job Abuse for Persistence and Execution",
-          "winrate": 0.863,
+          "winrate": 1.0,
           "command": "echo defend T1053.003"
         },
         "applied": true,
@@ -1979,455 +945,8 @@
         "reward": 1.7
       }
     ],
-    "red_return": -0.7999999999999998,
-    "blue_return": 6.2
-  },
-  {
-    "steps": [
-      {
-        "role": "red",
-        "state": {
-          "executed": [],
-          "detected": [],
-          "defended": [],
-          "foothold": 0,
-          "step": 0
-        },
-        "action": {
-          "role": "red",
-          "tech_id": "T1589",
-          "name": "Gather Victim Identity Information",
-          "tactics": [
-            "reconnaissance"
-          ],
-          "winrate": 0.7,
-          "command": "echo run T1589"
-        },
-        "result": {
-          "success": true,
-          "stdout": "[sim] executed T1589 (Gather Victim Identity Information) -> ok"
-        },
-        "wazuh": {
-          "timestamp": "2026-10-06T00:00:00.000+0000",
-          "host": {
-            "name": "financial-bank-web",
-            "ip": "172.30.20.10"
-          },
-          "source": {
-            "ip": "172.30.10.100",
-            "user": "www-data"
-          },
-          "event": {
-            "rule_id": "100100",
-            "description": "Possible Gather Victim Identity Information (T1589)",
-            "level": 10,
-            "groups": [
-              "attack",
-              "T1589"
-            ],
-            "decoder": "json"
-          }
-        },
-        "detected": true,
-        "covered": true,
-        "reward": -0.2
-      },
-      {
-        "role": "blue",
-        "state": {
-          "executed": [
-            "T1589"
-          ],
-          "detected": [
-            "T1589"
-          ],
-          "defended": [],
-          "foothold": 0,
-          "step": 0
-        },
-        "action": {
-          "role": "blue",
-          "tech_id": "T1589",
-          "deploy_rule": false,
-          "name": "Contain Gather Victim Identity Information",
-          "defense": "Detection of Gather Victim Identity Information",
-          "winrate": 1.0,
-          "command": "echo defend T1589"
-        },
-        "applied": true,
-        "mitigated": true,
-        "rule_deployed": false,
-        "reward": 1.7
-      },
-      {
-        "role": "red",
-        "state": {
-          "executed": [
-            "T1589"
-          ],
-          "detected": [
-            "T1589"
-          ],
-          "defended": [
-            "T1589"
-          ],
-          "foothold": 0,
-          "step": 1
-        },
-        "action": {
-          "role": "red",
-          "tech_id": "T1590",
-          "name": "Gather Victim Network Information",
-          "tactics": [
-            "reconnaissance"
-          ],
-          "winrate": 0.808,
-          "command": "echo run T1590"
-        },
-        "result": {
-          "success": true,
-          "stdout": "[sim] executed T1590 (Gather Victim Network Information) -> ok"
-        },
-        "wazuh": {
-          "timestamp": "2026-10-06T00:00:00.000+0000",
-          "host": {
-            "name": "financial-bank-web",
-            "ip": "172.30.20.10"
-          },
-          "source": {
-            "ip": "172.30.10.100",
-            "user": "www-data"
-          },
-          "event": {
-            "rule_id": "100100",
-            "description": "Possible Gather Victim Network Information (T1590)",
-            "level": 10,
-            "groups": [
-              "attack",
-              "T1590"
-            ],
-            "decoder": "json"
-          }
-        },
-        "detected": false,
-        "covered": false,
-        "reward": 1.0
-      },
-      {
-        "role": "red",
-        "state": {
-          "executed": [
-            "T1589",
-            "T1590"
-          ],
-          "detected": [
-            "T1589"
-          ],
-          "defended": [
-            "T1589"
-          ],
-          "foothold": 1,
-          "step": 2
-        },
-        "action": {
-          "role": "red",
-          "tech_id": "T1078.002",
-          "name": "Domain Accounts",
-          "tactics": [
-            "stealth",
-            "persistence",
-            "privilege-escalation",
-            "initial-access"
-          ],
-          "winrate": 0.64,
-          "command": "echo run T1078.002"
-        },
-        "result": {
-          "success": true,
-          "stdout": "[sim] executed T1078.002 (Domain Accounts) -> ok"
-        },
-        "wazuh": {
-          "timestamp": "2026-10-06T00:00:00.000+0000",
-          "host": {
-            "name": "financial-bank-web",
-            "ip": "172.30.20.10"
-          },
-          "source": {
-            "ip": "172.30.10.100",
-            "user": "www-data"
-          },
-          "event": {
-            "rule_id": "100100",
-            "description": "Possible Domain Accounts (T1078.002)",
-            "level": 10,
-            "groups": [
-              "attack",
-              "T1078.002"
-            ],
-            "decoder": "json"
-          }
-        },
-        "detected": true,
-        "covered": true,
-        "reward": -0.2
-      },
-      {
-        "role": "blue",
-        "state": {
-          "executed": [
-            "T1078.002",
-            "T1589",
-            "T1590"
-          ],
-          "detected": [
-            "T1078.002",
-            "T1589"
-          ],
-          "defended": [
-            "T1589"
-          ],
-          "foothold": 1,
-          "step": 2
-        },
-        "action": {
-          "role": "blue",
-          "tech_id": "T1078.002",
-          "deploy_rule": false,
-          "name": "Contain Domain Accounts",
-          "defense": "Abuse of Domain Accounts",
-          "winrate": 0.688,
-          "command": "echo defend T1078.002"
-        },
-        "applied": true,
-        "mitigated": true,
-        "rule_deployed": false,
-        "reward": 1.7
-      },
-      {
-        "role": "red",
-        "state": {
-          "executed": [
-            "T1078.002",
-            "T1589",
-            "T1590"
-          ],
-          "detected": [
-            "T1078.002",
-            "T1589"
-          ],
-          "defended": [
-            "T1078.002",
-            "T1589"
-          ],
-          "foothold": 1,
-          "step": 3
-        },
-        "action": {
-          "role": "red",
-          "tech_id": "T1133",
-          "name": "External Remote Services",
-          "tactics": [
-            "persistence",
-            "initial-access"
-          ],
-          "winrate": 0.595,
-          "command": "echo run T1133"
-        },
-        "result": {
-          "success": true,
-          "stdout": "[sim] executed T1133 (External Remote Services) -> ok"
-        },
-        "wazuh": {
-          "timestamp": "2026-10-06T00:00:00.000+0000",
-          "host": {
-            "name": "financial-bank-web",
-            "ip": "172.30.20.10"
-          },
-          "source": {
-            "ip": "172.30.10.100",
-            "user": "www-data"
-          },
-          "event": {
-            "rule_id": "100100",
-            "description": "Possible External Remote Services (T1133)",
-            "level": 10,
-            "groups": [
-              "attack",
-              "T1133"
-            ],
-            "decoder": "json"
-          }
-        },
-        "detected": true,
-        "covered": true,
-        "reward": -0.2
-      },
-      {
-        "role": "blue",
-        "state": {
-          "executed": [
-            "T1078.002",
-            "T1133",
-            "T1589",
-            "T1590"
-          ],
-          "detected": [
-            "T1078.002",
-            "T1133",
-            "T1589"
-          ],
-          "defended": [
-            "T1078.002",
-            "T1589"
-          ],
-          "foothold": 1,
-          "step": 3
-        },
-        "action": {
-          "role": "blue",
-          "tech_id": "T1133",
-          "deploy_rule": false,
-          "name": "Contain External Remote Services",
-          "defense": "Behavior-chain detection for T1133 External Remote Services across Windows, Linux, macOS, Containers",
-          "winrate": 0.913,
-          "command": "echo defend T1133"
-        },
-        "applied": true,
-        "mitigated": true,
-        "rule_deployed": false,
-        "reward": 1.7
-      },
-      {
-        "role": "red",
-        "state": {
-          "executed": [
-            "T1078.002",
-            "T1133",
-            "T1589",
-            "T1590"
-          ],
-          "detected": [
-            "T1078.002",
-            "T1133",
-            "T1589"
-          ],
-          "defended": [
-            "T1078.002",
-            "T1133",
-            "T1589"
-          ],
-          "foothold": 1,
-          "step": 4
-        },
-        "action": {
-          "role": "red",
-          "tech_id": "T1078",
-          "name": "Valid Accounts",
-          "tactics": [
-            "stealth",
-            "persistence",
-            "privilege-escalation",
-            "initial-access"
-          ],
-          "winrate": 1.0,
-          "command": "echo run T1078"
-        },
-        "result": {
-          "success": true,
-          "stdout": "[sim] executed T1078 (Valid Accounts) -> ok"
-        },
-        "wazuh": {
-          "timestamp": "2026-10-06T00:00:00.000+0000",
-          "host": {
-            "name": "financial-bank-web",
-            "ip": "172.30.20.10"
-          },
-          "source": {
-            "ip": "172.30.10.100",
-            "user": "www-data"
-          },
-          "event": {
-            "rule_id": "100100",
-            "description": "Possible Valid Accounts (T1078)",
-            "level": 10,
-            "groups": [
-              "attack",
-              "T1078"
-            ],
-            "decoder": "json"
-          }
-        },
-        "detected": false,
-        "covered": true,
-        "reward": 1.0
-      },
-      {
-        "role": "red",
-        "state": {
-          "executed": [
-            "T1078",
-            "T1078.002",
-            "T1133",
-            "T1589",
-            "T1590"
-          ],
-          "detected": [
-            "T1078.002",
-            "T1133",
-            "T1589"
-          ],
-          "defended": [
-            "T1078.002",
-            "T1133",
-            "T1589"
-          ],
-          "foothold": 2,
-          "step": 5
-        },
-        "action": {
-          "role": "red",
-          "tech_id": "T1053.002",
-          "name": "At",
-          "tactics": [
-            "execution",
-            "persistence",
-            "privilege-escalation"
-          ],
-          "winrate": 0.586,
-          "command": "echo run T1053.002"
-        },
-        "result": {
-          "success": false,
-          "stdout": "[sim] executed T1053.002 (At) -> blocked"
-        },
-        "wazuh": {
-          "timestamp": "2026-10-06T00:00:00.000+0000",
-          "host": {
-            "name": "financial-bank-web",
-            "ip": "172.30.20.10"
-          },
-          "source": {
-            "ip": "172.30.10.100",
-            "user": "www-data"
-          },
-          "event": {
-            "rule_id": "100100",
-            "description": "Possible At (T1053.002)",
-            "level": 10,
-            "groups": [
-              "attack",
-              "T1053.002"
-            ],
-            "decoder": "json"
-          }
-        },
-        "detected": false,
-        "covered": false,
-        "reward": 0.0
-      }
-    ],
-    "red_return": 1.4000000000000001,
-    "blue_return": 4.2
+    "red_return": 1.1,
+    "blue_return": 2.9
   },
   {
     "steps": [
@@ -2447,12 +966,12 @@
           "tactics": [
             "reconnaissance"
           ],
-          "winrate": 0.479,
+          "winrate": 1.0,
           "command": "echo run T1589.002"
         },
         "result": {
-          "success": false,
-          "stdout": "[sim] executed T1589.002 (Email Addresses) -> blocked"
+          "success": true,
+          "stdout": "[sim] executed T1589.002 (Email Addresses) -> ok"
         },
         "wazuh": {
           "timestamp": "2026-10-06T00:00:00.000+0000",
@@ -2477,7 +996,8 @@
         },
         "detected": true,
         "covered": true,
-        "reward": -1.2
+        "mitigated": true,
+        "reward": -0.2
       },
       {
         "role": "blue",
@@ -2498,7 +1018,1515 @@
           "deploy_rule": false,
           "name": "Contain Email Addresses",
           "defense": "Detection of Email Addresses",
-          "winrate": 0.775,
+          "winrate": 1.0,
+          "command": "echo defend T1589.002"
+        },
+        "applied": true,
+        "mitigated": true,
+        "rule_deployed": false,
+        "reward": 1.7
+      },
+      {
+        "role": "red",
+        "state": {
+          "executed": [
+            "T1589.002"
+          ],
+          "detected": [
+            "T1589.002"
+          ],
+          "defended": [
+            "T1589.002"
+          ],
+          "foothold": 0,
+          "step": 1
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1589.001",
+          "name": "Credentials",
+          "tactics": [
+            "reconnaissance"
+          ],
+          "winrate": 0.7,
+          "command": "echo run T1589.001"
+        },
+        "result": {
+          "success": true,
+          "stdout": "[sim] executed T1589.001 (Credentials) -> ok"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Credentials (T1589.001)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1589.001"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": true,
+        "covered": true,
+        "mitigated": true,
+        "reward": -0.2
+      },
+      {
+        "role": "blue",
+        "state": {
+          "executed": [
+            "T1589.001",
+            "T1589.002"
+          ],
+          "detected": [
+            "T1589.001",
+            "T1589.002"
+          ],
+          "defended": [
+            "T1589.002"
+          ],
+          "foothold": 0,
+          "step": 1
+        },
+        "action": {
+          "role": "blue",
+          "tech_id": "T1589.001",
+          "deploy_rule": false,
+          "name": "Contain Credentials",
+          "defense": "Detection of Credentials",
+          "winrate": 1.0,
+          "command": "echo defend T1589.001"
+        },
+        "applied": true,
+        "mitigated": true,
+        "rule_deployed": false,
+        "reward": 1.7
+      },
+      {
+        "role": "red",
+        "state": {
+          "executed": [
+            "T1589.001",
+            "T1589.002"
+          ],
+          "detected": [
+            "T1589.001",
+            "T1589.002"
+          ],
+          "defended": [
+            "T1589.001",
+            "T1589.002"
+          ],
+          "foothold": 0,
+          "step": 2
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1590",
+          "name": "Gather Victim Network Information",
+          "tactics": [
+            "reconnaissance"
+          ],
+          "winrate": 0.7,
+          "command": "echo run T1590"
+        },
+        "result": {
+          "success": false,
+          "stdout": "[sim] executed T1590 (Gather Victim Network Information) -> blocked"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Gather Victim Network Information (T1590)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1590"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": true,
+        "covered": true,
+        "mitigated": true,
+        "reward": -1.2
+      },
+      {
+        "role": "blue",
+        "state": {
+          "executed": [
+            "T1589.001",
+            "T1589.002",
+            "T1590"
+          ],
+          "detected": [
+            "T1589.001",
+            "T1589.002",
+            "T1590"
+          ],
+          "defended": [
+            "T1589.001",
+            "T1589.002"
+          ],
+          "foothold": 0,
+          "step": 2
+        },
+        "action": {
+          "role": "blue",
+          "tech_id": "T1590",
+          "deploy_rule": false,
+          "name": "Contain Gather Victim Network Information",
+          "defense": "Detection of Gather Victim Network Information",
+          "winrate": 1.0,
+          "command": "echo defend T1590"
+        },
+        "applied": true,
+        "mitigated": true,
+        "rule_deployed": false,
+        "reward": 1.7
+      },
+      {
+        "role": "red",
+        "state": {
+          "executed": [
+            "T1589.001",
+            "T1589.002",
+            "T1590"
+          ],
+          "detected": [
+            "T1589.001",
+            "T1589.002",
+            "T1590"
+          ],
+          "defended": [
+            "T1589.001",
+            "T1589.002",
+            "T1590"
+          ],
+          "foothold": 0,
+          "step": 3
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1590.002",
+          "name": "DNS",
+          "tactics": [
+            "reconnaissance"
+          ],
+          "winrate": 0.7,
+          "command": "echo run T1590.002"
+        },
+        "result": {
+          "success": true,
+          "stdout": "[sim] executed T1590.002 (DNS) -> ok"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible DNS (T1590.002)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1590.002"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": false,
+        "covered": true,
+        "mitigated": false,
+        "reward": 1.0
+      },
+      {
+        "role": "red",
+        "state": {
+          "executed": [
+            "T1589.001",
+            "T1589.002",
+            "T1590",
+            "T1590.002"
+          ],
+          "detected": [
+            "T1589.001",
+            "T1589.002",
+            "T1590"
+          ],
+          "defended": [
+            "T1589.001",
+            "T1589.002",
+            "T1590"
+          ],
+          "foothold": 1,
+          "step": 4
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1078.003",
+          "name": "Local Accounts",
+          "tactics": [
+            "stealth",
+            "persistence",
+            "privilege-escalation",
+            "initial-access"
+          ],
+          "winrate": 0.651,
+          "command": "echo run T1078.003"
+        },
+        "result": {
+          "success": true,
+          "stdout": "[sim] executed T1078.003 (Local Accounts) -> ok"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Local Accounts (T1078.003)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1078.003"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": false,
+        "covered": false,
+        "mitigated": false,
+        "reward": 1.0
+      },
+      {
+        "role": "red",
+        "state": {
+          "executed": [
+            "T1078.003",
+            "T1589.001",
+            "T1589.002",
+            "T1590",
+            "T1590.002"
+          ],
+          "detected": [
+            "T1589.001",
+            "T1589.002",
+            "T1590"
+          ],
+          "defended": [
+            "T1589.001",
+            "T1589.002",
+            "T1590"
+          ],
+          "foothold": 2,
+          "step": 5
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1053.001",
+          "name": "At (Linux)",
+          "tactics": [
+            "execution",
+            "persistence",
+            "privilege-escalation"
+          ],
+          "winrate": 0.687,
+          "command": "echo run T1053.001"
+        },
+        "result": {
+          "success": false,
+          "stdout": "[sim] executed T1053.001 (At (Linux)) -> blocked"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible At (Linux) (T1053.001)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1053.001"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": false,
+        "covered": false,
+        "mitigated": false,
+        "reward": 0.0
+      }
+    ],
+    "red_return": 0.40000000000000013,
+    "blue_return": 4.2
+  },
+  {
+    "steps": [
+      {
+        "role": "red",
+        "state": {
+          "executed": [],
+          "detected": [],
+          "defended": [],
+          "foothold": 0,
+          "step": 0
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1589.001",
+          "name": "Credentials",
+          "tactics": [
+            "reconnaissance"
+          ],
+          "winrate": 0.7,
+          "command": "echo run T1589.001"
+        },
+        "result": {
+          "success": true,
+          "stdout": "[sim] executed T1589.001 (Credentials) -> ok"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Credentials (T1589.001)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1589.001"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": true,
+        "covered": true,
+        "mitigated": true,
+        "reward": -0.2
+      },
+      {
+        "role": "blue",
+        "state": {
+          "executed": [
+            "T1589.001"
+          ],
+          "detected": [
+            "T1589.001"
+          ],
+          "defended": [],
+          "foothold": 0,
+          "step": 0
+        },
+        "action": {
+          "role": "blue",
+          "tech_id": "T1589.001",
+          "deploy_rule": false,
+          "name": "Contain Credentials",
+          "defense": "Detection of Credentials",
+          "winrate": 1.0,
+          "command": "echo defend T1589.001"
+        },
+        "applied": true,
+        "mitigated": true,
+        "rule_deployed": false,
+        "reward": 1.7
+      },
+      {
+        "role": "red",
+        "state": {
+          "executed": [
+            "T1589.001"
+          ],
+          "detected": [
+            "T1589.001"
+          ],
+          "defended": [
+            "T1589.001"
+          ],
+          "foothold": 0,
+          "step": 1
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1590",
+          "name": "Gather Victim Network Information",
+          "tactics": [
+            "reconnaissance"
+          ],
+          "winrate": 0.7,
+          "command": "echo run T1590"
+        },
+        "result": {
+          "success": false,
+          "stdout": "[sim] executed T1590 (Gather Victim Network Information) -> blocked"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Gather Victim Network Information (T1590)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1590"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": true,
+        "covered": true,
+        "mitigated": true,
+        "reward": -1.2
+      },
+      {
+        "role": "blue",
+        "state": {
+          "executed": [
+            "T1589.001",
+            "T1590"
+          ],
+          "detected": [
+            "T1589.001",
+            "T1590"
+          ],
+          "defended": [
+            "T1589.001"
+          ],
+          "foothold": 0,
+          "step": 1
+        },
+        "action": {
+          "role": "blue",
+          "tech_id": "T1590",
+          "deploy_rule": false,
+          "name": "Contain Gather Victim Network Information",
+          "defense": "Detection of Gather Victim Network Information",
+          "winrate": 1.0,
+          "command": "echo defend T1590"
+        },
+        "applied": true,
+        "mitigated": true,
+        "rule_deployed": false,
+        "reward": 1.7
+      },
+      {
+        "role": "red",
+        "state": {
+          "executed": [
+            "T1589.001",
+            "T1590"
+          ],
+          "detected": [
+            "T1589.001",
+            "T1590"
+          ],
+          "defended": [
+            "T1589.001",
+            "T1590"
+          ],
+          "foothold": 0,
+          "step": 2
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1589.002",
+          "name": "Email Addresses",
+          "tactics": [
+            "reconnaissance"
+          ],
+          "winrate": 0.7,
+          "command": "echo run T1589.002"
+        },
+        "result": {
+          "success": true,
+          "stdout": "[sim] executed T1589.002 (Email Addresses) -> ok"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Email Addresses (T1589.002)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1589.002"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": true,
+        "covered": true,
+        "mitigated": true,
+        "reward": -0.2
+      },
+      {
+        "role": "blue",
+        "state": {
+          "executed": [
+            "T1589.001",
+            "T1589.002",
+            "T1590"
+          ],
+          "detected": [
+            "T1589.001",
+            "T1589.002",
+            "T1590"
+          ],
+          "defended": [
+            "T1589.001",
+            "T1590"
+          ],
+          "foothold": 0,
+          "step": 2
+        },
+        "action": {
+          "role": "blue",
+          "tech_id": "T1589.002",
+          "deploy_rule": false,
+          "name": "Contain Email Addresses",
+          "defense": "Detection of Email Addresses",
+          "winrate": 1.0,
+          "command": "echo defend T1589.002"
+        },
+        "applied": true,
+        "mitigated": true,
+        "rule_deployed": false,
+        "reward": 1.7
+      },
+      {
+        "role": "red",
+        "state": {
+          "executed": [
+            "T1589.001",
+            "T1589.002",
+            "T1590"
+          ],
+          "detected": [
+            "T1589.001",
+            "T1589.002",
+            "T1590"
+          ],
+          "defended": [
+            "T1589.001",
+            "T1589.002",
+            "T1590"
+          ],
+          "foothold": 0,
+          "step": 3
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1590.002",
+          "name": "DNS",
+          "tactics": [
+            "reconnaissance"
+          ],
+          "winrate": 0.75,
+          "command": "echo run T1590.002"
+        },
+        "result": {
+          "success": true,
+          "stdout": "[sim] executed T1590.002 (DNS) -> ok"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible DNS (T1590.002)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1590.002"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": true,
+        "covered": true,
+        "mitigated": true,
+        "reward": -0.2
+      },
+      {
+        "role": "blue",
+        "state": {
+          "executed": [
+            "T1589.001",
+            "T1589.002",
+            "T1590",
+            "T1590.002"
+          ],
+          "detected": [
+            "T1589.001",
+            "T1589.002",
+            "T1590",
+            "T1590.002"
+          ],
+          "defended": [
+            "T1589.001",
+            "T1589.002",
+            "T1590"
+          ],
+          "foothold": 0,
+          "step": 3
+        },
+        "action": {
+          "role": "blue",
+          "tech_id": "T1590.002",
+          "deploy_rule": false,
+          "name": "Contain DNS",
+          "defense": "Detection of DNS",
+          "winrate": 0.713,
+          "command": "echo defend T1590.002"
+        },
+        "applied": true,
+        "mitigated": true,
+        "rule_deployed": false,
+        "reward": 1.7
+      },
+      {
+        "role": "red",
+        "state": {
+          "executed": [
+            "T1589.001",
+            "T1589.002",
+            "T1590",
+            "T1590.002"
+          ],
+          "detected": [
+            "T1589.001",
+            "T1589.002",
+            "T1590",
+            "T1590.002"
+          ],
+          "defended": [
+            "T1589.001",
+            "T1589.002",
+            "T1590",
+            "T1590.002"
+          ],
+          "foothold": 0,
+          "step": 4
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1590.001",
+          "name": "Domain Properties",
+          "tactics": [
+            "reconnaissance"
+          ],
+          "winrate": 0.693,
+          "command": "echo run T1590.001"
+        },
+        "result": {
+          "success": true,
+          "stdout": "[sim] executed T1590.001 (Domain Properties) -> ok"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Domain Properties (T1590.001)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1590.001"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": true,
+        "covered": true,
+        "mitigated": true,
+        "reward": -0.2
+      },
+      {
+        "role": "blue",
+        "state": {
+          "executed": [
+            "T1589.001",
+            "T1589.002",
+            "T1590",
+            "T1590.001",
+            "T1590.002"
+          ],
+          "detected": [
+            "T1589.001",
+            "T1589.002",
+            "T1590",
+            "T1590.001",
+            "T1590.002"
+          ],
+          "defended": [
+            "T1589.001",
+            "T1589.002",
+            "T1590",
+            "T1590.002"
+          ],
+          "foothold": 0,
+          "step": 4
+        },
+        "action": {
+          "role": "blue",
+          "tech_id": "T1590.001",
+          "deploy_rule": false,
+          "name": "Contain Domain Properties",
+          "defense": "Detection of Domain Properties",
+          "winrate": 1.0,
+          "command": "echo defend T1590.001"
+        },
+        "applied": true,
+        "mitigated": true,
+        "rule_deployed": false,
+        "reward": 1.7
+      },
+      {
+        "role": "red",
+        "state": {
+          "executed": [
+            "T1589.001",
+            "T1589.002",
+            "T1590",
+            "T1590.001",
+            "T1590.002"
+          ],
+          "detected": [
+            "T1589.001",
+            "T1589.002",
+            "T1590",
+            "T1590.001",
+            "T1590.002"
+          ],
+          "defended": [
+            "T1589.001",
+            "T1589.002",
+            "T1590",
+            "T1590.001",
+            "T1590.002"
+          ],
+          "foothold": 0,
+          "step": 5
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1590.003",
+          "name": "Network Trust Dependencies",
+          "tactics": [
+            "reconnaissance"
+          ],
+          "winrate": 0.684,
+          "command": "echo run T1590.003"
+        },
+        "result": {
+          "success": false,
+          "stdout": "[sim] executed T1590.003 (Network Trust Dependencies) -> blocked"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Network Trust Dependencies (T1590.003)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1590.003"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": false,
+        "covered": false,
+        "mitigated": false,
+        "reward": 0.0
+      }
+    ],
+    "red_return": -1.9999999999999998,
+    "blue_return": 8.2
+  },
+  {
+    "steps": [
+      {
+        "role": "red",
+        "state": {
+          "executed": [],
+          "detected": [],
+          "defended": [],
+          "foothold": 0,
+          "step": 0
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1589.003",
+          "name": "Employee Names",
+          "tactics": [
+            "reconnaissance"
+          ],
+          "winrate": 0.621,
+          "command": "echo run T1589.003"
+        },
+        "result": {
+          "success": true,
+          "stdout": "[sim] executed T1589.003 (Employee Names) -> ok"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Employee Names (T1589.003)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1589.003"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": true,
+        "covered": true,
+        "mitigated": true,
+        "reward": -0.2
+      },
+      {
+        "role": "blue",
+        "state": {
+          "executed": [
+            "T1589.003"
+          ],
+          "detected": [
+            "T1589.003"
+          ],
+          "defended": [],
+          "foothold": 0,
+          "step": 0
+        },
+        "action": {
+          "role": "blue",
+          "tech_id": "T1589.003",
+          "deploy_rule": false,
+          "name": "Contain Employee Names",
+          "defense": "Detection of Employee Names",
+          "winrate": 0.637,
+          "command": "echo defend T1589.003"
+        },
+        "applied": true,
+        "mitigated": true,
+        "rule_deployed": false,
+        "reward": 1.7
+      },
+      {
+        "role": "red",
+        "state": {
+          "executed": [
+            "T1589.003"
+          ],
+          "detected": [
+            "T1589.003"
+          ],
+          "defended": [
+            "T1589.003"
+          ],
+          "foothold": 0,
+          "step": 1
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1589.001",
+          "name": "Credentials",
+          "tactics": [
+            "reconnaissance"
+          ],
+          "winrate": 0.513,
+          "command": "echo run T1589.001"
+        },
+        "result": {
+          "success": true,
+          "stdout": "[sim] executed T1589.001 (Credentials) -> ok"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Credentials (T1589.001)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1589.001"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": true,
+        "covered": true,
+        "mitigated": true,
+        "reward": -0.2
+      },
+      {
+        "role": "blue",
+        "state": {
+          "executed": [
+            "T1589.001",
+            "T1589.003"
+          ],
+          "detected": [
+            "T1589.001",
+            "T1589.003"
+          ],
+          "defended": [
+            "T1589.003"
+          ],
+          "foothold": 0,
+          "step": 1
+        },
+        "action": {
+          "role": "blue",
+          "tech_id": "T1589.001",
+          "deploy_rule": false,
+          "name": "Contain Credentials",
+          "defense": "Detection of Credentials",
+          "winrate": 1.0,
+          "command": "echo defend T1589.001"
+        },
+        "applied": true,
+        "mitigated": true,
+        "rule_deployed": false,
+        "reward": 1.7
+      },
+      {
+        "role": "red",
+        "state": {
+          "executed": [
+            "T1589.001",
+            "T1589.003"
+          ],
+          "detected": [
+            "T1589.001",
+            "T1589.003"
+          ],
+          "defended": [
+            "T1589.001",
+            "T1589.003"
+          ],
+          "foothold": 0,
+          "step": 2
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1590.001",
+          "name": "Domain Properties",
+          "tactics": [
+            "reconnaissance"
+          ],
+          "winrate": 0.592,
+          "command": "echo run T1590.001"
+        },
+        "result": {
+          "success": true,
+          "stdout": "[sim] executed T1590.001 (Domain Properties) -> ok"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Domain Properties (T1590.001)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1590.001"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": true,
+        "covered": true,
+        "mitigated": true,
+        "reward": -0.2
+      },
+      {
+        "role": "blue",
+        "state": {
+          "executed": [
+            "T1589.001",
+            "T1589.003",
+            "T1590.001"
+          ],
+          "detected": [
+            "T1589.001",
+            "T1589.003",
+            "T1590.001"
+          ],
+          "defended": [
+            "T1589.001",
+            "T1589.003"
+          ],
+          "foothold": 0,
+          "step": 2
+        },
+        "action": {
+          "role": "blue",
+          "tech_id": "T1590.001",
+          "deploy_rule": false,
+          "name": "Contain Domain Properties",
+          "defense": "Detection of Domain Properties",
+          "winrate": 1.0,
+          "command": "echo defend T1590.001"
+        },
+        "applied": true,
+        "mitigated": true,
+        "rule_deployed": false,
+        "reward": 1.7
+      },
+      {
+        "role": "red",
+        "state": {
+          "executed": [
+            "T1589.001",
+            "T1589.003",
+            "T1590.001"
+          ],
+          "detected": [
+            "T1589.001",
+            "T1589.003",
+            "T1590.001"
+          ],
+          "defended": [
+            "T1589.001",
+            "T1589.003",
+            "T1590.001"
+          ],
+          "foothold": 0,
+          "step": 3
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1589.002",
+          "name": "Email Addresses",
+          "tactics": [
+            "reconnaissance"
+          ],
+          "winrate": 1.0,
+          "command": "echo run T1589.002"
+        },
+        "result": {
+          "success": true,
+          "stdout": "[sim] executed T1589.002 (Email Addresses) -> ok"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Email Addresses (T1589.002)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1589.002"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": true,
+        "covered": true,
+        "mitigated": true,
+        "reward": -0.2
+      },
+      {
+        "role": "blue",
+        "state": {
+          "executed": [
+            "T1589.001",
+            "T1589.002",
+            "T1589.003",
+            "T1590.001"
+          ],
+          "detected": [
+            "T1589.001",
+            "T1589.002",
+            "T1589.003",
+            "T1590.001"
+          ],
+          "defended": [
+            "T1589.001",
+            "T1589.003",
+            "T1590.001"
+          ],
+          "foothold": 0,
+          "step": 3
+        },
+        "action": {
+          "role": "blue",
+          "tech_id": "T1589.002",
+          "deploy_rule": false,
+          "name": "Contain Email Addresses",
+          "defense": "Detection of Email Addresses",
+          "winrate": 1.0,
+          "command": "echo defend T1589.002"
+        },
+        "applied": true,
+        "mitigated": true,
+        "rule_deployed": false,
+        "reward": 1.7
+      },
+      {
+        "role": "red",
+        "state": {
+          "executed": [
+            "T1589.001",
+            "T1589.002",
+            "T1589.003",
+            "T1590.001"
+          ],
+          "detected": [
+            "T1589.001",
+            "T1589.002",
+            "T1589.003",
+            "T1590.001"
+          ],
+          "defended": [
+            "T1589.001",
+            "T1589.002",
+            "T1589.003",
+            "T1590.001"
+          ],
+          "foothold": 0,
+          "step": 4
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1590.003",
+          "name": "Network Trust Dependencies",
+          "tactics": [
+            "reconnaissance"
+          ],
+          "winrate": 0.66,
+          "command": "echo run T1590.003"
+        },
+        "result": {
+          "success": false,
+          "stdout": "[sim] executed T1590.003 (Network Trust Dependencies) -> blocked"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Network Trust Dependencies (T1590.003)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1590.003"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": false,
+        "covered": false,
+        "mitigated": false,
+        "reward": 0.0
+      },
+      {
+        "role": "red",
+        "state": {
+          "executed": [
+            "T1589.001",
+            "T1589.002",
+            "T1589.003",
+            "T1590.001",
+            "T1590.003"
+          ],
+          "detected": [
+            "T1589.001",
+            "T1589.002",
+            "T1589.003",
+            "T1590.001"
+          ],
+          "defended": [
+            "T1589.001",
+            "T1589.002",
+            "T1589.003",
+            "T1590.001"
+          ],
+          "foothold": 0,
+          "step": 5
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1590.002",
+          "name": "DNS",
+          "tactics": [
+            "reconnaissance"
+          ],
+          "winrate": 0.675,
+          "command": "echo run T1590.002"
+        },
+        "result": {
+          "success": false,
+          "stdout": "[sim] executed T1590.002 (DNS) -> blocked"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible DNS (T1590.002)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1590.002"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": true,
+        "covered": true,
+        "mitigated": false,
+        "reward": -0.7
+      },
+      {
+        "role": "blue",
+        "state": {
+          "executed": [
+            "T1589.001",
+            "T1589.002",
+            "T1589.003",
+            "T1590.001",
+            "T1590.002",
+            "T1590.003"
+          ],
+          "detected": [
+            "T1589.001",
+            "T1589.002",
+            "T1589.003",
+            "T1590.001",
+            "T1590.002"
+          ],
+          "defended": [
+            "T1589.001",
+            "T1589.002",
+            "T1589.003",
+            "T1590.001"
+          ],
+          "foothold": 0,
+          "step": 5
+        },
+        "action": {
+          "role": "blue",
+          "tech_id": "T1590.002",
+          "deploy_rule": false,
+          "name": "Contain DNS",
+          "defense": "Detection of DNS",
+          "winrate": 0.85,
+          "command": "echo defend T1590.002"
+        },
+        "applied": false,
+        "mitigated": false,
+        "rule_deployed": false,
+        "reward": 1.0
+      }
+    ],
+    "red_return": -1.4999999999999998,
+    "blue_return": 7.5
+  },
+  {
+    "steps": [
+      {
+        "role": "red",
+        "state": {
+          "executed": [],
+          "detected": [],
+          "defended": [],
+          "foothold": 0,
+          "step": 0
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1589.002",
+          "name": "Email Addresses",
+          "tactics": [
+            "reconnaissance"
+          ],
+          "winrate": 1.0,
+          "command": "echo run T1589.002"
+        },
+        "result": {
+          "success": true,
+          "stdout": "[sim] executed T1589.002 (Email Addresses) -> ok"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Email Addresses (T1589.002)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1589.002"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": true,
+        "covered": true,
+        "mitigated": true,
+        "reward": -0.2
+      },
+      {
+        "role": "blue",
+        "state": {
+          "executed": [
+            "T1589.002"
+          ],
+          "detected": [
+            "T1589.002"
+          ],
+          "defended": [],
+          "foothold": 0,
+          "step": 0
+        },
+        "action": {
+          "role": "blue",
+          "tech_id": "T1589.002",
+          "deploy_rule": false,
+          "name": "Contain Email Addresses",
+          "defense": "Detection of Email Addresses",
+          "winrate": 1.0,
           "command": "echo defend T1589.002"
         },
         "applied": true,
@@ -2528,7 +2556,7 @@
           "tactics": [
             "reconnaissance"
           ],
-          "winrate": 0.744,
+          "winrate": 1.0,
           "command": "echo run T1590"
         },
         "result": {
@@ -2556,9 +2584,41 @@
             "decoder": "json"
           }
         },
-        "detected": false,
-        "covered": false,
-        "reward": 1.0
+        "detected": true,
+        "covered": true,
+        "mitigated": true,
+        "reward": -0.2
+      },
+      {
+        "role": "blue",
+        "state": {
+          "executed": [
+            "T1589.002",
+            "T1590"
+          ],
+          "detected": [
+            "T1589.002",
+            "T1590"
+          ],
+          "defended": [
+            "T1589.002"
+          ],
+          "foothold": 0,
+          "step": 1
+        },
+        "action": {
+          "role": "blue",
+          "tech_id": "T1590",
+          "deploy_rule": false,
+          "name": "Contain Gather Victim Network Information",
+          "defense": "Detection of Gather Victim Network Information",
+          "winrate": 1.0,
+          "command": "echo defend T1590"
+        },
+        "applied": true,
+        "mitigated": true,
+        "rule_deployed": false,
+        "reward": 1.7
       },
       {
         "role": "red",
@@ -2568,120 +2628,151 @@
             "T1590"
           ],
           "detected": [
-            "T1589.002"
+            "T1589.002",
+            "T1590"
           ],
           "defended": [
-            "T1589.002"
+            "T1589.002",
+            "T1590"
           ],
-          "foothold": 1,
+          "foothold": 0,
           "step": 2
         },
         "action": {
           "role": "red",
-          "tech_id": "T1078.002",
-          "name": "Domain Accounts",
+          "tech_id": "T1589.003",
+          "name": "Employee Names",
+          "tactics": [
+            "reconnaissance"
+          ],
+          "winrate": 0.55,
+          "command": "echo run T1589.003"
+        },
+        "result": {
+          "success": false,
+          "stdout": "[sim] executed T1589.003 (Employee Names) -> blocked"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Employee Names (T1589.003)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1589.003"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": false,
+        "covered": true,
+        "mitigated": false,
+        "reward": 0.0
+      },
+      {
+        "role": "red",
+        "state": {
+          "executed": [
+            "T1589.002",
+            "T1589.003",
+            "T1590"
+          ],
+          "detected": [
+            "T1589.002",
+            "T1590"
+          ],
+          "defended": [
+            "T1589.002",
+            "T1590"
+          ],
+          "foothold": 0,
+          "step": 3
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1589.001",
+          "name": "Credentials",
+          "tactics": [
+            "reconnaissance"
+          ],
+          "winrate": 0.7,
+          "command": "echo run T1589.001"
+        },
+        "result": {
+          "success": true,
+          "stdout": "[sim] executed T1589.001 (Credentials) -> ok"
+        },
+        "wazuh": {
+          "timestamp": "2026-10-06T00:00:00.000+0000",
+          "host": {
+            "name": "financial-bank-web",
+            "ip": "172.30.20.10"
+          },
+          "source": {
+            "ip": "172.30.10.100",
+            "user": "www-data"
+          },
+          "event": {
+            "rule_id": "100100",
+            "description": "Possible Credentials (T1589.001)",
+            "level": 10,
+            "groups": [
+              "attack",
+              "T1589.001"
+            ],
+            "decoder": "json"
+          }
+        },
+        "detected": false,
+        "covered": true,
+        "mitigated": false,
+        "reward": 1.0
+      },
+      {
+        "role": "red",
+        "state": {
+          "executed": [
+            "T1589.001",
+            "T1589.002",
+            "T1589.003",
+            "T1590"
+          ],
+          "detected": [
+            "T1589.002",
+            "T1590"
+          ],
+          "defended": [
+            "T1589.002",
+            "T1590"
+          ],
+          "foothold": 1,
+          "step": 4
+        },
+        "action": {
+          "role": "red",
+          "tech_id": "T1078.003",
+          "name": "Local Accounts",
           "tactics": [
             "stealth",
             "persistence",
             "privilege-escalation",
             "initial-access"
           ],
-          "winrate": 0.61,
-          "command": "echo run T1078.002"
-        },
-        "result": {
-          "success": false,
-          "stdout": "[sim] executed T1078.002 (Domain Accounts) -> blocked"
-        },
-        "wazuh": {
-          "timestamp": "2026-10-06T00:00:00.000+0000",
-          "host": {
-            "name": "financial-bank-web",
-            "ip": "172.30.20.10"
-          },
-          "source": {
-            "ip": "172.30.10.100",
-            "user": "www-data"
-          },
-          "event": {
-            "rule_id": "100100",
-            "description": "Possible Domain Accounts (T1078.002)",
-            "level": 10,
-            "groups": [
-              "attack",
-              "T1078.002"
-            ],
-            "decoder": "json"
-          }
-        },
-        "detected": true,
-        "covered": true,
-        "reward": -0.7
-      },
-      {
-        "role": "blue",
-        "state": {
-          "executed": [
-            "T1078.002",
-            "T1589.002",
-            "T1590"
-          ],
-          "detected": [
-            "T1078.002",
-            "T1589.002"
-          ],
-          "defended": [
-            "T1589.002"
-          ],
-          "foothold": 1,
-          "step": 2
-        },
-        "action": {
-          "role": "blue",
-          "tech_id": "T1078.002",
-          "deploy_rule": false,
-          "name": "Contain Domain Accounts",
-          "defense": "Abuse of Domain Accounts",
-          "winrate": 0.75,
-          "command": "echo defend T1078.002"
-        },
-        "applied": false,
-        "mitigated": false,
-        "rule_deployed": false,
-        "reward": 1.0
-      },
-      {
-        "role": "red",
-        "state": {
-          "executed": [
-            "T1078.002",
-            "T1589.002",
-            "T1590"
-          ],
-          "detected": [
-            "T1078.002",
-            "T1589.002"
-          ],
-          "defended": [
-            "T1589.002"
-          ],
-          "foothold": 1,
-          "step": 3
-        },
-        "action": {
-          "role": "red",
-          "tech_id": "T1133",
-          "name": "External Remote Services",
-          "tactics": [
-            "persistence",
-            "initial-access"
-          ],
-          "winrate": 0.643,
-          "command": "echo run T1133"
+          "winrate": 0.751,
+          "command": "echo run T1078.003"
         },
         "result": {
           "success": true,
-          "stdout": "[sim] executed T1133 (External Remote Services) -> ok"
+          "stdout": "[sim] executed T1078.003 (Local Accounts) -> ok"
         },
         "wazuh": {
           "timestamp": "2026-10-06T00:00:00.000+0000",
@@ -2695,167 +2786,37 @@
           },
           "event": {
             "rule_id": "100100",
-            "description": "Possible External Remote Services (T1133)",
+            "description": "Possible Local Accounts (T1078.003)",
             "level": 10,
             "groups": [
               "attack",
-              "T1133"
+              "T1078.003"
             ],
             "decoder": "json"
           }
         },
         "detected": false,
-        "covered": true,
-        "reward": 1.0
-      },
-      {
-        "role": "blue",
-        "state": {
-          "executed": [
-            "T1078.002",
-            "T1133",
-            "T1589.002",
-            "T1590"
-          ],
-          "detected": [
-            "T1078.002",
-            "T1589.002"
-          ],
-          "defended": [
-            "T1589.002"
-          ],
-          "foothold": 1,
-          "step": 3
-        },
-        "action": {
-          "role": "blue",
-          "tech_id": "T1078.002",
-          "deploy_rule": false,
-          "name": "Contain Domain Accounts",
-          "defense": "Abuse of Domain Accounts",
-          "winrate": 0.838,
-          "command": "echo defend T1078.002"
-        },
-        "applied": true,
+        "covered": false,
         "mitigated": false,
-        "rule_deployed": false,
-        "reward": -0.3
-      },
-      {
-        "role": "red",
-        "state": {
-          "executed": [
-            "T1078.002",
-            "T1133",
-            "T1589.002",
-            "T1590"
-          ],
-          "detected": [
-            "T1078.002",
-            "T1589.002"
-          ],
-          "defended": [
-            "T1078.002",
-            "T1589.002"
-          ],
-          "foothold": 2,
-          "step": 4
-        },
-        "action": {
-          "role": "red",
-          "tech_id": "T1053.001",
-          "name": "At (Linux)",
-          "tactics": [
-            "execution",
-            "persistence",
-            "privilege-escalation"
-          ],
-          "winrate": 0.708,
-          "command": "echo run T1053.001"
-        },
-        "result": {
-          "success": true,
-          "stdout": "[sim] executed T1053.001 (At (Linux)) -> ok"
-        },
-        "wazuh": {
-          "timestamp": "2026-10-06T00:00:00.000+0000",
-          "host": {
-            "name": "financial-bank-web",
-            "ip": "172.30.20.10"
-          },
-          "source": {
-            "ip": "172.30.10.100",
-            "user": "www-data"
-          },
-          "event": {
-            "rule_id": "100100",
-            "description": "Possible At (Linux) (T1053.001)",
-            "level": 10,
-            "groups": [
-              "attack",
-              "T1053.001"
-            ],
-            "decoder": "json"
-          }
-        },
-        "detected": true,
-        "covered": true,
-        "reward": 0.3
-      },
-      {
-        "role": "blue",
-        "state": {
-          "executed": [
-            "T1053.001",
-            "T1078.002",
-            "T1133",
-            "T1589.002",
-            "T1590"
-          ],
-          "detected": [
-            "T1053.001",
-            "T1078.002",
-            "T1589.002"
-          ],
-          "defended": [
-            "T1078.002",
-            "T1589.002"
-          ],
-          "foothold": 2,
-          "step": 4
-        },
-        "action": {
-          "role": "blue",
-          "tech_id": "T1053.001",
-          "deploy_rule": false,
-          "name": "Contain At (Linux)",
-          "defense": "generic monitoring",
-          "winrate": 0.8,
-          "command": "echo defend T1053.001"
-        },
-        "applied": false,
-        "mitigated": false,
-        "rule_deployed": false,
         "reward": 1.0
       },
       {
         "role": "red",
         "state": {
           "executed": [
-            "T1053.001",
-            "T1078.002",
-            "T1133",
+            "T1078.003",
+            "T1589.001",
             "T1589.002",
+            "T1589.003",
             "T1590"
           ],
           "detected": [
-            "T1053.001",
-            "T1078.002",
-            "T1589.002"
+            "T1589.002",
+            "T1590"
           ],
           "defended": [
-            "T1078.002",
-            "T1589.002"
+            "T1589.002",
+            "T1590"
           ],
           "foothold": 2,
           "step": 5
@@ -2869,12 +2830,12 @@
             "persistence",
             "privilege-escalation"
           ],
-          "winrate": 0.7,
+          "winrate": 1.0,
           "command": "echo run T1053.003"
         },
         "result": {
-          "success": false,
-          "stdout": "[sim] executed T1053.003 (Cron) -> blocked"
+          "success": true,
+          "stdout": "[sim] executed T1053.003 (Cron) -> ok"
         },
         "wazuh": {
           "timestamp": "2026-10-06T00:00:00.000+0000",
@@ -2897,50 +2858,13 @@
             "decoder": "json"
           }
         },
-        "detected": true,
+        "detected": false,
         "covered": true,
-        "reward": -1.2
-      },
-      {
-        "role": "blue",
-        "state": {
-          "executed": [
-            "T1053.001",
-            "T1053.003",
-            "T1078.002",
-            "T1133",
-            "T1589.002",
-            "T1590"
-          ],
-          "detected": [
-            "T1053.001",
-            "T1053.003",
-            "T1078.002",
-            "T1589.002"
-          ],
-          "defended": [
-            "T1078.002",
-            "T1589.002"
-          ],
-          "foothold": 2,
-          "step": 5
-        },
-        "action": {
-          "role": "blue",
-          "tech_id": "T1053.003",
-          "deploy_rule": false,
-          "name": "Contain Cron",
-          "defense": "Cross-Platform Detection of Cron Job Abuse for Persistence and Execution",
-          "winrate": 1.0,
-          "command": "echo defend T1053.003"
-        },
-        "applied": true,
-        "mitigated": true,
-        "rule_deployed": false,
-        "reward": 1.7
+        "mitigated": false,
+        "reward": 1.0
       }
     ],
-    "red_return": -0.7999999999999998,
-    "blue_return": 4.8
+    "red_return": 2.6,
+    "blue_return": 2.2000000000000006
   }
 ]

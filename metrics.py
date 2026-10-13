@@ -35,20 +35,31 @@ def _rate(a: int, b: int) -> float:
 
 def _episode_counts(steps: list[dict]) -> dict:
     red = [s for s in steps if s.get("role") == "red"]
-    blue = [s for s in steps if s.get("role") == "blue"]
+    def succ(s):
+        return bool((s.get("result") or {}).get("success"))
+    attempted = len(red)
+    succeeded = sum(1 for s in red if succ(s))
+    # Each attempt is exactly one of: blocked / contained / breached.
+    #   blocked   = attack did not execute on the target
+    #   contained = executed BUT blue mitigated the same technique
+    #   breached  = executed AND not contained  (this is NET attack success)
+    contained = sum(1 for s in red if succ(s) and s.get("mitigated"))
+    breached = sum(1 for s in red if succ(s) and not s.get("mitigated"))
+    blocked = attempted - succeeded
     return {
-        "attempted": len(red),
-        "succeeded": sum(1 for s in red if (s.get("result") or {}).get("success")),
+        "attempted": attempted,
+        "succeeded": succeeded,        # raw: attack command ran (ignores defense)
+        "breached": breached,          # net attack success (got through)
+        "contained": contained,        # succeeded but neutralized by blue
+        "blocked": blocked,            # failed to execute
         "detected": sum(1 for s in red if s.get("detected")),
-        "applied": sum(1 for s in blue if s.get("applied")),
-        "mitigated": sum(1 for s in blue if s.get("mitigated")),
     }
 
 
 def compute_metrics(trajectories: list[dict]) -> dict:
     """trajectories: list of {'steps': [...], ...}, one per iteration."""
     per_iter = []
-    cum = {"attempted": 0, "succeeded": 0, "detected": 0, "applied": 0, "mitigated": 0}
+    cum = {"attempted": 0, "succeeded": 0, "breached": 0, "contained": 0, "blocked": 0, "detected": 0}
     for i, traj in enumerate(trajectories, 1):
         c = _episode_counts(traj.get("steps", []))
         for k in cum:
@@ -56,24 +67,35 @@ def compute_metrics(trajectories: list[dict]) -> dict:
         per_iter.append({
             "iteration": i,
             **c,
+            # raw execution (ignores defense) -- does NOT move with containment
             "attack_success_rate": _rate(c["succeeded"], c["attempted"]),
+            # the partition: these three sum to 1.0 and trade off against each other
+            "breach_rate": _rate(c["breached"], c["attempted"]),        # net attack success
+            "containment_rate": _rate(c["contained"], c["attempted"]),  # 방어(봉쇄)율
+            "block_rate": _rate(c["blocked"], c["attempted"]),
             "detection_rate": _rate(c["detected"], c["attempted"]),
-            "containment_rate": _rate(c["mitigated"], c["attempted"]),
             # cumulative
             "cum_attempted": cum["attempted"],
             "cum_succeeded": cum["succeeded"],
             "cum_detected": cum["detected"],
-            "cum_mitigated": cum["mitigated"],
+            "cum_breached": cum["breached"],
+            "cum_contained": cum["contained"],
             "cum_attack_success_rate": _rate(cum["succeeded"], cum["attempted"]),
+            "cum_breach_rate": _rate(cum["breached"], cum["attempted"]),
+            "cum_containment_rate": _rate(cum["contained"], cum["attempted"]),
+            "cum_block_rate": _rate(cum["blocked"], cum["attempted"]),
             "cum_detection_rate": _rate(cum["detected"], cum["attempted"]),
-            "cum_containment_rate": _rate(cum["mitigated"], cum["attempted"]),
         })
     summary = {
         "iterations": len(trajectories),
         "totals": cum,
-        "attack_success_rate": _rate(cum["succeeded"], cum["attempted"]),
+        "attack_success_rate": _rate(cum["succeeded"], cum["attempted"]),  # raw execution
+        "breach_rate": _rate(cum["breached"], cum["attempted"]),           # net attack success
+        "containment_rate": _rate(cum["contained"], cum["attempted"]),     # defense rate
+        "block_rate": _rate(cum["blocked"], cum["attempted"]),
         "detection_rate": _rate(cum["detected"], cum["attempted"]),
-        "containment_rate": _rate(cum["mitigated"], cum["attempted"]),
+        # breach + containment + block == 1.0
+        "defense_rate": _rate(cum["contained"] + cum["blocked"], cum["attempted"]),
     }
     return {"summary": summary, "per_iteration": per_iter}
 
@@ -92,22 +114,25 @@ def write_metrics(metrics: dict, out_dir: str) -> None:
 
 def print_metrics(metrics: dict) -> None:
     s = metrics["summary"]
-    print("\n" + "=" * 70)
-    print("CUMULATIVE METRICS (attack / detection)")
-    print("=" * 70)
-    print(f"  iter | attempt succ det mitig | cum_atkRate cum_detRate cum_containRate")
+    print("\n" + "=" * 72)
+    print("CUMULATIVE METRICS  (each attempt = blocked | contained | breached)")
+    print("=" * 72)
+    print(f"  iter | attempt breach contain block det | cum_breach cum_contain cum_block")
     for r in metrics["per_iteration"]:
-        print(f"  {r['iteration']:>4} | {r['attempted']:>7} {r['succeeded']:>4} "
-              f"{r['detected']:>3} {r['mitigated']:>5} | "
-              f"{r['cum_attack_success_rate']:>10} {r['cum_detection_rate']:>11} "
-              f"{r['cum_containment_rate']:>15}")
+        print(f"  {r['iteration']:>4} | {r['attempted']:>7} {r['breached']:>6} "
+              f"{r['contained']:>7} {r['blocked']:>5} {r['detected']:>3} | "
+              f"{r['cum_breach_rate']:>10} {r['cum_containment_rate']:>11} {r['cum_block_rate']:>9}")
     t = s["totals"]
-    print("-" * 70)
-    print(f"  TOTAL attempts={t['attempted']} succeeded={t['succeeded']} "
-          f"detected={t['detected']} mitigated={t['mitigated']}")
-    print(f"  >> attack success rate : {s['attack_success_rate']*100:.1f}%")
-    print(f"  >> detection rate      : {s['detection_rate']*100:.1f}%")
-    print(f"  >> containment rate    : {s['containment_rate']*100:.1f}% (of all attacks)")
+    print("-" * 72)
+    print(f"  TOTAL attempts={t['attempted']} breached={t['breached']} "
+          f"contained={t['contained']} blocked={t['blocked']} detected={t['detected']}")
+    print(f"  >> breach rate (net attack success) : {s['breach_rate']*100:.1f}%")
+    print(f"  >> containment rate (defense/bongswae): {s['containment_rate']*100:.1f}%")
+    print(f"  >> block rate                       : {s['block_rate']*100:.1f}%")
+    print(f"  >> defense rate (contain+block)     : {s['defense_rate']*100:.1f}%"
+          f"   [breach + defense = 100%]")
+    print(f"  (raw attack execution rate = {s['attack_success_rate']*100:.1f}%, ignores defense)")
+    print(f"  >> detection rate                   : {s['detection_rate']*100:.1f}%")
 
 
 def load_and_report(traj_path: str, out_dir: str) -> dict:
