@@ -133,11 +133,21 @@ def main():
     if not args.skip_coverage:
         step_coverage(args.profile)
     step_loop(args)
+
+    # cumulative attack/detection metrics table
+    traj_path = os.path.join(args.out_dir, "trajectories.json")
+    if os.path.exists(traj_path):
+        import metrics as _metrics
+        _metrics.load_and_report(traj_path, args.out_dir)
+
     if not args.skip_train_hint:
         step_train_hint(args)
 
     print("\n" + "=" * 70)
-    print("DONE. See output/coverage/ and output/pipeline/ for artifacts.")
+    print("DONE. Artifacts in output/pipeline/ :")
+    print("  trajectories.json  -> every red/blue action, detection, mitigation")
+    print("  metrics.json/.csv  -> cumulative attack & detection rates")
+    print("  llm_improve_*.md   -> per-role strategy adaptation notes")
     print("=" * 70)
 
 

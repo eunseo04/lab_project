@@ -646,6 +646,19 @@ def run_closed_loop(iterations: int = 3, ctf_name: Optional[str] = None,
         json.dump([asdict(t) for t in all_traj], f, ensure_ascii=False, indent=2)
     with open(os.path.join(out_dir, "priors.json"), "w", encoding="utf-8") as f:
         json.dump({"red": red_priors, "blue": blue_priors}, f, ensure_ascii=False, indent=2)
+
+    # cumulative attack / detection metrics
+    try:
+        import metrics as _metrics
+        m = _metrics.compute_metrics([asdict(t) for t in all_traj])
+        _metrics.write_metrics(m, out_dir)
+        s = m["summary"]
+        print(f"[pipeline] metrics: attack_success={s['attack_success_rate']*100:.1f}% "
+              f"detection={s['detection_rate']*100:.1f}% "
+              f"containment={s['containment_rate']*100:.1f}% -> {out_dir}/metrics.json")
+    except Exception as e:  # pragma: no cover
+        print(f"[pipeline] metrics computation skipped: {e}")
+
     print(f"[pipeline] done. artifacts in {out_dir}/")
     return all_traj
 
