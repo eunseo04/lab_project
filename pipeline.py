@@ -128,13 +128,24 @@ class CyberState:
 # ---------------------------------------------------------------------------
 # Strategy generation (Red + Blue action candidates from shared memory)
 # ---------------------------------------------------------------------------
-def generate_candidates(role: str, state: CyberState, memory: dict, k: int = 4, llm=None) -> list[dict]:
+def is_covered(tid: str, memory: dict, learned_covered=None) -> bool:
+    """A technique is detectable if Wazuh ships a rule for it OR blue has deployed one."""
+    base = bool(memory.get(tid, {}).get("wazuh_covered"))
+    return base or (learned_covered is not None and tid in learned_covered)
+
+
+def generate_candidates(role: str, state: CyberState, memory: dict, k: int = 4, llm=None,
+                        learned_covered=None) -> list[dict]:
     """Produce actionable strategy candidates for red or blue from the ATT&CK memory.
 
     The candidate *set* comes from the shared ATT&CK memory. When an LLM is available
     it reorders/selects the most promising techniques for the current state (the
     'LLM decides strategy / next action' step); MCTS then simulates to pick the best.
     Falls back to a rule-based ordering with no LLM.
+
+    Blue candidates carry `deploy_rule=True` when the technique is NOT yet detectable:
+    applying such a defense adds a Wazuh detection rule (coverage expansion), so blue's
+    self-improvement grows SIEM coverage over iterations.
     """
     target_tactic = state.tactic_reached()
     if role == "red":
@@ -153,12 +164,19 @@ def generate_candidates(role: str, state: CyberState, memory: dict, k: int = 4, 
             if tid in state.defended:
                 continue
             strat = (info.get("detection_strategies") or [{}])
-            pool.append({"role": "blue", "tech_id": tid,
-                         "name": f"Defend {info.get('name', tid)}",
-                         "defense": strat[0].get("name", "generic monitoring")})
+            covered = is_covered(tid, memory, learned_covered)
+            if covered:
+                pool.append({"role": "blue", "tech_id": tid, "deploy_rule": False,
+                             "name": f"Contain {info.get('name', tid)}",
+                             "defense": strat[0].get("name", "generic monitoring")})
+            else:
+                # the technique evaded the SIEM -> blue can author a detection rule
+                pool.append({"role": "blue", "tech_id": tid, "deploy_rule": True,
+                             "name": f"Deploy detection rule for {info.get('name', tid)}",
+                             "defense": strat[0].get("name", "new Wazuh rule")})
         if not pool:
-            pool = [{"role": "blue", "tech_id": None, "name": "Harden & monitor baseline",
-                     "defense": "baseline hardening"}]
+            pool = [{"role": "blue", "tech_id": None, "deploy_rule": False,
+                     "name": "Harden & monitor baseline", "defense": "baseline hardening"}]
 
     if llm is not None and getattr(llm, "available", False) and pool:
         pool = _llm_reorder_candidates(role, state, pool, llm, k)
@@ -276,16 +294,18 @@ class MCTS:
 
     def __init__(self, memory: dict, action_priors: Optional[dict] = None,
                  n_sims: int = 64, c_uct: float = 1.4, rng: Optional[random.Random] = None,
-                 llm=None):
+                 llm=None, learned_covered=None):
         self.memory = memory
         self.priors = action_priors or {}
         self.n_sims = n_sims
         self.c_uct = c_uct
         self.rng = rng or random.Random(0)
         self.llm = llm  # LLM proposes/reorders candidate actions (strategy generation)
+        self.learned_covered = learned_covered  # blue-deployed detection coverage
 
     def search(self, state: CyberState, role: str = "red") -> tuple[dict, float]:
-        candidates = generate_candidates(role, state, self.memory, llm=self.llm)
+        candidates = generate_candidates(role, state, self.memory, llm=self.llm,
+                                         learned_covered=self.learned_covered)
         if not candidates:
             return {}, 0.0
         N = {i: 0 for i in range(len(candidates))}
@@ -525,11 +545,14 @@ def llm_improve(trajectories: list[Trajectory], priors: dict, llm=None,
 # ---------------------------------------------------------------------------
 def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: DefenseGraph,
                 max_steps: int = 6, dry_run: bool = True,
-                rng: Optional[random.Random] = None, llm=None) -> Trajectory:
+                rng: Optional[random.Random] = None, llm=None, learned_covered=None) -> Trajectory:
     """One red-vs-blue self-play episode. BOTH agents use MCTS to choose actions,
     the LLM turns them into concrete commands, and both actually run against the
-    Target (attack / mitigation)."""
+    Target (attack / mitigation). Blue can DEPLOY detection rules, which grow
+    `learned_covered` so future attacks with that technique are detectable."""
     rng = rng or random.Random(2)
+    if learned_covered is None:
+        learned_covered = set()
     state = CyberState()
     traj = Trajectory()
     tgt_ip = target.target_ip() if hasattr(target, "target_ip") else "target"
@@ -541,10 +564,10 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
         red_action = llm_enrich_action(red_action, state, memory, llm=llm, target_ip=tgt_ip)
         result = target.run(red_action)
 
-        # 2) SIEM (Wazuh) detection -- coverage-driven
+        # 2) SIEM (Wazuh) detection -- coverage-driven (base rules OR blue-deployed rules)
         alert = synthetic_wazuh_alert(red_action) if dry_run else target.pull_wazuh_alert()
         ctx = extract_wazuh_context(alert)
-        covered = bool(memory.get(red_action["tech_id"], {}).get("wazuh_covered"))
+        covered = is_covered(red_action["tech_id"], memory, learned_covered)
         p_detect = 0.85 if covered else 0.15
         high_sev = ctx["event"]["level"] and int(ctx["event"]["level"]) >= 7
         detected = bool(high_sev and rng.random() < p_detect)
@@ -555,14 +578,21 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
                                foothold=state.foothold, step=state.step)
 
         # 3) BLUE: MCTS picks a defense, LLM makes it a mitigation command, apply it.
-        #    Blue acts on what it detected; if nothing detected it still hardens.
+        #    A defense on an uncovered technique DEPLOYS a detection rule (coverage++).
         defense_action, _ = blue_mcts.search(mid_state, role="blue")
         applied = False
+        rule_deployed = False
         if defense_action and defense_action.get("tech_id") is not None:
             defense_action = llm_enrich_defense(defense_action, mid_state, memory,
                                                 llm=llm, target_ip=tgt_ip)
             dres = target.defend(defense_action)
             applied = dres.get("applied", False)
+            if applied and defense_action.get("deploy_rule"):
+                # blue authored a new Wazuh rule -> this technique is now detectable
+                tid = defense_action["tech_id"]
+                if tid not in learned_covered:
+                    learned_covered.add(tid)
+                    rule_deployed = True
 
         # 4) advance state (a mitigation on the active technique removes red's foothold gain)
         mitigated = applied and defense_action and defense_action.get("tech_id") == red_action["tech_id"]
@@ -572,21 +602,22 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
         new_state = CyberState(executed=executed, detected=det, defended=defd,
                                foothold=foothold, step=state.step + 1)
 
-        # 5) rewards: red advances & evades; blue detects & contains
+        # 5) rewards: red advances & evades; blue detects, contains & grows coverage
         red_reward = (1.0 if result["success"] else 0.0) - (0.7 if detected else 0.0) - (0.5 if mitigated else 0.0)
-        blue_reward = (1.0 if detected else -0.3) + (0.7 if mitigated else 0.0)
+        blue_reward = (1.0 if detected else -0.3) + (0.7 if mitigated else 0.0) + (0.6 if rule_deployed else 0.0)
         traj.red_return += red_reward
         traj.blue_return += blue_reward
         traj.steps.append({
             "role": "red", "state": asdict(state), "action": red_action,
             "result": {"success": result["success"], "stdout": result["stdout"][:120]},
-            "wazuh": ctx, "detected": bool(detected), "reward": round(red_reward, 3),
+            "wazuh": ctx, "detected": bool(detected), "covered": bool(covered),
+            "reward": round(red_reward, 3),
         })
         if defense_action and defense_action.get("tech_id") is not None:
             traj.steps.append({
                 "role": "blue", "state": asdict(mid_state), "action": defense_action,
                 "applied": bool(applied), "mitigated": bool(mitigated),
-                "reward": round(blue_reward, 3),
+                "rule_deployed": bool(rule_deployed), "reward": round(blue_reward, 3),
             })
 
         state = new_state
@@ -595,14 +626,55 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
     return traj
 
 
+def load_state(out_dir: str) -> dict:
+    """Load persisted learning state (priors + blue-deployed coverage) from a prior run."""
+    empty = {"red_priors": {}, "blue_priors": {}, "learned_covered": [], "runs": 0, "history": []}
+    path = os.path.join(out_dir, "state.json")
+    if not os.path.exists(path):
+        return dict(empty)
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            s = json.load(f)
+        for k, v in empty.items():
+            s.setdefault(k, v)
+        return s
+    except Exception as e:
+        print(f"[pipeline] could not load state ({e}); starting fresh.")
+        return dict(empty)
+
+
+def save_state(out_dir: str, red_priors: dict, blue_priors: dict,
+               learned_covered: set, runs: int, history: list) -> None:
+    Path(out_dir).mkdir(parents=True, exist_ok=True)
+    with open(os.path.join(out_dir, "state.json"), "w", encoding="utf-8") as f:
+        json.dump({"red_priors": red_priors, "blue_priors": blue_priors,
+                   "learned_covered": sorted(learned_covered), "runs": runs,
+                   "history": history},
+                  f, ensure_ascii=False, indent=2)
+
+
 def run_closed_loop(iterations: int = 3, ctf_name: Optional[str] = None,
                     dry_run: bool = True, out_dir: str = "output/pipeline",
                     seed: int = 0, profile: str = "financial_linux_web",
-                    use_llm: bool = True, attacker_container: Optional[str] = None) -> list[Trajectory]:
+                    use_llm: bool = True, attacker_container: Optional[str] = None,
+                    fresh: bool = False) -> list[Trajectory]:
     rng = random.Random(seed)
     memory = load_shared_memory(profile=profile)
-    red_priors: dict = {}
-    blue_priors: dict = {}
+
+    # Resume learned state across runs (priors + blue-deployed detection coverage),
+    # so each `main.py` run continues evolving instead of restarting from scratch.
+    state0 = {"red_priors": {}, "blue_priors": {}, "learned_covered": [], "runs": 0, "history": []} \
+        if fresh else load_state(out_dir)
+    red_priors: dict = dict(state0["red_priors"])
+    blue_priors: dict = dict(state0["blue_priors"])
+    learned_covered: set = set(state0["learned_covered"])
+    prior_runs = state0["runs"]
+    history: list = list(state0.get("history", []))
+    learned_at_start = len(learned_covered)
+    if prior_runs and not fresh:
+        print(f"[pipeline] resumed from {out_dir}/state.json: runs={prior_runs}, "
+              f"red_priors={len(red_priors)}, blue_priors={len(blue_priors)}, "
+              f"blue-deployed rules={len(learned_covered)}")
     defense = DefenseGraph(memory)
     target = (SimulatedTarget(rng) if dry_run
               else DockerTarget(ctf_name or "cowsay", attacker_container=attacker_container))
@@ -614,10 +686,13 @@ def run_closed_loop(iterations: int = 3, ctf_name: Optional[str] = None,
     try:
         for it in range(1, iterations + 1):
             # Both agents search with their OWN learned priors (self-play).
-            red_mcts = MCTS(memory, action_priors=red_priors, rng=random.Random(seed + it), llm=llm)
-            blue_mcts = MCTS(memory, action_priors=blue_priors, rng=random.Random(seed + 100 + it), llm=llm)
+            # blue_mcts sees learned_covered so it won't re-deploy rules it already has.
+            red_mcts = MCTS(memory, action_priors=red_priors, rng=random.Random(seed + it),
+                            llm=llm, learned_covered=learned_covered)
+            blue_mcts = MCTS(memory, action_priors=blue_priors, rng=random.Random(seed + 100 + it),
+                             llm=llm, learned_covered=learned_covered)
             traj = run_episode(memory, target, red_mcts, blue_mcts, defense,
-                               dry_run=dry_run, rng=rng, llm=llm)
+                               dry_run=dry_run, rng=rng, llm=llm, learned_covered=learned_covered)
             all_traj.append(traj)
             print(f"[iter {it}] steps={len(traj.steps)} "
                   f"red_return={traj.red_return:.2f} blue_return={traj.blue_return:.2f}")
@@ -646,6 +721,33 @@ def run_closed_loop(iterations: int = 3, ctf_name: Optional[str] = None,
         json.dump([asdict(t) for t in all_traj], f, ensure_ascii=False, indent=2)
     with open(os.path.join(out_dir, "priors.json"), "w", encoding="utf-8") as f:
         json.dump({"red": red_priors, "blue": blue_priors}, f, ensure_ascii=False, indent=2)
+
+    # record coverage history for this run (for the dashboard growth curve)
+    base_covered = sum(1 for v in memory.values() if v.get("wazuh_covered"))
+    target_total = len(memory)
+    try:
+        import coverage as _cov
+        dataset_total = len(_cov._valid_tids(_cov.load_dataset()))
+    except Exception:
+        dataset_total = target_total
+    learned_n = len(learned_covered)
+    history.append({
+        "run": prior_runs + 1,
+        "base_covered": base_covered,          # Wazuh ships rules for these
+        "blue_rules": learned_n,               # cumulative blue-deployed rules
+        "new_rules": learned_n - learned_at_start,
+        "total_covered": base_covered + learned_n,
+        "target_total": target_total,          # techniques in Target profile
+        "dataset_total": dataset_total,        # techniques in attack_dataset.json
+        "target_coverage": round((base_covered + learned_n) / max(target_total, 1), 4),
+        "dataset_coverage": round((base_covered + learned_n) / max(dataset_total, 1), 4),
+    })
+
+    # persist learned state so the NEXT run resumes and keeps evolving
+    save_state(out_dir, red_priors, blue_priors, learned_covered, prior_runs + 1, history)
+    print(f"[pipeline] saved state.json: runs={prior_runs + 1}, "
+          f"blue rules={learned_n} | coverage target={100*(base_covered+learned_n)/max(target_total,1):.1f}% "
+          f"dataset={100*(base_covered+learned_n)/max(dataset_total,1):.1f}%")
 
     # cumulative attack / detection metrics
     try:
@@ -678,6 +780,8 @@ def parse_args():
                     help="Container to launch real attack tools from (--live)")
     ap.add_argument("--no-llm", dest="use_llm", action="store_false",
                     help="Disable the LLM (rule-based only)")
+    ap.add_argument("--fresh", action="store_true",
+                    help="Ignore saved state.json and start learning from scratch")
     ap.set_defaults(dry_run=True, use_llm=True)
     return ap.parse_args()
 
@@ -687,4 +791,4 @@ if __name__ == "__main__":
     run_closed_loop(iterations=args.iterations, ctf_name=args.ctf_name,
                     dry_run=args.dry_run, out_dir=args.out_dir, seed=args.seed,
                     profile=args.profile, use_llm=args.use_llm,
-                    attacker_container=args.attacker_container)
+                    attacker_container=args.attacker_container, fresh=args.fresh)

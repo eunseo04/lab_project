@@ -74,6 +74,7 @@ def step_loop(args) -> None:
         profile=args.profile,
         use_llm=args.use_llm,
         attacker_container=args.attacker_container,
+        fresh=args.fresh,
     )
 
 
@@ -111,6 +112,8 @@ def parse_args():
                     help="Use the real Docker target + Wazuh (requires daemon/SIEM)")
     ap.add_argument("--no-llm", dest="use_llm", action="store_false",
                     help="Disable OpenAI even if a key is set")
+    ap.add_argument("--fresh", action="store_true",
+                    help="Ignore saved state.json and start learning from scratch")
     ap.add_argument("--skip-coverage", action="store_true")
     ap.add_argument("--skip-train-hint", action="store_true")
     ap.set_defaults(dry_run=True, use_llm=True)
