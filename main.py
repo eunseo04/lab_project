@@ -75,6 +75,8 @@ def step_loop(args) -> None:
         use_llm=args.use_llm,
         attacker_container=args.attacker_container,
         fresh=args.fresh,
+        evasive=args.evasive,
+        benign_rate=args.benign_rate,
     )
 
 
@@ -116,6 +118,13 @@ def parse_args():
                     help="Ignore saved state.json and start learning from scratch")
     ap.add_argument("--skip-coverage", action="store_true")
     ap.add_argument("--skip-train-hint", action="store_true")
+    ap.add_argument("--evasive", action="store_true",
+                    help="Run ONE stealth campaign that blends into benign log noise and "
+                         "prefers low-signal (uncovered) techniques, instead of a fresh "
+                         "loud attack each step. Stress-tests blue's detection (Macro-F1).")
+    ap.add_argument("--benign-rate", type=int, default=int(os.environ.get("BENIGN_RATE", "4")),
+                    help="Normal (benign) log events interleaved per attacker action; "
+                         "needed to measure precision/false-alarms, not just recall.")
     ap.set_defaults(dry_run=True, use_llm=True)
     return ap.parse_args()
 

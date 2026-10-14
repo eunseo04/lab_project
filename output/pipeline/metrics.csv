@@ -1,7 +1,4 @@
-iteration,attempted,succeeded,breached,contained,blocked,detected,attack_success_rate,breach_rate,containment_rate,block_rate,detection_rate,cum_attempted,cum_succeeded,cum_detected,cum_breached,cum_contained,cum_attack_success_rate,cum_breach_rate,cum_containment_rate,cum_block_rate,cum_detection_rate
-1,6,3,2,1,3,3,0.5,0.3333,0.1667,0.5,0.5,6,3,3,2,1,0.5,0.3333,0.1667,0.5,0.5
-2,6,4,2,2,2,2,0.6667,0.3333,0.3333,0.3333,0.3333,12,7,5,4,3,0.5833,0.3333,0.25,0.4167,0.4167
-3,6,4,2,2,2,3,0.6667,0.3333,0.3333,0.3333,0.5,18,11,8,6,5,0.6111,0.3333,0.2778,0.3889,0.4444
-4,6,4,0,4,2,5,0.6667,0.0,0.6667,0.3333,0.8333,24,15,13,6,9,0.625,0.25,0.375,0.375,0.5417
-5,6,4,0,4,2,5,0.6667,0.0,0.6667,0.3333,0.8333,30,19,18,6,13,0.6333,0.2,0.4333,0.3667,0.6
-6,6,5,3,2,1,2,0.8333,0.5,0.3333,0.1667,0.3333,36,24,20,9,15,0.6667,0.25,0.4167,0.3333,0.5556
+iteration,attempted,succeeded,breached,contained,blocked,detected,attack_success_rate,breach_rate,containment_rate,block_rate,detection_rate,detection_macro_f1,red_win,cum_attempted,cum_succeeded,cum_detected,cum_breached,cum_contained,cum_attack_success_rate,cum_breach_rate,cum_containment_rate,cum_block_rate,cum_detection_rate
+1,6,3,1,2,3,0,0.5,0.1667,0.3333,0.5,0.0,0.4444,False,6,3,0,1,2,0.5,0.1667,0.3333,0.5,0.0
+2,6,6,4,2,0,2,1.0,0.6667,0.3333,0.0,0.3333,0.64,False,12,9,2,5,4,0.75,0.4167,0.3333,0.25,0.1667
+3,6,3,2,1,3,3,0.5,0.3333,0.1667,0.5,0.5,0.6563,False,18,12,5,7,5,0.6667,0.3889,0.2778,0.3333,0.2778

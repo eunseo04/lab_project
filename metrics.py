@@ -33,6 +33,38 @@ def _rate(a: int, b: int) -> float:
     return round(a / b, 4) if b else 0.0
 
 
+def _f1_scores(conf: dict) -> dict:
+    """DefenderBench detection metric: precision/recall and MACRO-F1 over the two
+    classes {malicious, benign}, from a per-event confusion matrix.
+
+      malicious class: positive = 'alerted'  -> tp / fp / fn / tn as collected
+      benign class:    positive = 'not alerted' -> its tp=our tn, fp=our fn, fn=our fp
+
+    Macro-F1 = mean of the two per-class F1s. Unlike a bare detection_rate (which is
+    only recall on the malicious class and ignores false alarms), Macro-F1 drops if
+    blue is trigger-happy (many fp) OR misses attacks (many fn) -- so it is a reliable,
+    gameable-resistant measure of detection quality."""
+    tp, fp, fn, tn = conf.get("tp", 0), conf.get("fp", 0), conf.get("fn", 0), conf.get("tn", 0)
+
+    def f1(tp_, fp_, fn_):
+        p = tp_ / (tp_ + fp_) if (tp_ + fp_) else 0.0
+        r = tp_ / (tp_ + fn_) if (tp_ + fn_) else 0.0
+        return (2 * p * r / (p + r) if (p + r) else 0.0), p, r
+
+    mal_f1, mal_p, mal_r = f1(tp, fp, fn)       # detect attacks
+    ben_f1, _, _ = f1(tn, fn, fp)               # leave normal traffic alone
+    total = tp + fp + fn + tn
+    return {
+        "events": total,
+        "tp": tp, "fp": fp, "fn": fn, "tn": tn,
+        "precision": round(mal_p, 4),           # of blue's alerts, how many were real attacks
+        "recall": round(mal_r, 4),              # of real attacks, how many blue caught
+        "detection_f1": round(mal_f1, 4),       # F1 on the malicious class
+        "macro_f1": round((mal_f1 + ben_f1) / 2, 4),   # <-- DefenderBench-style detection score
+        "false_alarm_rate": _rate(fp, fp + tn), # of benign events, how many blue mis-flagged
+    }
+
+
 def _episode_counts(steps: list[dict]) -> dict:
     red = [s for s in steps if s.get("role") == "red"]
     def succ(s):
@@ -56,14 +88,33 @@ def _episode_counts(steps: list[dict]) -> dict:
     }
 
 
+def _agg_confusion(trajectories: list[dict]) -> dict:
+    conf = {"tp": 0, "fp": 0, "fn": 0, "tn": 0}
+    for traj in trajectories:
+        c = (traj.get("meta") or {}).get("confusion") or {}
+        for k in conf:
+            conf[k] += int(c.get(k, 0))
+    return conf
+
+
 def compute_metrics(trajectories: list[dict]) -> dict:
-    """trajectories: list of {'steps': [...], ...}, one per iteration."""
+    """trajectories: list of {'steps': [...], 'meta': {...}}, one per iteration."""
     per_iter = []
     cum = {"attempted": 0, "succeeded": 0, "breached": 0, "contained": 0, "blocked": 0, "detected": 0}
+    cum_conf = {"tp": 0, "fp": 0, "fn": 0, "tn": 0}
+    red_wins = 0
+    episodes_with_meta = 0
     for i, traj in enumerate(trajectories, 1):
         c = _episode_counts(traj.get("steps", []))
         for k in cum:
             cum[k] += c[k]
+        meta = traj.get("meta") or {}
+        ec = meta.get("confusion") or {}
+        for k in cum_conf:
+            cum_conf[k] += int(ec.get(k, 0))
+        if "red_win" in meta:
+            episodes_with_meta += 1
+            red_wins += 1 if meta.get("red_win") else 0
         per_iter.append({
             "iteration": i,
             **c,
@@ -74,6 +125,9 @@ def compute_metrics(trajectories: list[dict]) -> dict:
             "containment_rate": _rate(c["contained"], c["attempted"]),  # 방어(봉쇄)율
             "block_rate": _rate(c["blocked"], c["attempted"]),
             "detection_rate": _rate(c["detected"], c["attempted"]),
+            # DefenderBench-style detection quality for THIS episode (needs benign events)
+            "detection_macro_f1": _f1_scores(ec)["macro_f1"] if ec else None,
+            "red_win": bool(meta.get("red_win")) if "red_win" in meta else None,
             # cumulative
             "cum_attempted": cum["attempted"],
             "cum_succeeded": cum["succeeded"],
@@ -96,6 +150,14 @@ def compute_metrics(trajectories: list[dict]) -> dict:
         "detection_rate": _rate(cum["detected"], cum["attempted"]),
         # breach + containment + block == 1.0
         "defense_rate": _rate(cum["contained"] + cum["blocked"], cum["attempted"]),
+    }
+    # DefenderBench-adapted headline scores (reliable attack/defense judgment):
+    #   red_winning_pct  -- CBS "Winning %": share of campaigns that reached the objective
+    #   detection (Macro-F1 + precision/recall) -- the defensive score over labeled events
+    summary["defenderbench"] = {
+        "episodes_scored": episodes_with_meta,
+        "red_winning_pct": _rate(red_wins, episodes_with_meta),
+        "detection": _f1_scores(cum_conf),
     }
     return {"summary": summary, "per_iteration": per_iter}
 
@@ -127,12 +189,23 @@ def print_metrics(metrics: dict) -> None:
     print(f"  TOTAL attempts={t['attempted']} breached={t['breached']} "
           f"contained={t['contained']} blocked={t['blocked']} detected={t['detected']}")
     print(f"  >> breach rate (net attack success) : {s['breach_rate']*100:.1f}%")
-    print(f"  >> containment rate (defense/bongswae): {s['containment_rate']*100:.1f}%")
+    print(f"  >> containment rate (defense): {s['containment_rate']*100:.1f}%")
     print(f"  >> block rate                       : {s['block_rate']*100:.1f}%")
     print(f"  >> defense rate (contain+block)     : {s['defense_rate']*100:.1f}%"
           f"   [breach + defense = 100%]")
     print(f"  (raw attack execution rate = {s['attack_success_rate']*100:.1f}%, ignores defense)")
-    print(f"  >> detection rate                   : {s['detection_rate']*100:.1f}%")
+    print(f"  >> detection rate (recall only)     : {s['detection_rate']*100:.1f}%")
+    db = s.get("defenderbench")
+    if db and db.get("episodes_scored"):
+        d = db["detection"]
+        print("-" * 72)
+        print("  DEFENDERBENCH-ADAPTED SCORES (reliable attack/defense judgment)")
+        print(f"  >> RED winning %% (campaign reached objective): {db['red_winning_pct']*100:.1f}%"
+              f"   [{db['episodes_scored']} episodes]")
+        print(f"  >> BLUE detection Macro-F1          : {d['macro_f1']:.3f}"
+              f"   (precision={d['precision']:.3f} recall={d['recall']:.3f})")
+        print(f"     events={d['events']} tp={d['tp']} fp={d['fp']} fn={d['fn']} tn={d['tn']}"
+              f"  false-alarm={d['false_alarm_rate']*100:.1f}%")
 
 
 def load_and_report(traj_path: str, out_dir: str) -> dict:

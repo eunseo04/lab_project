@@ -135,7 +135,7 @@ def is_covered(tid: str, memory: dict, learned_covered=None) -> bool:
 
 
 def generate_candidates(role: str, state: CyberState, memory: dict, k: int = 4, llm=None,
-                        learned_covered=None) -> list[dict]:
+                        learned_covered=None, evasive: bool = False) -> list[dict]:
     """Produce actionable strategy candidates for red or blue from the ATT&CK memory.
 
     The candidate *set* comes from the shared ATT&CK memory. When an LLM is available
@@ -157,6 +157,14 @@ def generate_candidates(role: str, state: CyberState, memory: dict, k: int = 4, 
         ]
         # prefer techniques matching the tactic red is currently trying to advance
         pool.sort(key=lambda a: (target_tactic not in a["tactics"], a["tech_id"]))
+        if evasive:
+            # EVASIVE campaign: among on-tactic techniques, prefer the lowest-signal
+            # ones -- those NOT yet covered by a Wazuh rule -- so the action blends into
+            # the benign baseline instead of tripping an existing detection. This is what
+            # drives the "hide in normal logs" behaviour; blue must grow coverage to catch up.
+            pool.sort(key=lambda a: (target_tactic not in a["tactics"],
+                                     is_covered(a["tech_id"], memory, learned_covered),
+                                     a["tech_id"]))
     else:  # blue: defend what has been executed/detected but not yet defended
         pool = []
         for tid in (state.detected or state.executed):
@@ -294,7 +302,7 @@ class MCTS:
 
     def __init__(self, memory: dict, action_priors: Optional[dict] = None,
                  n_sims: int = 64, c_uct: float = 1.4, rng: Optional[random.Random] = None,
-                 llm=None, learned_covered=None):
+                 llm=None, learned_covered=None, evasive: bool = False):
         self.memory = memory
         self.priors = action_priors or {}
         self.n_sims = n_sims
@@ -302,10 +310,12 @@ class MCTS:
         self.rng = rng or random.Random(0)
         self.llm = llm  # LLM proposes/reorders candidate actions (strategy generation)
         self.learned_covered = learned_covered  # blue-deployed detection coverage
+        self.evasive = evasive  # red plans a stealth campaign that blends into benign noise
 
     def search(self, state: CyberState, role: str = "red") -> tuple[dict, float]:
         candidates = generate_candidates(role, state, self.memory, llm=self.llm,
-                                         learned_covered=self.learned_covered)
+                                         learned_covered=self.learned_covered,
+                                         evasive=self.evasive and role == "red")
         if not candidates:
             return {}, 0.0
         N = {i: 0 for i in range(len(candidates))}
@@ -343,10 +353,14 @@ class MCTS:
             advances = action.get("tactics") and state.tactic_reached() in action["tactics"]
             p_success = 0.4 + 0.4 * prior + (0.1 if advances else 0.0)
             success = self.rng.random() < p_success
-            detected = self.rng.random() < 0.5  # SIEM coverage proxy
+            # evasive red plans against detection: uncovered techniques are quieter,
+            # and getting caught is weighted much more heavily (stealth is the objective).
+            covered = is_covered(action.get("tech_id"), self.memory, self.learned_covered)
+            p_detect = (0.75 if covered else 0.15) if self.evasive else 0.5
+            detected = self.rng.random() < p_detect
             reward = 0.0
             reward += 1.0 if success else -0.2
-            reward -= 0.6 if detected else 0.0
+            reward -= (1.1 if self.evasive else 0.6) if detected else 0.0
             return max(0.0, min(1.0, 0.5 + 0.5 * reward))
         else:  # blue win-rate: catching/defending the active technique
             p_defend = 0.3 + 0.6 * prior
@@ -365,13 +379,16 @@ class SimulatedTarget:
     def target_ip(self) -> str:
         return "172.30.20.10"
 
-    def run(self, action: dict) -> dict:
-        success = self.rng.random() < float(action.get("winrate", 0.5))
+    def run(self, action: dict, defended: bool = False) -> dict:
+        base = float(action.get("winrate", 0.5))
+        # a re-attempt against a correctly-applied defense should mostly fail
+        p = base * 0.15 if defended else base
+        success = self.rng.random() < p
         return {
             "action": action,
             "success": success,
-            "stdout": f"[sim] executed {action.get('tech_id')} ({action.get('name')}) -> "
-                      f"{'ok' if success else 'blocked'}",
+            "stdout": f"[sim] {'re-attempt ' if defended else ''}executed {action.get('tech_id')} "
+                      f"({action.get('name')}) -> {'ok' if success else 'blocked'}",
         }
 
     def defend(self, defense_action: dict) -> dict:
@@ -398,16 +415,20 @@ class DockerTarget:
 
     def __init__(self, ctf_name: str, attacker_container: Optional[str] = None):
         import caibench
+        from wazuh_client import get_wazuh_client
         self.ctf = caibench.ctf(name=ctf_name)
         self.ctf.start_ctf()
         self.ip = self.ctf.get_ip()
         self.attacker_container = attacker_container or os.environ.get("ATTACKER_CONTAINER") or None
+        self.wazuh = get_wazuh_client()
+        self.agent_name = os.environ.get("WAZUH_AGENT_NAME") or ctf_name
 
     def target_ip(self) -> str:
         return self.ip or "target"
 
-    def run(self, action: dict) -> dict:
-        """Red attack: tools run FROM the attacker container (remote) or IN the target."""
+    def run(self, action: dict, defended: bool = False) -> dict:
+        """Red attack: tools run FROM the attacker container (remote) or IN the target.
+        `defended` just marks a re-attempt probe; reality (the command result) decides."""
         import redtools
         cmd = action.get("command") or f"echo run {action.get('tech_id')}"
         if self.attacker_container:
@@ -416,6 +437,51 @@ class DockerTarget:
             out = redtools.run_command(cmd, ctf=self.ctf)
         return {"action": action, "success": bool(out and "error" not in out.lower()),
                 "stdout": out or ""}
+
+    def wazuh_detect(self, since, tech_id: str):
+        """Return (detected: bool, context: dict) from REAL Wazuh alerts since `since`."""
+        if not (self.wazuh and self.wazuh.available):
+            return None, None  # caller falls back
+        alerts = self.wazuh.query_alerts(since=since, agent_name=self.agent_name)
+        tids = self.wazuh.technique_ids(alerts)
+        detected = tech_id in tids
+        ctx = extract_wazuh_context(alerts[0]) if alerts else None
+        return detected, ctx
+
+    def run_benign(self, command: str) -> str:
+        """Execute a NORMAL (benign) command on the target host itself (not the attacker
+        box) so Wazuh observes genuine routine activity."""
+        import redtools
+        return redtools.run_command(command, ctf=self.ctf)
+
+    def measure_benign_fp(self, benign_events: list[dict]):
+        """Run benign commands ON the target, then ask Wazuh whether it alerted in that
+        window -> REAL false positives. Returns {"events", "fp", "tn", "alerts"} or None
+        if Wazuh is unavailable (caller falls back to the proxy model).
+
+        Time-separation is the key to attribution: benign commands run in their OWN window
+        (before the attack), so any alert here is a false alarm on normal activity, not the
+        attack. The alert count is clamped to the number of benign commands."""
+        if not (self.wazuh and self.wazuh.available):
+            return None
+        from datetime import datetime as _dt, timezone as _tz
+        import time as _time
+        t0 = _dt.now(_tz.utc)
+        for ev in benign_events:
+            cmd = ev.get("command")
+            if cmd:
+                self.run_benign(cmd)
+        _time.sleep(float(os.environ.get("WAZUH_POLL_WAIT", "3")))  # let alerts land
+        alerts = self.wazuh.query_alerts(since=t0, agent_name=self.agent_name)
+        # Benign window must not count attack-tagged alerts (shouldn't appear here, but be safe).
+        fp_alerts = [a for a in alerts if not self.wazuh.technique_ids([a])]
+        n = len(benign_events)
+        fp_count = min(len(fp_alerts), n)   # each benign event alerts at most once
+        events = []
+        for i, ev in enumerate(benign_events):
+            events.append({"malicious": False, "kind": ev["decoder"]["name"],
+                           "level": ev["rule"]["level"], "alerted": i < fp_count, "live": True})
+        return {"events": events, "fp": fp_count, "tn": n - fp_count, "alerts": len(alerts)}
 
     def defend(self, defense_action: dict) -> dict:
         """Blue defense: mitigation runs ON the target host (containment/hardening)."""
@@ -469,6 +535,7 @@ class Trajectory:
     steps: list = field(default_factory=list)
     red_return: float = 0.0
     blue_return: float = 0.0
+    meta: dict = field(default_factory=dict)  # campaign/win info for DefenderBench-style scoring
 
 
 def export_grpo_dataset(trajectories: list[Trajectory], out_path: str, role: str = "red") -> str:
@@ -545,32 +612,90 @@ def llm_improve(trajectories: list[Trajectory], priors: dict, llm=None,
 # ---------------------------------------------------------------------------
 def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: DefenseGraph,
                 max_steps: int = 6, dry_run: bool = True,
-                rng: Optional[random.Random] = None, llm=None, learned_covered=None) -> Trajectory:
+                rng: Optional[random.Random] = None, llm=None, learned_covered=None,
+                evasive: bool = False, benign_rate: int = 4) -> Trajectory:
     """One red-vs-blue self-play episode. BOTH agents use MCTS to choose actions,
     the LLM turns them into concrete commands, and both actually run against the
     Target (attack / mitigation). Blue can DEPLOY detection rules, which grow
-    `learned_covered` so future attacks with that technique are detectable."""
+    `learned_covered` so future attacks with that technique are detectable.
+
+    EVASIVE mode: this is ONE continuous campaign that advances through the kill
+    chain, with the attacker's action interleaved among `benign_rate` normal log
+    events each step (see benign_activity.py). Blue is scored on whether it tells
+    the malicious event apart from the benign baseline (precision/recall -> Macro-F1),
+    not merely on how often it alarms. Red prefers low-signal (uncovered) techniques,
+    so it hides in the noise until blue grows detection coverage to catch up."""
     rng = rng or random.Random(2)
     if learned_covered is None:
         learned_covered = set()
     state = CyberState()
     traj = Trajectory()
     tgt_ip = target.target_ip() if hasattr(target, "target_ip") else "target"
+    from benign_activity import BenignActivityGenerator
+    benign_gen = BenignActivityGenerator(rng=rng, agent_name=getattr(target, "agent_name", "target"))
+    # per-event confusion tally across the whole episode (DefenderBench detection = Macro-F1)
+    conf = {"tp": 0, "fp": 0, "fn": 0, "tn": 0}
+    fp_base = float(os.environ.get("BLUE_FP_RATE", "0.03"))  # blue's baseline false-alarm rate
     for _ in range(max_steps):
         # 1) RED: MCTS picks a technique, LLM makes it a command, execute on target
         red_action, _ = red_mcts.search(state, role="red")
         if not red_action:
             break
         red_action = llm_enrich_action(red_action, state, memory, llm=llm, target_ip=tgt_ip)
+        from datetime import datetime as _dt, timezone as _tz
+
+        # 1b) BENIGN window FIRST (time-separated from the attack). In --live mode these
+        #     run as real commands on the target and we read Wazuh for TRUE false positives;
+        #     otherwise they are scored by the proxy model further below.
+        n_benign = benign_rate if (evasive or benign_rate) else 0
+        live_benign = None
+        if not dry_run and hasattr(target, "measure_benign_fp") and n_benign:
+            live_benign = target.measure_benign_fp(benign_gen.batch(n_benign))
+
+        attack_time = _dt.now(_tz.utc)
         result = target.run(red_action)
 
-        # 2) SIEM (Wazuh) detection -- coverage-driven (base rules OR blue-deployed rules)
-        alert = synthetic_wazuh_alert(red_action) if dry_run else target.pull_wazuh_alert()
-        ctx = extract_wazuh_context(alert)
+        # 2) SIEM (Wazuh) detection
         covered = is_covered(red_action["tech_id"], memory, learned_covered)
-        p_detect = 0.85 if covered else 0.15
-        high_sev = ctx["event"]["level"] and int(ctx["event"]["level"]) >= 7
-        detected = bool(high_sev and rng.random() < p_detect)
+        live_detect = None
+        if not dry_run and hasattr(target, "wazuh_detect"):
+            import time as _time
+            _time.sleep(float(os.environ.get("WAZUH_POLL_WAIT", "3")))  # let the alert land
+            live_detect, live_ctx = target.wazuh_detect(attack_time, red_action["tech_id"])
+        if live_detect is not None:
+            # REAL Wazuh: detected iff an alert tagged with this technique actually fired
+            detected = bool(live_detect)
+            ctx = live_ctx or extract_wazuh_context(synthetic_wazuh_alert(red_action))
+        else:
+            # simulated proxy: coverage-driven probability (base rules OR blue-deployed)
+            ctx = extract_wazuh_context(synthetic_wazuh_alert(red_action))
+            p_detect = 0.85 if covered else 0.15
+            high_sev = ctx["event"]["level"] and int(ctx["event"]["level"]) >= 7
+            detected = bool(high_sev and rng.random() < p_detect)
+
+        # 2b) BENIGN baseline: score blue's discrimination on normal activity.
+        #     A false positive is blue alerting on a benign event. This is what makes
+        #     "detection" a precision/recall measure (Macro-F1) instead of a recall-only
+        #     rate that a trigger-happy detector could max out.
+        events = []
+        if live_benign is not None:
+            # REAL false positives: benign commands actually ran on the target and Wazuh
+            # either alerted on them (FP) or not (TN).
+            for e in live_benign["events"]:
+                conf["fp" if e["alerted"] else "tn"] += 1
+                events.append(e)
+        else:
+            # proxy: FP chance rises with how alarm-like the event looks (_noise) on top of
+            # a baseline false-alarm rate (dry-run, or live without Wazuh available).
+            for bev in benign_gen.batch(n_benign, base_ts=attack_time):
+                fp = rng.random() < min(0.9, fp_base + bev.get("_noise", 0.0))
+                conf["fp" if fp else "tn"] += 1
+                events.append({"malicious": False, "kind": bev["decoder"]["name"],
+                               "level": bev["rule"]["level"], "alerted": bool(fp)})
+        # the one malicious event this step
+        conf["tp" if detected else "fn"] += 1
+        events.append({"malicious": True, "tech_id": red_action["tech_id"],
+                       "kind": "attack", "alerted": bool(detected)})
 
         executed = tuple(sorted(set(state.executed) | {red_action["tech_id"]}))
         det = tuple(sorted(set(state.detected) | ({red_action["tech_id"]} if detected else set())))
@@ -594,8 +719,16 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
                     learned_covered.add(tid)
                     rule_deployed = True
 
-        # 4) advance state (a mitigation on the active technique removes red's foothold gain)
-        mitigated = applied and defense_action and defense_action.get("tech_id") == red_action["tech_id"]
+        # 4) VERIFY the defense: re-attempt the same attack. Containment counts ONLY if
+        #    the attack no longer succeeds after the defense (reliable criterion), not
+        #    merely because the mitigation command ran.
+        mitigated = False
+        reverified = None
+        if (applied and defense_action and result["success"]
+                and defense_action.get("tech_id") == red_action["tech_id"]):
+            reprobe = target.run(red_action, defended=True)
+            reverified = not reprobe["success"]
+            mitigated = bool(reverified)
         defd = tuple(sorted(set(state.defended) |
                             ({defense_action["tech_id"]} if (applied and defense_action and defense_action.get("tech_id")) else set())))
         foothold = state.foothold + (1 if (result["success"] and not detected and not mitigated) else 0)
@@ -612,18 +745,31 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
             "result": {"success": result["success"], "stdout": result["stdout"][:120]},
             "wazuh": ctx, "detected": bool(detected), "covered": bool(covered),
             "mitigated": bool(mitigated),  # was this successful attack contained by blue?
+            "events": events,             # benign+malicious stream for precision/recall
+            "evaded": bool(result["success"] and not detected and not mitigated),
             "reward": round(red_reward, 3),
         })
         if defense_action and defense_action.get("tech_id") is not None:
             traj.steps.append({
                 "role": "blue", "state": asdict(mid_state), "action": defense_action,
                 "applied": bool(applied), "mitigated": bool(mitigated),
+                "verified": reverified,  # True/False if a re-probe confirmed the block; None if not tested
                 "rule_deployed": bool(rule_deployed), "reward": round(blue_reward, 3),
             })
 
         state = new_state
         if state.foothold >= len(_TACTIC_ORDER) - 1:  # red reached exfiltration
             break
+    # DefenderBench-style episode outcome: red "wins" (CBS Winning %) iff the campaign
+    # reached its final objective (exfiltration tactic). conf[] carries the per-event
+    # confusion matrix used for blue's Macro-F1.
+    traj.meta = {
+        "evasive": bool(evasive),
+        "red_win": bool(state.foothold >= len(_TACTIC_ORDER) - 1),
+        "final_foothold": int(state.foothold),
+        "objective_steps": len(_TACTIC_ORDER) - 1,
+        "confusion": conf,
+    }
     return traj
 
 
@@ -658,7 +804,8 @@ def run_closed_loop(iterations: int = 3, ctf_name: Optional[str] = None,
                     dry_run: bool = True, out_dir: str = "output/pipeline",
                     seed: int = 0, profile: str = "financial_linux_web",
                     use_llm: bool = True, attacker_container: Optional[str] = None,
-                    fresh: bool = False) -> list[Trajectory]:
+                    fresh: bool = False, evasive: bool = False,
+                    benign_rate: int = 4) -> list[Trajectory]:
     rng = random.Random(seed)
     memory = load_shared_memory(profile=profile)
 
@@ -689,11 +836,12 @@ def run_closed_loop(iterations: int = 3, ctf_name: Optional[str] = None,
             # Both agents search with their OWN learned priors (self-play).
             # blue_mcts sees learned_covered so it won't re-deploy rules it already has.
             red_mcts = MCTS(memory, action_priors=red_priors, rng=random.Random(seed + it),
-                            llm=llm, learned_covered=learned_covered)
+                            llm=llm, learned_covered=learned_covered, evasive=evasive)
             blue_mcts = MCTS(memory, action_priors=blue_priors, rng=random.Random(seed + 100 + it),
                              llm=llm, learned_covered=learned_covered)
             traj = run_episode(memory, target, red_mcts, blue_mcts, defense,
-                               dry_run=dry_run, rng=rng, llm=llm, learned_covered=learned_covered)
+                               dry_run=dry_run, rng=rng, llm=llm, learned_covered=learned_covered,
+                               evasive=evasive, benign_rate=benign_rate)
             all_traj.append(traj)
             print(f"[iter {it}] steps={len(traj.steps)} "
                   f"red_return={traj.red_return:.2f} blue_return={traj.blue_return:.2f}")
@@ -756,9 +904,16 @@ def run_closed_loop(iterations: int = 3, ctf_name: Optional[str] = None,
         m = _metrics.compute_metrics([asdict(t) for t in all_traj])
         _metrics.write_metrics(m, out_dir)
         s = m["summary"]
+        db = s.get("defenderbench", {})
+        det = db.get("detection", {})
+        extra = ""
+        if db.get("episodes_scored"):
+            extra = (f" | RED win%={db['red_winning_pct']*100:.1f}% "
+                     f"BLUE Macro-F1={det.get('macro_f1', 0):.3f} "
+                     f"(P={det.get('precision', 0):.2f} R={det.get('recall', 0):.2f})")
         print(f"[pipeline] metrics: breach(net)={s['breach_rate']*100:.1f}% "
               f"containment={s['containment_rate']*100:.1f}% block={s['block_rate']*100:.1f}% "
-              f"detection={s['detection_rate']*100:.1f}% -> {out_dir}/metrics.json")
+              f"detection={s['detection_rate']*100:.1f}%{extra} -> {out_dir}/metrics.json")
     except Exception as e:  # pragma: no cover
         print(f"[pipeline] metrics computation skipped: {e}")
 
