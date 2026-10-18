@@ -8,6 +8,10 @@ services:
       DB_NAME: bank
       DB_USER: bankapp
       DB_PASSWORD: bankpass
+      WAZUH_MANAGER: host.docker.internal
+    # let the in-container Wazuh agent reach the manager published on the Windows host
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       bank-db:
         condition: service_healthy

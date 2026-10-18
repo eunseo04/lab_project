@@ -1,8 +1,33 @@
 import os
+import logging
+from datetime import datetime, timezone
 import psycopg2
 from flask import Flask, request, jsonify, render_template_string
 
 app = Flask(__name__)
+
+# --- access log in Apache "combined" format, written to a file the Wazuh agent tails ---
+# Wazuh's web-accesslog decoder + web attack rules (e.g. 31103 SQL injection, 31104/31106
+# generic web attacks) parse this file, turning HTTP attacks on the vulnerable endpoints
+# into REAL SIEM alerts instead of being invisible (Flask otherwise logs only to stdout).
+_ACCESS_LOG = os.environ.get("ACCESS_LOG", "/var/log/bank-web/access.log")
+os.makedirs(os.path.dirname(_ACCESS_LOG), exist_ok=True)
+_access = logging.getLogger("bankweb.access")
+_access.setLevel(logging.INFO)
+_access.addHandler(logging.FileHandler(_ACCESS_LOG))
+_access.propagate = False
+
+
+@app.after_request
+def _log_access(response):
+    ts = datetime.now(timezone.utc).strftime("%d/%b/%Y:%H:%M:%S +0000")
+    target = request.full_path if request.query_string else request.path
+    line = (f'{request.remote_addr} - - [{ts}] '
+            f'"{request.method} {target} {request.environ.get("SERVER_PROTOCOL", "HTTP/1.1")}" '
+            f'{response.status_code} {response.calculate_content_length() or 0} '
+            f'"{request.referrer or "-"}" "{request.user_agent or "-"}"')
+    _access.info(line)
+    return response
 
 DB = {
     "host": os.environ["DB_HOST"],

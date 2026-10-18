@@ -31,6 +31,19 @@ except Exception:  # pragma: no cover
 DEFAULT_MODEL = "Qwen/Qwen3-8B"
 
 
+def _strip_think(text: str) -> str:
+    """Remove any <think>...</think> reasoning block (safety net if thinking slips on),
+    and drop a dangling '<think>' with no close. Returns the visible answer only."""
+    import re
+    if not text:
+        return text
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+    if "</think>" in text:            # unmatched: keep what follows the last close
+        text = text.rsplit("</think>", 1)[1]
+    text = text.replace("<think>", "")
+    return text.strip()
+
+
 class LLMConfig:
     def __init__(self):
         self.model = os.environ.get("QWEN_MODEL", DEFAULT_MODEL).strip()
@@ -45,6 +58,10 @@ class LLMConfig:
                                or os.environ.get("REWARD_MODEL_NAME")
                                or self.model).strip()
         self.device = os.environ.get("QWEN_DEVICE", "auto").strip()  # auto|cpu|cuda
+        # Qwen3 ships in "thinking" mode (emits a long <think>...</think> before the answer),
+        # which is slow and eats the token budget so the actual CMD:/DETECTED line never lands.
+        # The pipeline needs terse structured replies, so thinking is OFF by default.
+        self.enable_thinking = os.environ.get("QWEN_ENABLE_THINKING", "").strip() in ("1", "true", "True")
         self.max_new_tokens = int(os.environ.get("QWEN_MAX_NEW_TOKENS", "512"))
         self.temperature = float(os.environ.get("QWEN_TEMPERATURE", "0.7"))
         self.top_p = float(os.environ.get("QWEN_TOP_P", "0.9"))
@@ -109,13 +126,15 @@ class LLMClient:
             "max_tokens": max_new_tokens or self.config.max_new_tokens,
             "temperature": temp,
             "top_p": self.config.top_p,
+            # tell the Qwen3 chat template whether to think (vLLM passes this through)
+            "chat_template_kwargs": {"enable_thinking": self.config.enable_thinking},
         }
         try:
             r = requests.post(self._endpoint_base() + "/chat/completions",
                               json=payload, headers=headers, timeout=self.config.timeout)
             r.raise_for_status()
             data = r.json()
-            return (data["choices"][0]["message"]["content"] or "").strip()
+            return _strip_think((data["choices"][0]["message"]["content"] or "").strip())
         except Exception as e:
             print(f"[llm] endpoint generation failed: {e}")
             return ""
