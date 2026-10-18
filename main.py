@@ -63,7 +63,7 @@ def step_coverage(profile: str, out_dir: str = "output/coverage") -> dict:
 
 def step_loop(args) -> None:
     print("\n" + "=" * 70)
-    print("B. RED/BLUE CLOSED LOOP (MCTS + Qwen2.5-0.5B + Target + Wazuh + GRPO)")
+    print("B. RED/BLUE CLOSED LOOP (MCTS + Qwen3-8B + Target + Wazuh + GRPO)")
     print("=" * 70)
     pipeline.run_closed_loop(
         iterations=args.iterations,
@@ -81,13 +81,13 @@ def step_loop(args) -> None:
 
 
 def step_train_hint(args) -> None:
-    model = os.environ.get("QWEN_MODEL", "Qwen/Qwen2.5-0.5B-Instruct")
+    model = os.environ.get("QWEN_MODEL", "Qwen/Qwen3-8B")
     reward_url = os.environ.get("REWARD_MODEL_URL", "http://localhost:8000")
     reward_name = os.environ.get("REWARD_MODEL_NAME", model)
     print("\n" + "=" * 70)
-    print("C. GRPO TRAINING (local Qwen2.5-0.5B-Instruct policy)")
+    print("C. GRPO TRAINING (local Qwen3-8B policy)")
     print("=" * 70)
-    print("  Policy, reward, and eval all use Qwen2.5-0.5B-Instruct locally.")
+    print("  Policy, reward, and eval all use Qwen3-8B locally.")
     print("  Start a vLLM server of the model for the reward/eval endpoint, e.g.:")
     print(f"    python -m vllm.entrypoints.openai.api_server --model {model} --port 8000\n")
     print("  GRPO is scored the TriPlay way (red completion -> QA model -> eval judge),")
@@ -144,7 +144,10 @@ def main():
           f"iterations={args.iterations}")
     llm = get_llm() if args.use_llm else None
     if llm and not llm.config.disabled:
-        print(f"  LLM=local Qwen:{llm.config.model} (loads on first use)")
+        if llm.config.use_endpoint:
+            print(f"  LLM=endpoint {llm.config.endpoint} model={llm.config.endpoint_model}")
+        else:
+            print(f"  LLM=local {llm.config.model} (loads on first use; set QWEN_ENDPOINT for vLLM)")
     else:
         print("  LLM=disabled (rule-based fallback)")
 

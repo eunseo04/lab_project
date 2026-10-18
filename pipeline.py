@@ -92,6 +92,44 @@ _TACTIC_ORDER = [
     "collection", "command-and-control", "exfiltration",
 ]
 
+# Capability each kill-chain stage GRANTS once cleared. These are the verified facts
+# carried to the next turn: a stage's technique may only be attempted when the previous
+# stage's capability is already held (precondition), and clearing a stage adds its
+# capability. The final stage's capability ("exfil") is the campaign objective -- but
+# whether the objective was truly achieved is decided by the ENVIRONMENT (flag capture),
+# not by this internal progress (see Objective / verify_flag).
+_STAGE_CAPABILITY = {
+    "reconnaissance": "recon",
+    "resource-development": "infra",
+    "initial-access": "access",       # first foothold / shell on the host
+    "execution": "exec",              # code execution on the host
+    "persistence": "persistence",
+    "privilege-escalation": "root",   # elevated privileges
+    "defense-impairment": "stealth",
+    "credential-access": "creds",
+    "discovery": "mapped",
+    "lateral-movement": "pivot",
+    "collection": "staged",           # target data located/staged
+    "command-and-control": "c2",
+    "exfiltration": "exfil",          # data moved out == objective reached
+}
+
+
+def stage_capability(stage: str) -> Optional[str]:
+    return _STAGE_CAPABILITY.get(stage)
+
+
+def prerequisite_capability(stage: str) -> Optional[str]:
+    """The capability a technique at `stage` REQUIRES before it can be attempted
+    (the previous stage's capability). The first stage has no prerequisite."""
+    try:
+        i = _TACTIC_ORDER.index(stage)
+    except ValueError:
+        return None
+    if i <= 0:
+        return None
+    return _STAGE_CAPABILITY.get(_TACTIC_ORDER[i - 1])
+
 
 def load_shared_memory(profile: str = "financial_linux_web") -> dict:
     """ATT&CK techniques shared by both Red and Blue (the 'shared-memory' dataset).
@@ -129,11 +167,18 @@ def load_shared_memory(profile: str = "financial_linux_web") -> dict:
 # ---------------------------------------------------------------------------
 @dataclass
 class CyberState:
-    """Abstract state of one engagement, shared by the MCTS and the executor."""
+    """Abstract state of one engagement, shared by the MCTS and the executor.
+
+    `capabilities` and `flag` are the VERIFIED facts the executor threads from turn to
+    turn: capabilities are the stage powers red has actually earned (preconditions for
+    later stages) and `flag` is True only once the environment confirmed the objective
+    was captured. The MCTS reads these so it plans from real state, not assumptions."""
     executed: tuple = ()        # techniques red has run
     detected: tuple = ()        # techniques Wazuh flagged
     defended: tuple = ()        # techniques blue has mitigated
-    foothold: int = 0           # index into _TACTIC_ORDER reached by red
+    capabilities: tuple = ()    # verified stage capabilities red currently holds
+    foothold: int = 0           # kill-chain stages cleared so far (derived progress index)
+    flag: bool = False          # objective captured (environment-verified)
     step: int = 0
 
     def key(self) -> str:
@@ -141,6 +186,10 @@ class CyberState:
 
     def tactic_reached(self) -> str:
         return _TACTIC_ORDER[min(self.foothold, len(_TACTIC_ORDER) - 1)]
+
+    def has(self, cap: Optional[str]) -> bool:
+        """True if red holds this capability (None means 'no prerequisite')."""
+        return cap is None or cap in self.capabilities
 
 
 # ---------------------------------------------------------------------------
@@ -153,7 +202,8 @@ def is_covered(tid: str, memory: dict, learned_covered=None) -> bool:
 
 
 def generate_candidates(role: str, state: CyberState, memory: dict, k: int = 4, llm=None,
-                        learned_covered=None, evasive: bool = False) -> list[dict]:
+                        learned_covered=None, evasive: bool = False,
+                        objective: Optional["Objective"] = None) -> list[dict]:
     """Produce actionable strategy candidates for red or blue from the ATT&CK memory.
 
     The candidate *set* comes from the shared ATT&CK memory. When an LLM is available
@@ -173,20 +223,28 @@ def generate_candidates(role: str, state: CyberState, memory: dict, k: int = 4, 
             for tid, info in memory.items()
             if tid not in state.executed
         ]
-        # STAGED kill chain: only offer techniques for the stage red is currently on,
-        # so the campaign must advance one tactic at a time instead of jumping straight
-        # to the objective. If the current stage is exhausted (all its techniques already
-        # executed), look ahead to the next reachable stage so the chain can still move.
+        # STAGED kill chain WITH PRECONDITIONS: only offer techniques for the stage red
+        # is currently on, and only if red actually HOLDS that stage's prerequisite
+        # capability (the previous stage's power). The campaign advances one tactic at a
+        # time and never skips a stage it has not truly cleared. If the current stage is
+        # exhausted, look ahead ONLY to a later stage whose prerequisite red already holds
+        # (so a failed step can never be treated as if it had succeeded).
         def _on_stage(a, tac):
             return tac in (a.get("tactics") or [])
-        pool = [a for a in all_unexec if _on_stage(a, target_tactic)]
+        pool = []
+        if state.has(prerequisite_capability(target_tactic)):
+            pool = [a for a in all_unexec if _on_stage(a, target_tactic)]
         if not pool:
             for nxt in _TACTIC_ORDER[state.foothold + 1:]:
+                if not state.has(prerequisite_capability(nxt)):
+                    break  # cannot reach this stage yet -> do not skip ahead
                 pool = [a for a in all_unexec if _on_stage(a, nxt)]
                 if pool:
                     break
         if not pool:
-            pool = all_unexec  # last resort: never return empty
+            # current stage has no untried technique AND we may not skip: retry the
+            # current stage's techniques (campaign stalls here rather than faking progress).
+            pool = [a for a in all_unexec if _on_stage(a, target_tactic)] or all_unexec
         pool.sort(key=lambda a: a["tech_id"])
         if evasive:
             # EVASIVE campaign: among the stage's techniques, prefer the lowest-signal
@@ -217,22 +275,32 @@ def generate_candidates(role: str, state: CyberState, memory: dict, k: int = 4, 
                      "name": "Harden & monitor baseline", "defense": "baseline hardening"}]
 
     if llm is not None and getattr(llm, "available", False) and pool:
-        pool = _llm_reorder_candidates(role, state, pool, llm, k)
+        pool = _llm_reorder_candidates(role, state, pool, llm, k, objective=objective)
     return pool[:k]
 
 
-def _llm_reorder_candidates(role: str, state: CyberState, pool: list[dict], llm, k: int) -> list[dict]:
-    """Ask the LLM to pick the most promising next techniques for this state."""
+def _llm_reorder_candidates(role: str, state: CyberState, pool: list[dict], llm, k: int,
+                            objective: Optional["Objective"] = None) -> list[dict]:
+    """Ask the LLM to pick the most promising next techniques for this state, told the
+    objective and the verified capabilities so it chooses goal-relevant, low-detection
+    moves rather than arbitrary techniques."""
     shortlist = pool[: max(k * 3, 12)]  # keep the prompt small
     menu = "\n".join(f"- {c['tech_id']}: {c['name']}" for c in shortlist if c.get("tech_id"))
     if not menu:
         return pool
+    goal = ""
+    if objective is not None:
+        goal = (f" The campaign objective is to {objective.name} by reaching the "
+                f"'{objective.capture_tactic}' stage (capture {objective.target_file}). "
+                f"Prefer techniques that advance toward that goal while minimizing the "
+                f"chance of Wazuh detection.")
     system = (f"You are the {role.upper()} agent in an authorized financial cyber-range. "
               f"From the candidate MITRE ATT&CK techniques, choose the {k} best to try "
-              f"NEXT given the state, most promising first. Reply with ONLY the technique "
-              f"IDs separated by commas (e.g. T1190,T1059).")
-    user = (f"State: foothold={state.foothold} ({state.tactic_reached()}), "
-            f"executed={list(state.executed)}, detected={list(state.detected)}.\n"
+              f"NEXT given the state and the objective, most promising first.{goal} "
+              f"Reply with ONLY the technique IDs separated by commas (e.g. T1190,T1059).")
+    user = (f"State: stage={state.tactic_reached()} (foothold={state.foothold}), "
+            f"capabilities={list(state.capabilities)}, executed={list(state.executed)}, "
+            f"detected={list(state.detected)}, flag_captured={state.flag}.\n"
             f"Candidates:\n{menu}")
     text = llm.complete(user, system=system)
     if not text:
@@ -324,7 +392,8 @@ def llm_enrich_defense(defense: dict, state: CyberState, memory: dict, llm=None,
 # ---------------------------------------------------------------------------
 def step_reward(role: str, *, success: bool, detected: bool,
                 mitigated: bool = False, rule_deployed: bool = False,
-                evasive: bool = False) -> float:
+                evasive: bool = False, captured: bool = False,
+                on_stage: bool = True) -> float:
     """One source of truth for the per-action / per-step reward.
 
     This is the MCTS-side reward: it drives action-level search (rollouts),
@@ -332,6 +401,10 @@ def step_reward(role: str, *, success: bool, detected: bool,
     be duplicated by a divergent inline formula inside run_episode; that copy has
     been removed and both the MCTS rollout and the realized self-play step now
     call this function, so there is a single reward definition.
+
+    It is GOAL-AWARE: capturing the objective flag dominates (`captured`), and an
+    off-stage action that cannot advance the campaign is penalized (`on_stage`) so
+    the agent pursues the goal instead of spraying unrelated techniques.
 
     IMPORTANT: GRPO does NOT use this. GRPO scores whole trajectories with the
     TriPlay reward (reward.py). Keep the two separate: MCTS = action/strategy
@@ -343,6 +416,8 @@ def step_reward(role: str, *, success: bool, detected: bool,
         r = (1.0 if success else -0.2)
         r -= (1.1 if evasive else 0.6) if detected else 0.0
         r -= 0.5 if mitigated else 0.0  # containment only known on a realized step
+        r -= 0.3 if not on_stage else 0.0  # off-stage effort does not progress the goal
+        r += 3.0 if captured else 0.0      # objective reached: dominates the return
         return r
     # blue: reward detection, containment and growing coverage (MCTS has no
     # separately-shaped blue rollout reward, so this is the single blue definition).
@@ -365,7 +440,8 @@ class MCTS:
 
     def __init__(self, memory: dict, action_priors: Optional[dict] = None,
                  n_sims: int = 64, c_uct: float = 1.4, rng: Optional[random.Random] = None,
-                 llm=None, learned_covered=None, evasive: bool = False):
+                 llm=None, learned_covered=None, evasive: bool = False,
+                 objective: Optional["Objective"] = None):
         self.memory = memory
         self.priors = action_priors or {}
         self.n_sims = n_sims
@@ -374,11 +450,13 @@ class MCTS:
         self.llm = llm  # LLM proposes/reorders candidate actions (strategy generation)
         self.learned_covered = learned_covered  # blue-deployed detection coverage
         self.evasive = evasive  # red plans a stealth campaign that blends into benign noise
+        self.objective = objective or Objective()  # the goal MCTS plans toward
 
     def search(self, state: CyberState, role: str = "red") -> tuple[dict, float]:
         candidates = generate_candidates(role, state, self.memory, llm=self.llm,
                                          learned_covered=self.learned_covered,
-                                         evasive=self.evasive and role == "red")
+                                         evasive=self.evasive and role == "red",
+                                         objective=self.objective)
         if not candidates:
             return {}, 0.0
         N = {i: 0 for i in range(len(candidates))}
@@ -410,50 +488,93 @@ class MCTS:
         return best_i
 
     def _rollout(self, state: CyberState, action: dict, role: str) -> float:
-        """Stochastic self-play rollout. Replace with real Target+Wazuh outcomes."""
+        """Stochastic, GOAL-AWARE self-play rollout: it weighs both the chance of
+        advancing toward the objective and the detection risk, so MCTS prefers actions
+        that make verifiable progress to the flag over merely trying many techniques."""
         prior = self.priors.get(action.get("tech_id") or action["name"], 0.5)
         if role == "red":
-            advances = action.get("tactics") and state.tactic_reached() in action["tactics"]
-            p_success = 0.4 + 0.4 * prior + (0.1 if advances else 0.0)
+            stage = state.tactic_reached()
+            on_stage = bool(action.get("tactics") and stage in action["tactics"])
+            # precondition: this technique can only progress if red holds the stage's
+            # prerequisite capability; otherwise it is wasted effort this turn.
+            can_progress = on_stage and state.has(prerequisite_capability(stage))
+            p_success = 0.4 + 0.4 * prior + (0.1 if can_progress else 0.0)
             success = self.rng.random() < p_success
             # evasive red plans against detection: uncovered techniques are quieter,
             # and getting caught is weighted much more heavily (stealth is the objective).
             covered = is_covered(action.get("tech_id"), self.memory, self.learned_covered)
             p_detect = (0.75 if covered else 0.15) if self.evasive else 0.5
             detected = self.rng.random() < p_detect
+            # objective: if this is the capture stage and the step would succeed+evade,
+            # simulate capturing the flag (dominant reward) so search drives to the goal.
+            is_capture = can_progress and stage == self.objective.capture_tactic
+            captured = bool(is_capture and success and not detected)
             # single reward definition (shared with run_episode); normalize the
             # raw step reward to a [0,1] win-rate for UCT backups.
             reward = step_reward("red", success=success, detected=detected,
-                                 evasive=self.evasive)
-            return max(0.0, min(1.0, 0.5 + 0.5 * reward))
+                                 evasive=self.evasive, captured=captured,
+                                 on_stage=can_progress)
+            # keep the win-rate in [0,1]; the capture bonus widens the top end.
+            return max(0.0, min(1.0, 0.5 + 0.25 * reward))
         else:  # blue win-rate: catching/defending the active technique
             p_defend = 0.3 + 0.6 * prior
             return 1.0 if self.rng.random() < p_defend else 0.2
 
 
 # ---------------------------------------------------------------------------
+# Objective (the verifiable, per-episode goal)
+# ---------------------------------------------------------------------------
+@dataclass
+class Objective:
+    """A concrete, environment-verifiable goal for the episode, e.g. reading a
+    protected flag file. Campaign success is decided by actually capturing this (the
+    environment confirms it), NOT by reaching an internal progress score."""
+    name: str = "capture_flag"
+    challenge: Optional[str] = None     # CTF challenge key (live) or "sim" (dry-run)
+    capture_tactic: str = "exfiltration"  # kill-chain stage at which the flag is taken
+    target_file: str = "/root/flag.txt"   # the specific file red must access
+    description: str = ""
+
+
+# ---------------------------------------------------------------------------
 # Target execution (Docker vs simulated)
 # ---------------------------------------------------------------------------
 class SimulatedTarget:
-    """Stand-in for the Docker target: deterministic-ish outcome, no daemon needed."""
+    """Stand-in for the Docker target: deterministic-ish outcome, no daemon needed.
+
+    Models a verifiable objective without a container: the protected flag string only
+    appears in command output when red actually performs the capture at the objective
+    stage with all preconditions met -- so `verify_flag` is a real check against the
+    state machine, not a coin flip."""
 
     def __init__(self, rng: Optional[random.Random] = None):
         self.rng = rng or random.Random(1)
+        self._flag = f"FLAG{{sim_{self.rng.randint(100000, 999999)}}}"
 
     def target_ip(self) -> str:
         return "172.30.20.10"
 
-    def run(self, action: dict, defended: bool = False) -> dict:
+    def objective(self) -> Objective:
+        return Objective(name="capture_flag", challenge="sim",
+                         capture_tactic="exfiltration", target_file="/root/flag.txt",
+                         description="Exfiltrate the protected flag file /root/flag.txt.")
+
+    def run(self, action: dict, defended: bool = False, capture: bool = False) -> dict:
         base = float(action.get("winrate", 0.5))
         # a re-attempt against a correctly-applied defense should mostly fail
         p = base * 0.15 if defended else base
         success = self.rng.random() < p
-        return {
-            "action": action,
-            "success": success,
-            "stdout": f"[sim] {'re-attempt ' if defended else ''}executed {action.get('tech_id')} "
-                      f"({action.get('name')}) -> {'ok' if success else 'blocked'}",
-        }
+        stdout = (f"[sim] {'re-attempt ' if defended else ''}executed {action.get('tech_id')} "
+                  f"({action.get('name')}) -> {'ok' if success else 'blocked'}")
+        # The flag is only readable when THIS is the objective-capture action and it
+        # worked; whether it counts as captured also requires evasion (decided by caller).
+        if capture and success:
+            stdout += f"\n[sim] read {self.objective().target_file}: {self._flag}"
+        return {"action": action, "success": success, "stdout": stdout}
+
+    def verify_flag(self, stdout: str) -> bool:
+        """Environment check: did red's own output actually contain the flag?"""
+        return bool(stdout) and self._flag in stdout
 
     def defend(self, defense_action: dict) -> dict:
         applied = self.rng.random() < float(defense_action.get("winrate", 0.6))
@@ -490,9 +611,57 @@ class DockerTarget:
     def target_ip(self) -> str:
         return self.ip or "target"
 
-    def run(self, action: dict, defended: bool = False) -> dict:
+    def objective(self) -> Objective:
+        """The real CTF objective: capture a flag. The challenge/flag come from the CTF
+        config (flag_commands, e.g. `cat /root/root.txt`), read at start_ctf()."""
+        challenge = None
+        target_file = os.environ.get("OBJECTIVE_FILE", "/root/root.txt")
+        try:
+            chals = self.ctf.get_challenges() or {}
+            challenge = list(chals.keys())[0] if chals else None
+        except Exception:
+            pass
+        try:
+            fc = getattr(self.ctf, "flag_commands", {}) or {}
+            # best-effort: show the path the flag lives at, for the red prompt context
+            for cmd in fc.values():
+                if isinstance(cmd, str) and "/" in cmd:
+                    target_file = cmd.split()[-1]
+                    break
+        except Exception:
+            pass
+        desc = ""
+        try:
+            desc = self.ctf.get_instructions() or ""
+        except Exception:
+            pass
+        return Objective(name="capture_flag", challenge=challenge,
+                         capture_tactic=os.environ.get("OBJECTIVE_TACTIC", "exfiltration"),
+                         target_file=target_file, description=desc)
+
+    def verify_flag(self, stdout: str) -> bool:
+        """Environment check: did red's OWN command output contain a real flag value?
+        This is the ground-truth, unfakeable objective test (the flags were extracted
+        from the container at start_ctf via the CTF's flag_commands)."""
+        if not stdout:
+            return False
+        try:
+            if self.ctf.get_challenges():
+                for ch in self.ctf.get_challenges():
+                    if self.ctf.check_flag(stdout, ch):
+                        return True
+        except Exception:
+            pass
+        try:
+            flags = getattr(self.ctf, "flags", {}) or {}
+            return any(isinstance(v, str) and v and v in stdout for v in flags.values())
+        except Exception:
+            return False
+
+    def run(self, action: dict, defended: bool = False, capture: bool = False) -> dict:
         """Red attack: tools run FROM the attacker container (remote) or IN the target.
-        `defended` just marks a re-attempt probe; reality (the command result) decides."""
+        `defended` just marks a re-attempt probe; `capture` is advisory (the real command
+        output decides whether the flag was obtained -- see verify_flag)."""
         import redtools
         cmd = action.get("command") or f"echo run {action.get('tech_id')}"
         if self.attacker_container:
@@ -820,11 +989,15 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
     if learned_covered is None:
         learned_covered = set()
     if max_steps is None:
-        # allow up to ~2 attempts per kill-chain stage so a staged campaign can
-        # recover from a failed/contained step and still reach the objective.
-        max_steps = 2 * (len(_TACTIC_ORDER) - 1)
+        # allow ~3 attempts per kill-chain stage so a staged campaign can recover from
+        # failed/contained steps, reach the final stage AND still get turns to attempt
+        # the objective capture there (reaching the last stage is not itself success).
+        max_steps = 3 * len(_TACTIC_ORDER)
     state = CyberState()
     traj = Trajectory()
+    objective = target.objective() if hasattr(target, "objective") else Objective()
+    print(f"[episode] objective: {objective.name} -> capture {objective.target_file} "
+          f"at the '{objective.capture_tactic}' stage")
     tgt_ip = target.target_ip() if hasattr(target, "target_ip") else "target"
     from benign_activity import BenignActivityGenerator
     benign_gen = BenignActivityGenerator(rng=rng, agent_name=getattr(target, "agent_name", "target"))
@@ -847,8 +1020,16 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
         if not dry_run and hasattr(target, "measure_benign_fp") and n_benign:
             live_benign = target.measure_benign_fp(benign_gen.batch(n_benign))
 
+        # Is THIS the objective-capture move? Only if the technique is on the capture
+        # stage AND red already holds that stage's prerequisite capability (precondition).
+        stage_tactic = state.tactic_reached()
+        on_stage = stage_tactic in (red_action.get("tactics") or [])
+        preconds_met = state.has(prerequisite_capability(stage_tactic))
+        is_capture = bool(on_stage and preconds_met
+                          and stage_tactic == objective.capture_tactic)
+
         attack_time = _dt.now(_tz.utc)
-        result = target.run(red_action)
+        result = target.run(red_action, capture=is_capture)
 
         # 2) SIEM (Wazuh) detection
         covered = is_covered(red_action["tech_id"], memory, learned_covered)
@@ -928,21 +1109,36 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
         defd = tuple(sorted(set(state.defended) |
                             ({defense_action["tech_id"]} if (applied and defense_action and defense_action.get("tech_id")) else set())))
         # STAGED progression: a stage is cleared only by an ON-STAGE technique that
-        # succeeds AND evades detection/containment. An off-stage or caught action does
-        # not advance the kill chain, so red must work through the tactics in order.
-        stage_tactic = state.tactic_reached()
-        on_stage = stage_tactic in (red_action.get("tactics") or [])
-        advanced = bool(result["success"] and not detected and not mitigated and on_stage)
+        # succeeds AND evades detection/containment, AND whose precondition is met.
+        # An off-stage, caught, or precondition-missing action does not advance the kill
+        # chain, so red must work through the tactics in order (no faked progress).
+        evaded = bool(result["success"] and not detected and not mitigated)
+        advanced = bool(evaded and on_stage and preconds_met)
         foothold = state.foothold + (1 if advanced else 0)
+        # grant the stage's capability as a VERIFIED fact carried to the next turn
+        caps = set(state.capabilities)
+        if advanced:
+            cap = stage_capability(stage_tactic)
+            if cap:
+                caps.add(cap)
+        # OBJECTIVE: environment-verified flag capture (ground truth), not the progress
+        # counter. verify_flag checks red's OWN command output for the real flag; it only
+        # counts if the capture move also evaded detection/containment.
+        captured = bool(is_capture and evaded and target.verify_flag(result.get("stdout", "")))
+        flag = bool(state.flag or captured)
+        if captured:
+            caps.add("exfil")
         new_state = CyberState(executed=executed, detected=det, defended=defd,
-                               foothold=foothold, step=state.step + 1)
+                               capabilities=tuple(sorted(caps)), foothold=foothold,
+                               flag=flag, step=state.step + 1)
 
-        # 5) rewards: single definition shared with the MCTS rollout (step_reward).
-        #    The old divergent inline self-play formula has been removed so MCTS and
-        #    self-play use one reward. (GRPO does NOT use these; it scores whole
+        # 5) rewards: single, GOAL-AWARE definition shared with the MCTS rollout
+        #    (step_reward). The old divergent inline self-play formula has been removed so
+        #    MCTS and self-play use one reward. (GRPO does NOT use these; it scores whole
         #    trajectories with the TriPlay reward in reward.py.)
         red_reward = step_reward("red", success=result["success"], detected=detected,
-                                 mitigated=mitigated, evasive=evasive)
+                                 mitigated=mitigated, evasive=evasive,
+                                 captured=captured, on_stage=(on_stage and preconds_met))
         blue_reward = step_reward("blue", success=result["success"], detected=detected,
                                   mitigated=mitigated, rule_deployed=rule_deployed)
         traj.red_return += red_reward
@@ -953,10 +1149,14 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
             "wazuh": ctx, "detected": bool(detected), "covered": bool(covered),
             "mitigated": bool(mitigated),  # was this successful attack contained by blue?
             "events": events,             # benign+malicious stream for precision/recall
-            "evaded": bool(result["success"] and not detected and not mitigated),
+            "evaded": evaded,
             "stage": stage_tactic,        # kill-chain stage this step was attempted at
             "on_stage": bool(on_stage),   # did the technique belong to the current stage?
+            "preconds_met": bool(preconds_met),  # was the stage's prerequisite held?
             "advanced": advanced,         # did this step clear the stage (foothold += 1)?
+            "capabilities": list(new_state.capabilities),  # verified powers after this step
+            "is_capture": is_capture,     # was this an objective-capture attempt?
+            "captured": captured,         # did the environment confirm the flag was taken?
             "reward": round(red_reward, 3),
         })
         if defense_action and defense_action.get("tech_id") is not None:
@@ -969,9 +1169,11 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
 
         # Per-step execution summary (ordered account of what actually happened this
         # turn after real/simulated execution): stage -> technique -> outcome.
-        outcome = ("ADVANCED" if advanced else
+        outcome = ("FLAG-CAPTURED" if captured else
+                   "ADVANCED" if advanced else
                    "contained" if mitigated else
                    "detected" if detected else
+                   "no-precond" if (on_stage and not preconds_met) else
                    "failed" if not result["success"] else "blocked(off-stage)")
         print(f"  [step {state.step:>2}] stage={stage_tactic:<20} "
               f"{red_action.get('tech_id')} ({red_action.get('name','')[:28]}) "
@@ -979,15 +1181,26 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
               f"{'  rule+' if rule_deployed else ''}")
 
         state = new_state
-        if state.foothold >= len(_TACTIC_ORDER) - 1:  # red reached the final stage
+        if state.flag:  # objective captured (environment-verified) -> campaign done
+            print(f"  [episode] OBJECTIVE ACHIEVED: flag captured at step {state.step}.")
             break
-    # DefenderBench-style episode outcome: red "wins" (CBS Winning %) iff the campaign
-    # reached its final objective (the last kill-chain stage, exfiltration). conf[]
-    # carries the per-event confusion matrix used for blue's Macro-F1.
+        if state.foothold >= len(_TACTIC_ORDER) - 1 and not is_capture:
+            # reached the final stage but has not yet captured the flag: keep trying the
+            # capture at this stage until it succeeds+evades or steps run out.
+            pass
+    # Episode outcome: red "wins" iff the ENVIRONMENT confirmed the objective was captured
+    # (the flag), NOT merely by reaching the final progress index. conf[] carries the
+    # per-event confusion matrix used for blue's Macro-F1.
     stages_cleared = [s["stage"] for s in traj.steps if s.get("role") == "red" and s.get("advanced")]
+    objective_achieved = bool(state.flag)
     traj.meta = {
         "evasive": bool(evasive),
-        "red_win": bool(state.foothold >= len(_TACTIC_ORDER) - 1),
+        "objective": {"name": objective.name, "target_file": objective.target_file,
+                      "capture_tactic": objective.capture_tactic},
+        "objective_achieved": objective_achieved,  # ENVIRONMENT-verified flag capture
+        "red_win": objective_achieved,  # win == captured the flag (verified), not progress
+        "reached_final_stage": bool(state.foothold >= len(_TACTIC_ORDER) - 1),
+        "final_capabilities": list(state.capabilities),
         "final_foothold": int(state.foothold),
         "final_stage": _TACTIC_ORDER[min(state.foothold, len(_TACTIC_ORDER) - 1)],
         "objective_steps": len(_TACTIC_ORDER) - 1,
@@ -1052,18 +1265,21 @@ def run_closed_loop(iterations: int = 3, ctf_name: Optional[str] = None,
     target = (SimulatedTarget(rng) if dry_run
               else DockerTarget(ctf_name or "cowsay", attacker_container=attacker_container))
     llm = get_llm() if (use_llm and get_llm is not None) else None
+    objective = target.objective() if hasattr(target, "objective") else Objective()
 
     all_traj: list[Trajectory] = []
     red_notes: list[str] = []
     blue_notes: list[str] = []
     try:
         for it in range(1, iterations + 1):
-            # Both agents search with their OWN learned priors (self-play).
-            # blue_mcts sees learned_covered so it won't re-deploy rules it already has.
+            # Both agents search with their OWN learned priors (self-play). red_mcts is
+            # told the objective so it plans toward the flag; blue_mcts sees
+            # learned_covered so it won't re-deploy rules it already has.
             red_mcts = MCTS(memory, action_priors=red_priors, rng=random.Random(seed + it),
-                            llm=llm, learned_covered=learned_covered, evasive=evasive)
+                            llm=llm, learned_covered=learned_covered, evasive=evasive,
+                            objective=objective)
             blue_mcts = MCTS(memory, action_priors=blue_priors, rng=random.Random(seed + 100 + it),
-                             llm=llm, learned_covered=learned_covered)
+                             llm=llm, learned_covered=learned_covered, objective=objective)
             traj = run_episode(memory, target, red_mcts, blue_mcts, defense,
                                dry_run=dry_run, rng=rng, llm=llm, learned_covered=learned_covered,
                                evasive=evasive, benign_rate=benign_rate)
