@@ -502,14 +502,17 @@ class DockerTarget:
         return {"action": action, "success": bool(out and "error" not in out.lower()),
                 "stdout": out or ""}
 
-    def wazuh_detect(self, since, tech_id: str):
-        """Return (detected: bool, context: dict) from REAL Wazuh alerts since `since`."""
+    def wazuh_detect(self, since, tech_id: str, tech_name: str = "", llm=None):
+        """Query REAL Wazuh alerts since `since`, then let the LLM JUDGE from the raw
+        alert evidence whether the attack was detected or MISSED. Falls back to a
+        deterministic technique-id match only when no LLM is available.
+        Returns (detected: bool, context: dict)."""
         if not (self.wazuh and self.wazuh.available):
-            return None, None  # caller falls back
+            return None, None  # caller falls back to the proxy model
         alerts = self.wazuh.query_alerts(since=since, agent_name=self.agent_name)
-        tids = self.wazuh.technique_ids(alerts)
-        detected = tech_id in tids
         ctx = extract_wazuh_context(alerts[0]) if alerts else None
+        detected = judge_detection(alerts, tech_id, tech_name, llm=llm,
+                                   fallback_tids=self.wazuh.technique_ids(alerts))
         return detected, ctx
 
     def run_benign(self, command: str) -> str:
@@ -565,6 +568,44 @@ class DockerTarget:
 # ---------------------------------------------------------------------------
 # Detection (Wazuh) + graph-based defense lookup
 # ---------------------------------------------------------------------------
+def judge_detection(alerts: list, tech_id: str, tech_name: str = "", llm=None,
+                    fallback_tids=None) -> bool:
+    """Decide DETECTED vs MISSED from the Wazuh query result.
+
+    Preferred path: hand the RAW alert evidence to the LLM and let IT judge whether the
+    attack was caught or slipped through. Real Wazuh alerts often lack a precise
+    `rule.mitre.id`, so a strict id-equality test would wrongly call a caught attack
+    'missed'; the LLM reasons over the description/groups/level instead. Falls back to
+    the exact technique-id membership test only when no LLM is available (or the LLM is
+    ambiguous), so the loop still runs offline.
+    """
+    if llm is not None and getattr(llm, "available", False):
+        if not alerts:
+            evidence = "(no Wazuh alerts fired in this window)"
+        else:
+            lines = []
+            for a in alerts[:10]:
+                r = a.get("rule", {}) or {}
+                mitre = (r.get("mitre", {}) or {}).get("id", [])
+                lines.append(f"- level={r.get('level')} mitre={mitre} "
+                             f"groups={r.get('groups', [])} desc={str(r.get('description',''))[:90]}")
+            evidence = "\n".join(lines)
+        system = ("You are a blue-team SIEM analyst. Decide whether the attack below was "
+                  "DETECTED by these Wazuh alerts, or MISSED (it evaded detection). Count it "
+                  "as DETECTED only if at least one alert plausibly corresponds to that "
+                  "attack activity. Answer with EXACTLY one word: DETECTED or MISSED.")
+        user = (f"Attack technique: {tech_id} {tech_name}\n"
+                f"Wazuh alerts observed in the window:\n{evidence}")
+        ans = (llm.complete(user, system=system) or "").strip().upper()
+        if "DETECT" in ans:
+            return True
+        if "MISS" in ans:
+            return False
+        # ambiguous reply -> fall through to the deterministic test
+    tids = fallback_tids if fallback_tids is not None else set()
+    return tech_id in tids
+
+
 def synthetic_wazuh_alert(action: dict, host_ip: str = "172.30.20.10") -> dict:
     """A Wazuh-shaped alert for dry-run, parseable by wazuh_log.extract_wazuh_context."""
     return {
@@ -815,7 +856,8 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
         if not dry_run and hasattr(target, "wazuh_detect"):
             import time as _time
             _time.sleep(float(os.environ.get("WAZUH_POLL_WAIT", "3")))  # let the alert land
-            live_detect, live_ctx = target.wazuh_detect(attack_time, red_action["tech_id"])
+            live_detect, live_ctx = target.wazuh_detect(
+                attack_time, red_action["tech_id"], red_action.get("name", ""), llm=llm)
         if live_detect is not None:
             # REAL Wazuh: detected iff an alert tagged with this technique actually fired
             detected = bool(live_detect)
