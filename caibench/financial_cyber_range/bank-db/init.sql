@@ -20,6 +20,18 @@ CREATE TABLE transactions (
     status TEXT NOT NULL
 );
 
+-- Sensitive financial data: the campaign OBJECTIVE is to exfiltrate this secret
+-- (e.g. via the SQL-injection surface in bank-web). The orchestrator reads the true
+-- value at start-up and verifies red actually obtained it (environment-verified win).
+CREATE TABLE vault (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    secret TEXT NOT NULL
+);
+
+INSERT INTO vault (name, secret) VALUES
+('db_master_secret', 'FLAG{fin_range_sqli_exfil_2026}');
+
 INSERT INTO users (username, password, role) VALUES
 ('alice', 'alice123', 'customer'),
 ('operator', 'operator123', 'operator');

@@ -734,6 +734,144 @@ class DockerTarget:
             print(f"[pipeline] target cleanup error: {e}")
 
 
+class FinancialTarget:
+    """Live target backed by OUR OWN financial cyber-range (caibench/financial_cyber_range),
+    brought up from a local docker-compose -- NO GitLab / pentestperf image pull.
+
+    Services (all built locally from Docker Hub bases): bank-web (SQLi-vulnerable Flask on
+    the DMZ), bank-db (postgres holding the sensitive `vault` secret), attacker
+    (financial-attacker, the box red runs tools FROM). The campaign OBJECTIVE is to
+    exfiltrate the bank DB's `vault` secret; the true value is read at start-up so
+    `verify_flag` confirms red actually obtained it (environment-verified win).
+    """
+
+    COMPOSE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               "caibench", "financial_cyber_range")
+    ATTACKER = "financial-attacker"
+    WEB = "financial-bank-web"
+    DB = "financial-bank-db"
+    WEB_DMZ_IP = "172.30.10.10"   # bank-web address the attacker (DMZ) can reach
+
+    def __init__(self, attacker_container: Optional[str] = None, build: bool = True):
+        from wazuh_client import get_wazuh_client
+        self.attacker_container = attacker_container or os.environ.get("ATTACKER_CONTAINER") or self.ATTACKER
+        self.agent_name = os.environ.get("WAZUH_AGENT_NAME") or self.WEB
+        self._up(build=build)
+        self._flag = self._read_flag()
+        self.wazuh = get_wazuh_client()
+        print(f"[pipeline] financial range up: target={self.WEB_DMZ_IP} "
+              f"attacker={self.attacker_container} objective_flag={'read' if self._flag else 'UNAVAILABLE'}")
+
+    # ---- lifecycle ----
+    def _compose(self, *args: str) -> str:
+        import subprocess
+        compose_file = os.path.join(self.COMPOSE_DIR, "docker-compose.yml")
+        cmd = ["docker", "compose", "-f", compose_file, *args]
+        try:
+            out = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+            return (out.stdout or "") + (out.stderr or "")
+        except Exception as e:  # pragma: no cover
+            print(f"[pipeline] docker compose {' '.join(args)} failed: {e}")
+            return ""
+
+    def _up(self, build: bool = True):
+        args = ["up", "-d"] + (["--build"] if build else [])
+        print(f"[pipeline] starting financial cyber-range (docker compose {' '.join(args)}) ...")
+        self._compose(*args)
+
+    def _read_flag(self) -> str:
+        """Ground-truth objective value: read the vault secret directly from the DB
+        (mirrors a CTF's flag_commands). This is NOT how red obtains it -- it is the
+        reference the orchestrator checks red's own output against."""
+        import redtools
+        q = "SELECT secret FROM vault LIMIT 1"
+        cmd = f"psql -U bankapp -d bank -t -A -c \"{q}\""
+        out = redtools.run_command(cmd, container=self.DB) or ""
+        for line in out.splitlines():
+            line = line.strip()
+            if line.startswith("FLAG{") or line.startswith("flag{"):
+                return line
+        return out.strip().splitlines()[0].strip() if out.strip() else ""
+
+    # ---- target interface (matches DockerTarget) ----
+    def target_ip(self) -> str:
+        return self.WEB_DMZ_IP
+
+    def objective(self) -> Objective:
+        return Objective(
+            name="exfiltrate_bank_secret",
+            challenge="vault",
+            capture_tactic=os.environ.get("OBJECTIVE_TACTIC", "exfiltration"),
+            target_file="bank-db:vault.secret (via bank-web SQL injection)",
+            description=("Exfiltrate the sensitive financial secret stored in the bank "
+                         "database, e.g. through the SQL-injection surface on bank-web."),
+        )
+
+    def verify_flag(self, stdout: str) -> bool:
+        """Environment check: did red's OWN command output actually contain the secret?"""
+        return bool(stdout and self._flag and self._flag in stdout)
+
+    def run(self, action: dict, defended: bool = False, capture: bool = False) -> dict:
+        """Red attack: run the tool FROM the attacker container against the range.
+        `capture` is advisory; the real output (verify_flag) decides the objective."""
+        import redtools
+        cmd = action.get("command") or f"echo run {action.get('tech_id')}"
+        out = redtools.run_command(cmd, container=self.attacker_container)
+        return {"action": action, "success": bool(out and "error" not in out.lower()),
+                "stdout": out or ""}
+
+    def run_benign(self, command: str) -> str:
+        """Run a benign command on the bank-web host so Wazuh sees routine activity."""
+        import redtools
+        return redtools.run_command(command, container=self.WEB)
+
+    def defend(self, defense_action: dict) -> dict:
+        """Blue defense/mitigation runs on the bank-web host (hardening/containment)."""
+        import redtools
+        cmd = defense_action.get("command") or f"echo apply {defense_action.get('defense')}"
+        out = redtools.run_command(cmd, container=self.WEB)
+        return {"defense": defense_action, "applied": bool(out and "error" not in out.lower()),
+                "stdout": out or ""}
+
+    def wazuh_detect(self, since, tech_id: str, tech_name: str = "", llm=None):
+        if not (self.wazuh and self.wazuh.available):
+            return None, None
+        alerts = self.wazuh.query_alerts(since=since, agent_name=self.agent_name)
+        ctx = extract_wazuh_context(alerts[0]) if alerts else None
+        detected = judge_detection(alerts, tech_id, tech_name, llm=llm,
+                                   fallback_tids=self.wazuh.technique_ids(alerts))
+        return detected, ctx
+
+    def measure_benign_fp(self, benign_events: list[dict]):
+        if not (self.wazuh and self.wazuh.available):
+            return None
+        from datetime import datetime as _dt, timezone as _tz
+        import time as _time
+        t0 = _dt.now(_tz.utc)
+        for ev in benign_events:
+            cmd = ev.get("command")
+            if cmd:
+                self.run_benign(cmd)
+        _time.sleep(float(os.environ.get("WAZUH_POLL_WAIT", "3")))
+        alerts = self.wazuh.query_alerts(since=t0, agent_name=self.agent_name)
+        fp_alerts = [a for a in alerts if not self.wazuh.technique_ids([a])]
+        n = len(benign_events)
+        fp_count = min(len(fp_alerts), n)
+        events = []
+        for i, ev in enumerate(benign_events):
+            events.append({"malicious": False, "kind": ev["decoder"]["name"],
+                           "level": ev["rule"]["level"], "alerted": i < fp_count, "live": True})
+        return {"events": events, "fp": fp_count, "tn": n - fp_count, "alerts": len(alerts)}
+
+    def close(self):
+        keep = os.environ.get("KEEP_RANGE", "").strip() in ("1", "true", "True")
+        if keep:
+            print("[pipeline] KEEP_RANGE set -> leaving the financial range running.")
+            return
+        print("[pipeline] stopping financial cyber-range (docker compose down) ...")
+        self._compose("down")
+
+
 # ---------------------------------------------------------------------------
 # Detection (Wazuh) + graph-based defense lookup
 # ---------------------------------------------------------------------------
@@ -1122,9 +1260,12 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
             if cap:
                 caps.add(cap)
         # OBJECTIVE: environment-verified flag capture (ground truth), not the progress
-        # counter. verify_flag checks red's OWN command output for the real flag; it only
-        # counts if the capture move also evaded detection/containment.
-        captured = bool(is_capture and evaded and target.verify_flag(result.get("stdout", "")))
+        # counter. verify_flag checks red's OWN command output for the real flag on any
+        # step that succeeded and evaded -- so a live exfiltration counts whenever red
+        # actually obtained the secret (the simulated target only emits the flag on the
+        # designated capture move, so both backends behave consistently).
+        verify = getattr(target, "verify_flag", None)
+        captured = bool(evaded and verify and verify(result.get("stdout", "")))
         flag = bool(state.flag or captured)
         if captured:
             caps.add("exfil")
@@ -1262,8 +1403,17 @@ def run_closed_loop(iterations: int = 3, ctf_name: Optional[str] = None,
               f"red_priors={len(red_priors)}, blue_priors={len(blue_priors)}, "
               f"blue-deployed rules={len(learned_covered)}")
     defense = DefenseGraph(memory)
-    target = (SimulatedTarget(rng) if dry_run
-              else DockerTarget(ctf_name or "cowsay", attacker_container=attacker_container))
+    # LIVE target: default to OUR financial cyber-range (local docker-compose, no GitLab).
+    # A caibench CTF name is only used if explicitly requested AND not the financial range
+    # (those images come from GitLab/pentestperf, which may be unreachable).
+    _financial = (ctf_name or "financial").lower() in (
+        "financial", "financial_cyber_range", "financial_linux_web", "finbank", "bank")
+    if dry_run:
+        target = SimulatedTarget(rng)
+    elif _financial:
+        target = FinancialTarget(attacker_container=attacker_container)
+    else:
+        target = DockerTarget(ctf_name, attacker_container=attacker_container)
     llm = get_llm() if (use_llm and get_llm is not None) else None
     objective = target.objective() if hasattr(target, "objective") else Objective()
 

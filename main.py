@@ -17,7 +17,8 @@ still runs with rule-based fallbacks. See llm.py.
 Examples:
   python main.py                        # dry-run, OpenAI if key present
   python main.py --iterations 5
-  python main.py --live --ctf-name cowsay   # real Docker target + Wazuh
+  python main.py --live                 # real target: OUR financial cyber-range (local
+                                        # docker-compose, no GitLab) + Wazuh
   python main.py --skip-coverage
 """
 from __future__ import annotations
@@ -110,9 +111,12 @@ def parse_args():
     ap = argparse.ArgumentParser(description="Financial-security closed-loop workflow")
     ap.add_argument("--iterations", type=int, default=3)
     ap.add_argument("--profile", default=os.environ.get("TARGET_PROFILE", "financial_linux_web"))
-    ap.add_argument("--ctf-name", default=os.environ.get("CTF_NAME", "cowsay"))
+    ap.add_argument("--ctf-name", default=os.environ.get("CTF_NAME", "financial"),
+                    help="LIVE target: 'financial' (default) brings up OUR local financial "
+                         "cyber-range (no GitLab). Any other name uses a caibench CTF image.")
     ap.add_argument("--attacker-container", default=os.environ.get("ATTACKER_CONTAINER"),
-                    help="Container to launch real attack tools from (--live)")
+                    help="Container to launch real attack tools from (--live); "
+                         "defaults to the financial range's 'financial-attacker'")
     ap.add_argument("--out-dir", default="output/pipeline")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--dry-run", action="store_true")
