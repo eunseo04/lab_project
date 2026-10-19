@@ -317,7 +317,7 @@ def _llm_reorder_candidates(role: str, state: CyberState, pool: list[dict], llm,
 
 
 def llm_enrich_action(action: dict, state: CyberState, memory: dict, llm=None,
-                      target_ip: str = "target") -> dict:
+                      target_ip: str = "target", objective=None) -> dict:
     """Ask the LLM to turn a chosen ATT&CK technique into a concrete, runnable
     action (command + rationale) against the Target. Falls back to a plain echo
     when no LLM is available, so the loop still runs offline.
@@ -328,11 +328,18 @@ def llm_enrich_action(action: dict, state: CyberState, memory: dict, llm=None,
         action.setdefault("command", f"echo run {action.get('tech_id')}")
         return action
     info = memory.get(action["tech_id"], {})
+    goal = ""
+    if objective is not None:
+        goal = f" CAMPAIGN OBJECTIVE: {objective.name} — capture {objective.target_file}."
+        if getattr(objective, "attack_surface", ""):
+            goal += " " + objective.attack_surface
     system = ("You are a red-team operator working ONLY inside an authorized, isolated "
               "financial cyber-range (Docker). Given one MITRE ATT&CK technique and the "
               f"engagement state, output ONE shell command to attempt it against the lab "
               f"target at {target_ip} (use real tools: nmap, curl, nc, hydra, sqlmap...), "
-              "and a one-line rationale. Respond EXACTLY as two lines: "
+              "and a one-line rationale." + goal +
+              " Attack ONLY the real endpoints described above and keep every step aimed at the "
+              "objective — do NOT invent URLs or hosts. Respond EXACTLY as two lines: "
               "'CMD: <command>' then 'WHY: <rationale>'.")
     user = (f"Technique {action['tech_id']} ({action.get('name')}). "
             f"Tactics: {info.get('tactics', [])}. Target IP: {target_ip}. "
@@ -352,29 +359,37 @@ def llm_enrich_action(action: dict, state: CyberState, memory: dict, llm=None,
 
 
 def llm_enrich_defense(defense: dict, state: CyberState, memory: dict, llm=None,
-                       target_ip: str = "target") -> dict:
-    """Ask the LLM to turn a chosen defense into a concrete mitigation command run
-    ON the target host (e.g. iptables block, kill process, add Wazuh rule, rotate
-    creds). Falls back to an echo when no LLM is available.
+                       target_ip: str = "target", attack_command: str = "",
+                       attacker_ip: str = "", wazuh_desc: str = "") -> dict:
+    """Ask the LLM to turn a chosen defense into a concrete mitigation command run ON the
+    target host that actually CONTAINS the observed attack. It is fed the real attack
+    command + the Wazuh alert + the attacker IP + the dataset detection strategy, so the
+    mitigation targets what actually happened (not just a technique label). Falls back to
+    a real iptables block of the attacker when no LLM is available (still contains).
     """
     if not defense or defense.get("tech_id") is None:
         defense.setdefault("command", f"echo apply {defense.get('defense','hardening')}")
         return defense
-    if llm is None or not getattr(llm, "available", False):
-        defense.setdefault("command", f"echo defend {defense.get('tech_id')}")
-        return defense
     info = memory.get(defense["tech_id"], {})
     strat = (info.get("detection_strategies") or [{}])[0].get("name", "monitoring")
-    system = ("You are the BLUE defender of an authorized financial cyber-range (Linux). "
-              "Given the attacker technique just observed, output ONE shell command to "
-              "CONTAIN or MITIGATE it on the host (iptables/ufw block, kill PID, disable "
-              "account, tighten perms, add an auditd/Wazuh rule), and a one-line rationale. "
-              "Respond EXACTLY as: 'CMD: <command>' then 'WHY: <rationale>'.")
-    user = (f"Observed technique {defense['tech_id']} ({info.get('name')}). "
-            f"Detection strategy: {strat}. Host: {target_ip}. "
-            f"Already defended: {list(state.defended)}.")
+    # deterministic fallback that ACTUALLY contains: drop the attacker at the host firewall
+    fallback_cmd = (f"iptables -A INPUT -s {attacker_ip} -j DROP" if attacker_ip
+                    else f"echo defend {defense['tech_id']}")
+    if llm is None or not getattr(llm, "available", False):
+        defense.setdefault("command", fallback_cmd)
+        return defense
+    system = ("You are the BLUE defender of bank-web (Linux). CONTAIN the DETECTED attack so it "
+              "cannot succeed again. Containment options ON THIS HOST: block the attacker IP with "
+              "'iptables -A INPUT -s <ip> -j DROP' (most reliable against a remote attacker), kill a "
+              "malicious process, disable the exploited endpoint, tighten DB perms, or add a Wazuh "
+              "rule. Output ONE shell command that STOPS the observed attack from succeeding again, "
+              "then a one-line rationale. Respond EXACTLY as: 'CMD: <command>' then 'WHY: <rationale>'.")
+    user = (f"Detected attack technique {defense['tech_id']} ({info.get('name')}), "
+            f"executed as: {attack_command or 'n/a'}.\n"
+            f"Wazuh alert: {wazuh_desc or 'n/a'}. Attacker IP: {attacker_ip or 'unknown'}. "
+            f"Detection strategy: {strat}. Already defended: {list(state.defended)}.")
     text = llm.complete(user, system=system)
-    cmd = f"echo defend {defense['tech_id']}"
+    cmd = fallback_cmd
     why = ""
     for line in (text or "").splitlines():
         if line.upper().startswith("CMD:"):
@@ -534,6 +549,8 @@ class Objective:
     capture_tactic: str = "exfiltration"  # kill-chain stage at which the flag is taken
     target_file: str = "/root/flag.txt"   # the specific file red must access
     description: str = ""
+    attack_surface: str = ""            # REAL exploitable endpoints, fed to the LLM so it
+                                        # attacks actual vulns instead of inventing URLs
 
 
 # ---------------------------------------------------------------------------
@@ -607,6 +624,9 @@ class DockerTarget:
         self.attacker_container = attacker_container or os.environ.get("ATTACKER_CONTAINER") or None
         self.wazuh = get_wazuh_client()
         self.agent_name = os.environ.get("WAZUH_AGENT_NAME") or ctf_name
+        self._blue_rules: dict = {}   # tech_id -> (name, match_pattern); real Wazuh rules blue authors
+        self._rules_dirty = False
+        self._load_existing_blue_rules()  # ACCUMULATE across runs, don't overwrite
 
     def target_ip(self) -> str:
         return self.ip or "target"
@@ -671,16 +691,35 @@ class DockerTarget:
         return {"action": action, "success": bool(out and "error" not in out.lower()),
                 "stdout": out or ""}
 
-    def wazuh_detect(self, since, tech_id: str, tech_name: str = "", llm=None):
+    def wazuh_detect(self, since, tech_id: str, tech_name: str = "", command: str = "", llm=None):
         """Query REAL Wazuh alerts since `since`, then let the LLM JUDGE from the raw
         alert evidence whether the attack was detected or MISSED. Falls back to a
         deterministic technique-id match only when no LLM is available.
         Returns (detected: bool, context: dict)."""
         if not (self.wazuh and self.wazuh.available):
             return None, None  # caller falls back to the proxy model
-        alerts = self.wazuh.query_alerts(since=since, agent_name=self.agent_name)
-        ctx = extract_wazuh_context(alerts[0]) if alerts else None
-        detected = judge_detection(alerts, tech_id, tech_name, llm=llm,
+        import time as _time
+        # access.log -> agent -> manager -> indexer takes ~10-30s, so POLL instead of a
+        # single 3s read: return as soon as a matching alert lands, else give up after max.
+        max_wait = float(os.environ.get("WAZUH_POLL_MAX", "30"))
+        interval = float(os.environ.get("WAZUH_POLL_INTERVAL", "5"))
+        waited, alerts = 0.0, []
+        while True:
+            alerts = self.wazuh.query_alerts(since=since, agent_name=self.agent_name)
+            if self.wazuh.last_error is not None:
+                # configured but UNREACHABLE -> don't score a silent miss; use the proxy
+                print(f"[wazuh] indexer unreachable during detection -> proxy fallback for {tech_id}")
+                return None, None
+            if tech_id in self.wazuh.technique_ids(alerts):
+                break  # the attack's alert has landed -> decide now
+            if waited >= max_wait:
+                break  # gave the pipeline enough time; treat remaining as a miss
+            _time.sleep(interval)
+            waited += interval
+        # show the alert that actually matched this technique as the detection evidence
+        match = next((a for a in alerts if tech_id in self.wazuh.technique_ids([a])), None)
+        ctx = extract_wazuh_context(match or alerts[0]) if alerts else None
+        detected = judge_detection(alerts, tech_id, tech_name, command=command, llm=llm,
                                    fallback_tids=self.wazuh.technique_ids(alerts))
         return detected, ctx
 
@@ -709,6 +748,9 @@ class DockerTarget:
                 self.run_benign(cmd)
         _time.sleep(float(os.environ.get("WAZUH_POLL_WAIT", "3")))  # let alerts land
         alerts = self.wazuh.query_alerts(since=t0, agent_name=self.agent_name)
+        if self.wazuh.last_error is not None:
+            print("[wazuh] indexer unreachable during benign-FP measurement -> proxy fallback")
+            return None  # caller falls back to the proxy FP model
         # Benign window must not count attack-tagged alerts (shouldn't appear here, but be safe).
         fp_alerts = [a for a in alerts if not self.wazuh.technique_ids([a])]
         n = len(benign_events)
@@ -718,6 +760,91 @@ class DockerTarget:
             events.append({"malicious": False, "kind": ev["decoder"]["name"],
                            "level": ev["rule"]["level"], "alerted": i < fp_count, "live": True})
         return {"events": events, "fp": fp_count, "tn": n - fp_count, "alerts": len(alerts)}
+
+    @staticmethod
+    def _rule_pattern(command: str, tech_id: str) -> str:
+        """Pick a log substring to match on from the attacker's command. Web attacks leave
+        their URL path/query in the access log, so that is the most reliable signature;
+        otherwise fall back to the executable name (best-effort)."""
+        import re
+        if command:
+            m = re.search(r'https?://[^/\s]+(/[^\s"\'\\]*)', command)
+            if m and len(m.group(1)) > 1:
+                return m.group(1)[:120]
+            toks = command.strip().split()
+            if toks:
+                return (toks[-1] if toks[-1].startswith('/') else toks[0])[:80]
+        return tech_id
+
+    def _load_existing_blue_rules(self) -> None:
+        """Load blue rules already deployed in earlier runs so new ones ACCUMULATE instead
+        of overwriting bluesync_rules.xml (which the manager keeps in its volume)."""
+        if not (self.wazuh and self.wazuh.available):
+            return
+        import subprocess, re, html as _html
+        mgr = os.environ.get("WAZUH_MANAGER_CONTAINER", "single-node-wazuh.manager-1")
+        env = dict(os.environ, MSYS_NO_PATHCONV="1")
+        try:
+            r = subprocess.run(["docker", "exec", mgr, "cat",
+                                "/var/ossec/etc/rules/bluesync_rules.xml"],
+                               env=env, capture_output=True, text=True, timeout=10,
+                               encoding="utf-8", errors="replace")
+            xml = r.stdout or ""
+            # each rule: <match>PAT</match> ... <description>Blue-deployed: NAME (TECH)</description>
+            for m in re.finditer(r"<match>(.*?)</match>.*?Blue-deployed:\s*(.*?)\s*\((T\d{4}(?:\.\d{3})?)\)",
+                                 xml, re.DOTALL):
+                pat, name, tid = _html.unescape(m.group(1)), _html.unescape(m.group(2)), m.group(3)
+                self._blue_rules.setdefault(tid, (name, pat))
+            if self._blue_rules:
+                print(f"[wazuh] loaded {len(self._blue_rules)} existing blue rule(s) (accumulating)")
+        except Exception as e:  # pragma: no cover
+            print(f"[wazuh] could not load existing blue rules: {e}")
+
+    def deploy_wazuh_rule(self, tech_id: str, name: str = "", command: str = "") -> bool:
+        """Blue authors a REAL Wazuh rule for this technique (queued; applied by flush_rules).
+        Unlike the in-memory `learned_covered` set, this actually makes the manager able to
+        detect the technique on the next run -- closing the learn->detect loop in live mode."""
+        if not tech_id or not (self.wazuh and self.wazuh.available):
+            return False
+        if tech_id in self._blue_rules:
+            return False
+        self._blue_rules[tech_id] = (name or tech_id, self._rule_pattern(command, tech_id))
+        self._rules_dirty = True
+        return True
+
+    def flush_rules(self) -> int:
+        """Write all blue-authored rules to the manager's ruleset and reload it. Called at
+        iteration boundaries so rules deployed this round detect the SAME attack next round."""
+        if not self._rules_dirty or not self._blue_rules:
+            return 0
+        import subprocess, tempfile, html as _html
+        mgr = os.environ.get("WAZUH_MANAGER_CONTAINER", "single-node-wazuh.manager-1")
+        lines = ['<group name="bluesync,attack,">']
+        for i, (tid, (name, pat)) in enumerate(sorted(self._blue_rules.items())):
+            lines += [f'  <rule id="{100500 + i}" level="10">',
+                      f'    <match>{_html.escape(pat)}</match>',
+                      f'    <description>Blue-deployed: {_html.escape(str(name))} ({tid})</description>',
+                      f'    <mitre><id>{_html.escape(tid)}</id></mitre>',
+                      '  </rule>']
+        lines.append('</group>')
+        xml = "\n".join(lines) + "\n"
+        env = dict(os.environ, MSYS_NO_PATHCONV="1")
+        try:
+            tf = tempfile.NamedTemporaryFile("w", suffix=".xml", delete=False, encoding="utf-8")
+            tf.write(xml); tf.close()
+            dst = f"{mgr}:/var/ossec/etc/rules/bluesync_rules.xml"
+            subprocess.run(["docker", "cp", tf.name, dst], check=True, env=env, capture_output=True)
+            subprocess.run(["docker", "exec", mgr, "chown", "wazuh:wazuh",
+                            "/var/ossec/etc/rules/bluesync_rules.xml"], env=env, capture_output=True)
+            subprocess.run(["docker", "exec", mgr, "/var/ossec/bin/wazuh-control", "restart"],
+                           env=env, capture_output=True, timeout=180)
+            os.unlink(tf.name)
+            self._rules_dirty = False
+            print(f"[wazuh] reloaded manager with {len(self._blue_rules)} blue-authored rule(s)")
+            return len(self._blue_rules)
+        except Exception as e:  # pragma: no cover
+            print(f"[wazuh] blue rule deploy/reload failed: {e}")
+            return 0
 
     def defend(self, defense_action: dict) -> dict:
         """Blue defense: mitigation runs ON the target host (containment/hardening)."""
@@ -750,7 +877,8 @@ class FinancialTarget:
     ATTACKER = "financial-attacker"
     WEB = "financial-bank-web"
     DB = "financial-bank-db"
-    WEB_DMZ_IP = "172.30.10.10"   # bank-web address the attacker (DMZ) can reach
+    WEB_DMZ_IP = "172.30.10.10"      # bank-web address the attacker (DMZ) can reach
+    ATTACKER_DMZ_IP = "172.30.10.100"  # attacker source IP (blue blocks this to contain)
 
     def __init__(self, attacker_container: Optional[str] = None, build: bool = True):
         from wazuh_client import get_wazuh_client
@@ -797,7 +925,20 @@ class FinancialTarget:
     def target_ip(self) -> str:
         return self.WEB_DMZ_IP
 
+    def attacker_ip(self) -> str:
+        return self.ATTACKER_DMZ_IP
+
+    def reset_defenses(self) -> None:
+        """Flush blue's host firewall rules so each episode starts clean (otherwise a
+        first-episode attacker block would permanently stop all later attacks)."""
+        import redtools
+        try:
+            redtools.run_command("iptables -F INPUT 2>/dev/null || true", container=self.WEB)
+        except Exception:
+            pass
+
     def objective(self) -> Objective:
+        ip = getattr(self, "WEB_DMZ_IP", "172.30.10.10")
         return Objective(
             name="exfiltrate_bank_secret",
             challenge="vault",
@@ -805,6 +946,17 @@ class FinancialTarget:
             target_file="bank-db:vault.secret (via bank-web SQL injection)",
             description=("Exfiltrate the sensitive financial secret stored in the bank "
                          "database, e.g. through the SQL-injection surface on bank-web."),
+            attack_surface=(
+                f"The ONLY real exploitable endpoints on bank-web (http://{ip}:5000): "
+                "(1) GET /api/transactions?account_id=<v> is SQL-injectable; the backend runs "
+                "SELECT id,account_id,amount,merchant,status FROM transactions WHERE account_id='<v>'. "
+                "(2) POST /login with fields username,password is SQL-injectable. "
+                "The objective secret lives in table vault(name,secret). Exfiltrate it with a "
+                "UNION-based SQL injection on /api/transactions (match the 5 columns), e.g.: "
+                f"curl -s -G 'http://{ip}:5000/api/transactions' --data-urlencode "
+                "\"account_id=1' UNION SELECT 1,secret,1,'m','s' FROM vault--\". "
+                "Only these real paths exist — NEVER invent endpoints such as /exploit, "
+                "/exfiltrate, /web-service-endpoint, or /api/script."),
         )
 
     def verify_flag(self, stdout: str) -> bool:
@@ -816,8 +968,19 @@ class FinancialTarget:
         `capture` is advisory; the real output (verify_flag) decides the objective."""
         import redtools
         cmd = action.get("command") or f"echo run {action.get('tech_id')}"
+        # cap curl/wget so a blue firewall block fails fast instead of hanging on connect
+        if "curl " in cmd and " -m " not in cmd and "--max-time" not in cmd:
+            cmd = cmd.replace("curl ", "curl -m 10 ", 1)
+        elif cmd.startswith("wget ") and "-T" not in cmd and "--timeout" not in cmd:
+            cmd = cmd.replace("wget ", "wget -T 10 ", 1)
         out = redtools.run_command(cmd, container=self.attacker_container)
-        return {"action": action, "success": bool(out and "error" not in out.lower()),
+        # success = command produced output without an error marker AND wasn't firewall-blocked
+        lo = (out or "").lower()
+        # http_code 000 = curl could not connect (firewall block); also catch textual signals
+        blocked = (not out) or out.strip() == "000" or any(
+            s in lo for s in ("timed out", "couldn't connect", "could not connect",
+                              "connection refused", "could not resolve", "000\n", "code 000"))
+        return {"action": action, "success": bool(out) and "error" not in lo and not blocked,
                 "stdout": out or ""}
 
     def run_benign(self, command: str) -> str:
@@ -830,15 +993,32 @@ class FinancialTarget:
         import redtools
         cmd = defense_action.get("command") or f"echo apply {defense_action.get('defense')}"
         out = redtools.run_command(cmd, container=self.WEB)
-        return {"defense": defense_action, "applied": bool(out and "error" not in out.lower()),
-                "stdout": out or ""}
+        # many containment commands (iptables -A, kill, chmod) succeed with NO output, so
+        # "empty stdout" must NOT mean failure. Applied unless the command clearly errored.
+        lo = (out or "").lower()
+        failed = any(e in lo for e in ("error", "not permitted", "command not found",
+                                       "permission denied", "no such file", "cannot", "usage:"))
+        return {"defense": defense_action, "applied": not failed, "stdout": out or ""}
 
-    def wazuh_detect(self, since, tech_id: str, tech_name: str = "", llm=None):
+    def wazuh_detect(self, since, tech_id: str, tech_name: str = "", command: str = "", llm=None):
         if not (self.wazuh and self.wazuh.available):
             return None, None
-        alerts = self.wazuh.query_alerts(since=since, agent_name=self.agent_name)
-        ctx = extract_wazuh_context(alerts[0]) if alerts else None
-        detected = judge_detection(alerts, tech_id, tech_name, llm=llm,
+        import time as _time
+        max_wait = float(os.environ.get("WAZUH_POLL_MAX", "30"))
+        interval = float(os.environ.get("WAZUH_POLL_INTERVAL", "5"))
+        waited, alerts = 0.0, []
+        while True:
+            alerts = self.wazuh.query_alerts(since=since, agent_name=self.agent_name)
+            if self.wazuh.last_error is not None:
+                print(f"[wazuh] indexer unreachable during detection -> proxy fallback for {tech_id}")
+                return None, None
+            if tech_id in self.wazuh.technique_ids(alerts) or waited >= max_wait:
+                break
+            _time.sleep(interval)
+            waited += interval
+        match = next((a for a in alerts if tech_id in self.wazuh.technique_ids([a])), None)
+        ctx = extract_wazuh_context(match or alerts[0]) if alerts else None
+        detected = judge_detection(alerts, tech_id, tech_name, command=command, llm=llm,
                                    fallback_tids=self.wazuh.technique_ids(alerts))
         return detected, ctx
 
@@ -854,6 +1034,9 @@ class FinancialTarget:
                 self.run_benign(cmd)
         _time.sleep(float(os.environ.get("WAZUH_POLL_WAIT", "3")))
         alerts = self.wazuh.query_alerts(since=t0, agent_name=self.agent_name)
+        if self.wazuh.last_error is not None:
+            print("[wazuh] indexer unreachable during benign-FP measurement -> proxy fallback")
+            return None
         fp_alerts = [a for a in alerts if not self.wazuh.technique_ids([a])]
         n = len(benign_events)
         fp_count = min(len(fp_alerts), n)
@@ -875,16 +1058,17 @@ class FinancialTarget:
 # ---------------------------------------------------------------------------
 # Detection (Wazuh) + graph-based defense lookup
 # ---------------------------------------------------------------------------
-def judge_detection(alerts: list, tech_id: str, tech_name: str = "", llm=None,
-                    fallback_tids=None) -> bool:
-    """Decide DETECTED vs MISSED from the Wazuh query result.
+def judge_detection(alerts: list, tech_id: str, tech_name: str = "", command: str = "",
+                    llm=None, fallback_tids=None) -> bool:
+    """Decide DETECTED vs MISSED for the attack red ACTUALLY executed this step.
 
-    Preferred path: hand the RAW alert evidence to the LLM and let IT judge whether the
-    attack was caught or slipped through. Real Wazuh alerts often lack a precise
-    `rule.mitre.id`, so a strict id-equality test would wrongly call a caught attack
-    'missed'; the LLM reasons over the description/groups/level instead. Falls back to
-    the exact technique-id membership test only when no LLM is available (or the LLM is
-    ambiguous), so the loop still runs offline.
+    Key point: the MCTS `tech_id` is the kill-chain *stage label*, but the command the LLM
+    runs may be a different concrete action (e.g. the campaign always SQL-injects to reach
+    its objective). So detection must judge whether the EXECUTED COMMAND was caught, NOT
+    whether an alert carries the exact tech_id -- a Wazuh SQLi alert (T1190) is still a hit
+    when red just ran a SQLi, even if this step's stage label is T1589. The LLM reasons over
+    the command + alert evidence; the offline fallback counts any attack-tagged alert
+    (has a mitre id) as a detection, not a strict tech_id match.
     """
     if llm is not None and getattr(llm, "available", False):
         if not alerts:
@@ -897,11 +1081,14 @@ def judge_detection(alerts: list, tech_id: str, tech_name: str = "", llm=None,
                 lines.append(f"- level={r.get('level')} mitre={mitre} "
                              f"groups={r.get('groups', [])} desc={str(r.get('description',''))[:90]}")
             evidence = "\n".join(lines)
-        system = ("You are a blue-team SIEM analyst. Decide whether the attack below was "
-                  "DETECTED by these Wazuh alerts, or MISSED (it evaded detection). Count it "
-                  "as DETECTED only if at least one alert plausibly corresponds to that "
-                  "attack activity. Answer with EXACTLY one word: DETECTED or MISSED.")
-        user = (f"Attack technique: {tech_id} {tech_name}\n"
+        system = ("You are a blue-team SIEM analyst. The red team just executed the command "
+                  "below; decide whether these Wazuh alerts DETECTED that attack activity, or "
+                  "it was MISSED. The alerts do NOT need to carry the exact technique id -- what "
+                  "matters is whether an alert corresponds to what the command actually did "
+                  "(e.g. a SQL-injection alert detects a SQL-injection command). Answer with "
+                  "EXACTLY one word: DETECTED or MISSED.")
+        user = (f"Attack technique (stage label): {tech_id} {tech_name}\n"
+                f"Command actually executed: {command or '(n/a)'}\n"
                 f"Wazuh alerts observed in the window:\n{evidence}")
         ans = (llm.complete(user, system=system) or "").strip().upper()
         if "DETECT" in ans:
@@ -910,7 +1097,13 @@ def judge_detection(alerts: list, tech_id: str, tech_name: str = "", llm=None,
             return False
         # ambiguous reply -> fall through to the deterministic test
     tids = fallback_tids if fallback_tids is not None else set()
-    return tech_id in tids
+    if tech_id in tids:
+        return True
+    # any attack-tagged alert (has a mitre id) in this attack window counts as a detection
+    for a in alerts:
+        if ((a.get("rule", {}) or {}).get("mitre", {}) or {}).get("id"):
+            return True
+    return False
 
 
 def synthetic_wazuh_alert(action: dict, host_ip: str = "172.30.20.10") -> dict:
@@ -1133,6 +1326,8 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
         max_steps = 3 * len(_TACTIC_ORDER)
     state = CyberState()
     traj = Trajectory()
+    if not dry_run and hasattr(target, "reset_defenses"):
+        target.reset_defenses()  # clean firewall each episode so red can attack -> blue contains
     objective = target.objective() if hasattr(target, "objective") else Objective()
     print(f"[episode] objective: {objective.name} -> capture {objective.target_file} "
           f"at the '{objective.capture_tactic}' stage")
@@ -1147,7 +1342,8 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
         red_action, _ = red_mcts.search(state, role="red")
         if not red_action:
             break
-        red_action = llm_enrich_action(red_action, state, memory, llm=llm, target_ip=tgt_ip)
+        red_action = llm_enrich_action(red_action, state, memory, llm=llm, target_ip=tgt_ip,
+                                       objective=objective)
         from datetime import datetime as _dt, timezone as _tz
 
         # 1b) BENIGN window FIRST (time-separated from the attack). In --live mode these
@@ -1173,10 +1369,10 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
         covered = is_covered(red_action["tech_id"], memory, learned_covered)
         live_detect = None
         if not dry_run and hasattr(target, "wazuh_detect"):
-            import time as _time
-            _time.sleep(float(os.environ.get("WAZUH_POLL_WAIT", "3")))  # let the alert land
+            # wazuh_detect now polls internally until the alert lands (or times out)
             live_detect, live_ctx = target.wazuh_detect(
-                attack_time, red_action["tech_id"], red_action.get("name", ""), llm=llm)
+                attack_time, red_action["tech_id"], red_action.get("name", ""),
+                command=red_action.get("command", ""), llm=llm)
         if live_detect is not None:
             # REAL Wazuh: detected iff an alert tagged with this technique actually fired
             detected = bool(live_detect)
@@ -1223,8 +1419,11 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
         applied = False
         rule_deployed = False
         if defense_action and defense_action.get("tech_id") is not None:
-            defense_action = llm_enrich_defense(defense_action, mid_state, memory,
-                                                llm=llm, target_ip=tgt_ip)
+            defense_action = llm_enrich_defense(
+                defense_action, mid_state, memory, llm=llm, target_ip=tgt_ip,
+                attack_command=red_action.get("command", ""),
+                attacker_ip=(target.attacker_ip() if hasattr(target, "attacker_ip") else ""),
+                wazuh_desc=str((ctx or {}).get("event", {}).get("description", "")))
             dres = target.defend(defense_action)
             applied = dres.get("applied", False)
             if applied and defense_action.get("deploy_rule"):
@@ -1233,6 +1432,11 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
                 if tid not in learned_covered:
                     learned_covered.add(tid)
                     rule_deployed = True
+                    # live: author a REAL Wazuh rule (applied at the iteration boundary),
+                    # matching the attacker's actual command so it detects the same TTP next round
+                    if not dry_run and hasattr(target, "deploy_wazuh_rule"):
+                        target.deploy_wazuh_rule(tid, defense_action.get("name", tid),
+                                                 red_action.get("command", ""))
 
         # 4) VERIFY the defense: re-attempt the same attack. Containment counts ONLY if
         #    the attack no longer succeeds after the defense (reliable criterion), not
@@ -1436,6 +1640,10 @@ def run_closed_loop(iterations: int = 3, ctf_name: Optional[str] = None,
             all_traj.append(traj)
             print(f"[iter {it}] steps={len(traj.steps)} "
                   f"red_return={traj.red_return:.2f} blue_return={traj.blue_return:.2f}")
+
+            # live: apply blue-authored Wazuh rules so NEXT iteration can really detect them
+            if not dry_run and hasattr(target, "flush_rules"):
+                target.flush_rules()
 
             # GRPO export for BOTH roles -> train.py consumes each policy's dataset
             export_grpo_dataset([traj], os.path.join(out_dir, f"grpo_red_iter{it}.jsonl"), role="red", memory=memory)

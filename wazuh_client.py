@@ -46,6 +46,9 @@ class WazuhConfig:
 class WazuhClient:
     def __init__(self, config: Optional[WazuhConfig] = None):
         self.config = config or WazuhConfig()
+        # last_error distinguishes "Wazuh unreachable" from "reachable but 0 alerts".
+        # Without it a connection failure returns [] and is silently scored as a MISS.
+        self.last_error: Optional[Exception] = None
 
     @property
     def available(self) -> bool:
@@ -82,9 +85,11 @@ class WazuhClient:
                               verify=self.config.verify_ssl, timeout=self.config.timeout)
             r.raise_for_status()
             hits = r.json().get("hits", {}).get("hits", [])
+            self.last_error = None
             return [h.get("_source", {}) for h in hits]
         except Exception as e:  # pragma: no cover
             print(f"[wazuh] query failed: {e}")
+            self.last_error = e
             return []
 
     @staticmethod

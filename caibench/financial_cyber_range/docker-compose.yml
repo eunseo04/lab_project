@@ -12,6 +12,9 @@ services:
     # let the in-container Wazuh agent reach the manager published on the Windows host
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    # blue containment runs on this host (iptables block of the attacker) -> needs NET_ADMIN
+    cap_add:
+      - NET_ADMIN
     depends_on:
       bank-db:
         condition: service_healthy

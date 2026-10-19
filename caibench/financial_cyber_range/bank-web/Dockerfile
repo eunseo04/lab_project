@@ -9,7 +9,7 @@ ARG WAZUH_VERSION=4.14.8-1
 ARG WAZUH_MANAGER=host.docker.internal
 ARG WAZUH_AGENT_NAME=financial-bank-web
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        curl gnupg procps ca-certificates && \
+        curl gnupg procps ca-certificates iptables && \
     curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH | \
         gpg --no-default-keyring --keyring gnupg-ring:/usr/share/keyrings/wazuh.gpg --import && \
     chmod 644 /usr/share/keyrings/wazuh.gpg && \

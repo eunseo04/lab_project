@@ -1,0 +1,42 @@
+<!--
+  bank-web 전용 포괄 웹 공격 탐지 룰 (Wazuh 기본 web_appsec 룰 보강).
+  기본 룰(31103 등)이 놓치는 boolean-based SQLi(OR 1=1), time-based, 인코딩 변형까지
+  커버해 /api/transactions · /login 공격면의 탐지 정확도를 100%에 가깝게 끌어올린다.
+  매칭 대상은 web-accesslog 디코더가 추출한 url 필드(요청 라인, URL-encoded 상태).
+-->
+<group name="web,accesslog,attack,sql_injection,bank-web,">
+
+  <!-- 포괄 SQL injection: union/boolean/error/time-based + 인코딩(%27,%3d) 변형 -->
+  <rule id="100600" level="10">
+    <if_sid>31100</if_sid>
+    <url type="pcre2">(?i)(union(\s|\+|%20)+select|\bor\b(\s|\+|%20)+\d|\band\b(\s|\+|%20)+\d|\d+(\s*=\s*|%3d|%253d)\d+|%27|%2527|'|--|%2d%2d|sleep\(|benchmark\(|pg_sleep|waitfor(\s|\+|%20)+delay|information_schema|from(\s|\+|%20)+(vault|users|accounts)|into(\s|\+|%20)+outfile)</url>
+    <description>bank-web SQL injection attempt (comprehensive)</description>
+    <mitre>
+      <id>T1190</id>
+    </mitre>
+    <group>sql_injection,pci_dss_6.5.1,</group>
+  </rule>
+
+  <!-- 반사형 XSS 시도 -->
+  <rule id="100601" level="9">
+    <if_sid>31100</if_sid>
+    <url type="pcre2">(?i)%3c(script|img|svg|iframe|body)|%6a%61%76%61%73%63%72%69%70%74|onerror(%3d|=)|onload(%3d|=)|alert(%28|\()</url>
+    <description>bank-web cross-site scripting (XSS) attempt</description>
+    <mitre>
+      <id>T1190</id>
+    </mitre>
+    <group>xss,</group>
+  </rule>
+
+  <!-- 경로 조작 / 민감 파일 접근 시도 -->
+  <rule id="100602" level="9">
+    <if_sid>31100</if_sid>
+    <url type="pcre2">(?i)(\.\./|%2e%2e%2f|%2e%2e/|/etc/passwd|/etc/shadow|boot\.ini|win\.ini)</url>
+    <description>bank-web path traversal / sensitive file access attempt</description>
+    <mitre>
+      <id>T1190</id>
+    </mitre>
+    <group>path_traversal,</group>
+  </rule>
+
+</group>
