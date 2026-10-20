@@ -288,19 +288,29 @@ def _llm_reorder_candidates(role: str, state: CyberState, pool: list[dict], llm,
     menu = "\n".join(f"- {c['tech_id']}: {c['name']}" for c in shortlist if c.get("tech_id"))
     if not menu:
         return pool
-    goal = ""
-    if objective is not None:
-        goal = (f" The campaign objective is to {objective.name} by reaching the "
-                f"'{objective.capture_tactic}' stage (capture {objective.target_file}). "
-                f"Prefer techniques that advance toward that goal while minimizing the "
-                f"chance of Wazuh detection.")
+    # ROLE-AWARE strategy framing: red plans toward the objective flag; blue plans to
+    # detect and contain the attacker's observed activity (its goal is NOT red's goal).
+    if role == "blue":
+        goal = (" Your objective as the defender is to DETECT and CONTAIN the attacker's "
+                "current activity: prefer defenses that reliably stop the executed/detected "
+                "techniques and expand detection coverage for techniques that evaded Wazuh.")
+        pick = f"choose the {k} best DEFENSES to deploy NEXT against the observed attack"
+    else:
+        g = ""
+        if objective is not None:
+            g = (f" The campaign objective is to {objective.name} by reaching the "
+                 f"'{objective.capture_tactic}' stage (capture {objective.target_file}). "
+                 f"Prefer techniques that advance toward that goal while minimizing the "
+                 f"chance of Wazuh detection.")
+        goal = g
+        pick = f"choose the {k} best techniques to try NEXT"
     system = (f"You are the {role.upper()} agent in an authorized financial cyber-range. "
-              f"From the candidate MITRE ATT&CK techniques, choose the {k} best to try "
-              f"NEXT given the state and the objective, most promising first.{goal} "
+              f"From the candidates, {pick} given the state, most promising first.{goal} "
               f"Reply with ONLY the technique IDs separated by commas (e.g. T1190,T1059).")
     user = (f"State: stage={state.tactic_reached()} (foothold={state.foothold}), "
             f"capabilities={list(state.capabilities)}, executed={list(state.executed)}, "
-            f"detected={list(state.detected)}, flag_captured={state.flag}.\n"
+            f"detected={list(state.detected)}, defended={list(state.defended)}, "
+            f"flag_captured={state.flag}.\n"
             f"Candidates:\n{menu}")
     text = llm.complete(user, system=system)
     if not text:
@@ -924,6 +934,11 @@ class FinancialTarget:
     # ---- target interface (matches DockerTarget) ----
     def target_ip(self) -> str:
         return self.WEB_DMZ_IP
+
+    def attacker_ip(self) -> str:
+        """The attacker box's address on the range, so blue can actually block it
+        (iptables DROP) during containment."""
+        return os.environ.get("ATTACKER_IP", "172.30.10.100")
 
     def attacker_ip(self) -> str:
         return self.ATTACKER_DMZ_IP
