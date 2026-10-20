@@ -203,7 +203,8 @@ def is_covered(tid: str, memory: dict, learned_covered=None) -> bool:
 
 def generate_candidates(role: str, state: CyberState, memory: dict, k: int = 4, llm=None,
                         learned_covered=None, evasive: bool = False,
-                        objective: Optional["Objective"] = None) -> list[dict]:
+                        objective: Optional["Objective"] = None,
+                        focus_tid: Optional[str] = None) -> list[dict]:
     """Produce actionable strategy candidates for red or blue from the ATT&CK memory.
 
     The candidate *set* comes from the shared ATT&CK memory. When an LLM is available
@@ -254,28 +255,43 @@ def generate_candidates(role: str, state: CyberState, memory: dict, k: int = 4, 
             pool.sort(key=lambda a: (is_covered(a["tech_id"], memory, learned_covered),
                                      a["tech_id"]))
     else:  # blue: defend what has been executed/detected but not yet defended
-        pool = []
-        for tid in (state.detected or state.executed):
+        def _mk_defense(tid: str) -> Optional[dict]:
             info = memory.get(tid, {})
             if tid in state.defended:
-                continue
+                return None
             strat = (info.get("detection_strategies") or [{}])
             covered = is_covered(tid, memory, learned_covered)
             if covered:
-                pool.append({"role": "blue", "tech_id": tid, "deploy_rule": False,
-                             "name": f"Contain {info.get('name', tid)}",
-                             "defense": strat[0].get("name", "generic monitoring")})
-            else:
-                # the technique evaded the SIEM -> blue can author a detection rule
-                pool.append({"role": "blue", "tech_id": tid, "deploy_rule": True,
-                             "name": f"Deploy detection rule for {info.get('name', tid)}",
-                             "defense": strat[0].get("name", "new Wazuh rule")})
+                return {"role": "blue", "tech_id": tid, "deploy_rule": False,
+                        "name": f"Contain {info.get('name', tid)}",
+                        "defense": strat[0].get("name", "generic monitoring")}
+            # the technique evaded the SIEM -> blue can author a detection rule
+            return {"role": "blue", "tech_id": tid, "deploy_rule": True,
+                    "name": f"Deploy detection rule for {info.get('name', tid)}",
+                    "defense": strat[0].get("name", "new Wazuh rule")}
+
+        # REACTIVE DEFENSE: anchor on the live incoming attack (focus_tid) first so blue
+        # actually contains THIS turn's technique -- containment only counts when blue
+        # defends the technique red just used, and a plain [:k] over all past techniques
+        # would often drop the current one. The current attack leads the candidate list.
+        ordered_tids = []
+        if focus_tid and focus_tid not in state.defended:
+            ordered_tids.append(focus_tid)
+        for tid in (state.detected or state.executed):
+            if tid not in ordered_tids:
+                ordered_tids.append(tid)
+        pool = [d for d in (_mk_defense(t) for t in ordered_tids) if d]
         if not pool:
             pool = [{"role": "blue", "tech_id": None, "deploy_rule": False,
                      "name": "Harden & monitor baseline", "defense": "baseline hardening"}]
 
     if llm is not None and getattr(llm, "available", False) and pool:
         pool = _llm_reorder_candidates(role, state, pool, llm, k, objective=objective)
+        # even after an LLM reorder, keep the live attack reachable within the top-k.
+        if role == "blue" and focus_tid:
+            focus = next((c for c in pool if c.get("tech_id") == focus_tid), None)
+            if focus:
+                pool = [focus] + [c for c in pool if c is not focus]
     return pool[:k]
 
 
@@ -477,11 +493,13 @@ class MCTS:
         self.evasive = evasive  # red plans a stealth campaign that blends into benign noise
         self.objective = objective or Objective()  # the goal MCTS plans toward
 
-    def search(self, state: CyberState, role: str = "red") -> tuple[dict, float]:
+    def search(self, state: CyberState, role: str = "red",
+               focus_tid: Optional[str] = None) -> tuple[dict, float]:
+        self._focus_tid = focus_tid  # blue: the live attack technique to contain
         candidates = generate_candidates(role, state, self.memory, llm=self.llm,
                                          learned_covered=self.learned_covered,
                                          evasive=self.evasive and role == "red",
-                                         objective=self.objective)
+                                         objective=self.objective, focus_tid=focus_tid)
         if not candidates:
             return {}, 0.0
         N = {i: 0 for i in range(len(candidates))}
@@ -543,6 +561,13 @@ class MCTS:
             return max(0.0, min(1.0, 0.5 + 0.25 * reward))
         else:  # blue win-rate: catching/defending the active technique
             p_defend = 0.3 + 0.6 * prior
+            # prefer defending the LIVE incoming attack (focus) -- that is what can be
+            # contained this turn; and deploying a rule for an evaded technique raises
+            # future detection, so reward it slightly.
+            if getattr(self, "_focus_tid", None) and action.get("tech_id") == self._focus_tid:
+                p_defend = min(1.0, p_defend + 0.4)
+            if action.get("deploy_rule"):
+                p_defend = min(1.0, p_defend + 0.1)
             return 1.0 if self.rng.random() < p_defend else 0.2
 
 
@@ -1428,9 +1453,11 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
         mid_state = CyberState(executed=executed, detected=det, defended=state.defended,
                                foothold=state.foothold, step=state.step)
 
-        # 3) BLUE: MCTS picks a defense, LLM makes it a mitigation command, apply it.
+        # 3) BLUE: MCTS picks a defense for the LIVE incoming attack (focus_tid = the
+        #    technique red just used), LLM makes it a mitigation command, apply it.
         #    A defense on an uncovered technique DEPLOYS a detection rule (coverage++).
-        defense_action, _ = blue_mcts.search(mid_state, role="blue")
+        defense_action, _ = blue_mcts.search(mid_state, role="blue",
+                                             focus_tid=red_action["tech_id"])
         applied = False
         rule_deployed = False
         if defense_action and defense_action.get("tech_id") is not None:
