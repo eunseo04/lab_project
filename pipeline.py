@@ -1366,8 +1366,6 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
         max_steps = 3 * len(_TACTIC_ORDER)
     state = CyberState()
     traj = Trajectory()
-    if not dry_run and hasattr(target, "reset_defenses"):
-        target.reset_defenses()  # clean firewall each episode so red can attack -> blue contains
     objective = target.objective() if hasattr(target, "objective") else Objective()
     print(f"[episode] objective: {objective.name} -> capture {objective.target_file} "
           f"at the '{objective.capture_tactic}' stage")
@@ -1378,6 +1376,11 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
     conf = {"tp": 0, "fp": 0, "fn": 0, "tn": 0}
     fp_base = float(os.environ.get("BLUE_FP_RATE", "0.03"))  # blue's baseline false-alarm rate
     for _ in range(max_steps):
+        # clean the firewall BEFORE each attack so the attack reaches the target and Wazuh
+        # can SEE it (detection) -- then blue's block only applies to the re-probe (containment).
+        # Otherwise a prior block would keep the attack off the host and it would never be logged.
+        if not dry_run and hasattr(target, "reset_defenses"):
+            target.reset_defenses()
         # 1) RED: MCTS picks a technique, LLM makes it a command, execute on target
         red_action, _ = red_mcts.search(state, role="red")
         if not red_action:
@@ -1630,7 +1633,7 @@ def run_closed_loop(iterations: int = 3, ctf_name: Optional[str] = None,
                     seed: int = 0, profile: str = "financial_linux_web",
                     use_llm: bool = True, attacker_container: Optional[str] = None,
                     fresh: bool = False, evasive: bool = False,
-                    benign_rate: int = 4) -> list[Trajectory]:
+                    benign_rate: int = 4, max_steps: Optional[int] = None) -> list[Trajectory]:
     rng = random.Random(seed)
     memory = load_shared_memory(profile=profile)
 
@@ -1678,7 +1681,7 @@ def run_closed_loop(iterations: int = 3, ctf_name: Optional[str] = None,
                              llm=llm, learned_covered=learned_covered, objective=objective)
             traj = run_episode(memory, target, red_mcts, blue_mcts, defense,
                                dry_run=dry_run, rng=rng, llm=llm, learned_covered=learned_covered,
-                               evasive=evasive, benign_rate=benign_rate)
+                               evasive=evasive, benign_rate=benign_rate, max_steps=max_steps)
             all_traj.append(traj)
             print(f"[iter {it}] steps={len(traj.steps)} "
                   f"red_return={traj.red_return:.2f} blue_return={traj.blue_return:.2f}")

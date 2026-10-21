@@ -78,6 +78,7 @@ def step_loop(args) -> None:
         fresh=args.fresh,
         evasive=args.evasive,
         benign_rate=args.benign_rate,
+        max_steps=args.max_steps,
     )
 
 
@@ -132,6 +133,8 @@ def parse_args():
                     help="Run ONE stealth campaign that blends into benign log noise and "
                          "prefers low-signal (uncovered) techniques, instead of a fresh "
                          "loud attack each step. Stress-tests blue's detection (Macro-F1).")
+    ap.add_argument("--max-steps", type=int, default=None,
+                    help="red steps per episode (default 3x kill-chain). Smaller = faster live run.")
     ap.add_argument("--benign-rate", type=int, default=int(os.environ.get("BENIGN_RATE", "4")),
                     help="Normal (benign) log events interleaved per attacker action; "
                          "needed to measure precision/false-alarms, not just recall.")

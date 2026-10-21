@@ -1,11 +1,20 @@
 # iter 1
-- **Enhance Early Detection of Red Actions**: BLUE received a higher reward than RED, but the negative returns suggest RED was more effective in avoiding detection. BLUE should improve its ability to identify and respond to subtle red actions, especially in the early stages of the episode, to prevent prolonged undetected attacks.
+- **Enhance early detection of T1583.001 and T1584.xxxx threats**: The red team successfully executed multiple attacks from these TTPs, indicating that BLUE may be missing early indicators. Improve anomaly detection models to flag these patterns sooner for faster response.
 
-- **Improve Response Consistency**: While BLUE received a positive reward for its response, the reward magnitude was smaller than RED's. BLUE should refine its response strategy to ensure more consistent and impactful containment actions, especially when red actions are detected.
+- **Optimize blue response timing and efficiency**: While BLUE achieved high returns, the response times for T1583.001 and T1584.xxxx were inconsistent. Streamline response protocols to ensure quicker and more consistent containment, especially for high-impact threats.
 
-- **Optimize Resource Allocation**: The high number of red
+- **Refine reward shaping for proactive defense**: The high blue return suggests strong defensive strategies, but the red team still managed to cause damage. Adjust reward functions to encourage more proactive defense behaviors that prevent attack execution, not just mitigate damage.
 
 # iter 2
-- **Enhance Threat Prioritization**: BLUE should focus more on high-impact threat indicators like `T1589` and `T1583` families, which appear frequently and are associated with significant negative returns. Prioritizing detection and containment of these threats can reduce the overall damage and improve return values.
+- **Enhance Early Detection Thresholds**: BLUE achieved a high return, but the red team managed to execute attacks successfully in multiple steps. BLUE should refine its anomaly detection thresholds to identify subtle attack patterns earlier, especially in the early stages of the attack lifecycle.
 
-- **Improve Response Timing**: The initial response to `T1589` by BLUE was positive, but subsequent threats like `T1583` and `T1584` were not addressed effectively. BLUE should refine its response timing to act faster and more consistently on
+- **Improve Response Consistency**: While BLUE's responses were generally effective (e.g., high reward values), there was variability in the effectiveness of responses (e.g., some steps had lower rewards). BLUE should standardize its response strategies to ensure consistent and optimal containment across all attack vectors.
+
+- **Leverage Temporal Patterns**: The attack steps show a pattern of red initiating attacks at specific timestamps (e.g., T1583.002, T1583.004, etc.). BLUE should focus on learning and reacting to these temporal patterns to anticipate and disrupt attacks more proactively.
+
+# iter 3
+- **Enhance threat detection for T1583.00x variants**: The red team repeatedly used T1583.00x tactics, which were successful in penetrating BLUE defenses. BLUE should improve its detection and response mechanisms for these specific attack vectors to reduce their effectiveness.
+
+- **Optimize reward structure for defensive actions**: BLUE received negative rewards for defensive actions (e.g., -0.3 for the first action), which may discourage proactive defense. Adjusting the reward structure to better incentivize early containment and threat neutralization could improve defensive behavior.
+
+- **Improve coordination during multi-step attacks**: The red team executed a multi-step attack sequence with T1583.00x, suggesting a coordinated strategy. BLUE should enhance its ability to detect and respond to multi-stage attack patterns to prevent escalation and improve containment efficiency.
