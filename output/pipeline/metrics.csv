@@ -1,4 +1,4 @@
 iteration,attempted,succeeded,breached,contained,blocked,detected,attack_success_rate,breach_rate,containment_rate,block_rate,detection_rate,detection_macro_f1,red_win,cum_attempted,cum_succeeded,cum_detected,cum_breached,cum_contained,cum_attack_success_rate,cum_breach_rate,cum_containment_rate,cum_block_rate,cum_detection_rate
-1,5,5,1,4,0,4,1.0,0.2,0.8,0.0,0.8,0.9206,False,5,5,4,1,4,1.0,0.2,0.8,0.0,0.8
-2,5,5,1,4,0,4,1.0,0.2,0.8,0.0,0.8,0.9206,False,10,10,8,2,8,1.0,0.2,0.8,0.0,0.8
-3,5,5,1,4,0,4,1.0,0.2,0.8,0.0,0.8,0.9206,False,15,15,12,3,12,1.0,0.2,0.8,0.0,0.8
+1,39,37,1,36,2,16,0.9487,0.0256,0.9231,0.0513,0.4103,0.6743,False,39,37,16,1,36,0.9487,0.0256,0.9231,0.0513,0.4103
+2,39,39,1,38,0,29,1.0,0.0256,0.9744,0.0,0.7436,0.7635,False,78,76,45,2,74,0.9744,0.0256,0.9487,0.0256,0.5769
+3,39,39,3,36,0,32,1.0,0.0769,0.9231,0.0,0.8205,0.8299,False,117,115,77,5,110,0.9829,0.0427,0.9402,0.0171,0.6581
