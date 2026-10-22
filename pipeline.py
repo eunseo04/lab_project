@@ -657,36 +657,70 @@ def llm_enrich_action(action: dict, state: CyberState, memory: dict, llm=None,
     return action
 
 
+def _defense_signature(command: str) -> str:
+    """Extract a distinctive token from the attack command for a TARGETED host-WAF match
+    (a string that survives in the on-the-wire request), so blue can drop just this attack
+    pattern instead of banning the whole attacker. Returns '' if nothing distinctive."""
+    import re as _re
+    c = command or ""
+    for kw in ("information_schema", "UNION", "vault", "secret", "sleep(", "pg_sleep",
+               "OR 1=1", "../", "/etc/passwd"):
+        if kw.lower() in c.lower():
+            return kw
+    m = _re.search(r"https?://[^/\s]+(/[^\s\"'\\?]+)", c)   # a URL path
+    if m and len(m.group(1)) > 1:
+        return m.group(1)[:60]
+    return ""
+
+
 def llm_enrich_defense(defense: dict, state: CyberState, memory: dict, llm=None,
                        target_ip: str = "target", attack_command: str = "",
                        attacker_ip: str = "", wazuh_desc: str = "") -> dict:
-    """Ask the LLM to turn a chosen defense into a concrete mitigation command run ON the
-    target host that actually CONTAINS the observed attack. It is fed the real attack
-    command + the Wazuh alert + the attacker IP + the dataset detection strategy, so the
-    mitigation targets what actually happened (not just a technique label). Falls back to
-    a real iptables block of the attacker when no LLM is available (still contains).
+    """Ask the LLM to REASON about the detected attack and pick a TARGETED mitigation that
+    neutralizes THIS specific technique -- a host WAF rule on the attack's payload signature,
+    revoking the abused DB privilege, locking an account, killing a process, removing a file,
+    etc. Blanket blocking of the attacker's source IP is only the LAST RESORT, used when no
+    targeted fix fits. It is fed the real attack command + Wazuh alert + attacker IP + the
+    dataset detection strategy so the mitigation matches what actually happened.
     """
     if not defense or defense.get("tech_id") is None:
         defense.setdefault("command", f"echo apply {defense.get('defense','hardening')}")
         return defense
     info = memory.get(defense["tech_id"], {})
     strat = (info.get("detection_strategies") or [{}])[0].get("name", "monitoring")
-    # deterministic fallback that ACTUALLY contains: drop the attacker at the host firewall
-    fallback_cmd = (f"iptables -A INPUT -s {attacker_ip} -j DROP" if attacker_ip
-                    else f"echo defend {defense['tech_id']}")
+    sig = _defense_signature(attack_command)
+    # deterministic fallback (no LLM): a TARGETED host-WAF drop on the attack signature;
+    # the attacker-IP ban is only the final fallback when there is no usable signature.
+    if sig:
+        fallback_cmd = (f'iptables -I INPUT -p tcp --dport 5000 -m string --string "{sig}" '
+                        f'--algo bm -j DROP')
+    elif attacker_ip:
+        fallback_cmd = f"iptables -I INPUT -s {attacker_ip} -j DROP"   # LAST RESORT
+    else:
+        fallback_cmd = f"echo defend {defense['tech_id']}"
     if llm is None or not getattr(llm, "available", False):
         defense.setdefault("command", fallback_cmd)
         return defense
-    system = ("You are the BLUE defender of bank-web (Linux). CONTAIN the DETECTED attack so it "
-              "cannot succeed again. Containment options ON THIS HOST: block the attacker IP with "
-              "'iptables -A INPUT -s <ip> -j DROP' (most reliable against a remote attacker), kill a "
-              "malicious process, disable the exploited endpoint, tighten DB perms, or add a Wazuh "
-              "rule. Output ONE shell command that STOPS the observed attack from succeeding again, "
-              "then a one-line rationale. Respond EXACTLY as: 'CMD: <command>' then 'WHY: <rationale>'.")
-    user = (f"Detected attack technique {defense['tech_id']} ({info.get('name')}), "
-            f"executed as: {attack_command or 'n/a'}.\n"
-            f"Wazuh alert: {wazuh_desc or 'n/a'}. Attacker IP: {attacker_ip or 'unknown'}. "
-            f"Detection strategy: {strat}. Already defended: {list(state.defended)}.")
+    # Give the defender the BATTLEFIELD (its authority + environment) and the ATTACK EVIDENCE,
+    # then let it DEVISE its own response. Deliberately NOT a menu of preset mitigations: the
+    # strategy must come from the policy's own reasoning (shaped by GRPO) over the attack log,
+    # not from recipes written into this prompt.
+    system = ("You are the BLUE incident responder with full root shell access to the bank-web "
+              "host (Linux; a Flask web app on tcp:5000 backed by a Postgres database 'bank-db' "
+              "that you can also reach). An intrusion has been DETECTED. Using ONLY the attack "
+              "evidence below and your own reasoning, DECIDE how to respond and output ONE concrete "
+              "shell command you judge will stop THIS attack from succeeding if it is retried. You "
+              "are NOT limited to any preset list of actions -- choose whatever host action your "
+              "analysis of the evidence justifies, from the most surgical fix to, only if nothing "
+              "narrower will work, blocking the source. Output the real command to run (not "
+              "pseudo-code); if you conclude no host action can neutralise it, reply EXACTLY "
+              "'CMD: NODEF'. Respond EXACTLY as: 'CMD: <command>' then 'WHY: <rationale>'.")
+    user = (f"Detected technique: {defense['tech_id']} ({info.get('name')}).\n"
+            f"Attacker command observed in the logs: {attack_command or 'n/a'}\n"
+            f"Wazuh alert: {wazuh_desc or 'n/a'}\n"
+            f"Attacker source IP: {attacker_ip or 'unknown'}\n"
+            f"SIEM detection context (ATT&CK data): {strat}\n"
+            f"Defenses already applied this engagement: {list(state.defended)}")
     text = llm.complete(user, system=system)
     cmd = fallback_cmd
     why = ""
@@ -1421,16 +1455,24 @@ class FinancialTarget:
         return redtools.run_command(command, container=self.WEB)
 
     def defend(self, defense_action: dict) -> dict:
-        """Blue defense/mitigation runs on the bank-web host (hardening/containment)."""
+        """Blue defense/mitigation runs on the bank-web host (hardening/containment).
+
+        Blue applies the TARGETED mitigation its reasoning chose (a host WAF rule on the
+        attack signature, a DB-privilege revoke, killing a process, etc.) -- NOT a blanket
+        attacker-IP ban (that is only blue's last-resort choice). The command is run as-is;
+        a DB-level action (psql ...) is routed to the bank-db container.
+        """
         import redtools
         cmd = defense_action.get("command") or f"echo apply {defense_action.get('defense')}"
-        out = redtools.run_command(cmd, container=self.WEB)
-        # many containment commands (iptables -A, kill, chmod) succeed with NO output, so
-        # "empty stdout" must NOT mean failure. Applied unless the command clearly errored.
-        lo = (out or "").lower()
+        # route DB-privilege mitigations to the database container; everything else to web
+        container = self.DB if (cmd.strip().startswith("psql") or " psql " in cmd) else self.WEB
+        out = redtools.run_command(cmd, container=container) or ""
+        # many containment commands (iptables, kill, chmod, revoke) succeed with NO output,
+        # so "empty stdout" must NOT mean failure. Applied unless the command clearly errored.
+        lo = out.lower()
         failed = any(e in lo for e in ("error", "not permitted", "command not found",
                                        "permission denied", "no such file", "cannot", "usage:"))
-        return {"defense": defense_action, "applied": not failed, "stdout": out or ""}
+        return {"defense": defense_action, "applied": not failed, "stdout": out}
 
     def measure_benign_fp(self, benign_events: list[dict]):
         if not (self.wazuh and self.wazuh.available):
@@ -1919,7 +1961,12 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
                 attack_command=red_action.get("command", ""),
                 attacker_ip=(target.attacker_ip() if hasattr(target, "attacker_ip") else ""),
                 wazuh_desc=str((ctx or {}).get("event", {}).get("description", "")))
-            dres = target.defend(defense_action)
+            # the defender may reason that no host action can neutralise this attack (NODEF):
+            # then nothing is applied -> no containment this step (an honest defensive miss).
+            if (defense_action.get("command") or "").strip().upper() == "NODEF":
+                dres = {"applied": False, "stdout": "[blue] no viable host mitigation (NODEF)"}
+            else:
+                dres = target.defend(defense_action)
             applied = dres.get("applied", False)
             if applied and defense_action.get("deploy_rule"):
                 # blue authored a new Wazuh rule -> this technique is now detectable
@@ -1934,12 +1981,16 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
                                                  red_action.get("command", ""))
 
         # 4) VERIFY the defense: re-attempt the same attack. Containment counts ONLY if
-        #    the attack no longer succeeds after the defense (reliable criterion), not
-        #    merely because the mitigation command ran.
+        #    the attack no longer succeeds after the defense (reliable, ground-truth
+        #    criterion), not merely because the mitigation command ran. The blue MCTS
+        #    already targets the LIVE technique (focus_tid), so we do NOT additionally
+        #    require the defense's tech_id to equal red's -- the re-probe is the real test
+        #    and a strict id match only produced false negatives (blue blocked the attacker
+        #    but it was not scored as contained).
         mitigated = False
         reverified = None
-        if (applied and defense_action and result["success"]
-                and defense_action.get("tech_id") == red_action["tech_id"]):
+        if (applied and defense_action and defense_action.get("tech_id") is not None
+                and result["success"]):
             reprobe = target.run(red_action, defended=True)
             reverified = not reprobe["success"]
             mitigated = bool(reverified)
