@@ -66,7 +66,9 @@ def _f1_scores(conf: dict) -> dict:
 
 
 def _episode_counts(steps: list[dict]) -> dict:
-    red = [s for s in steps if s.get("role") == "red"]
+    # skipped stages were NOT executed against the target (off-target prep tactics or an
+    # LLM 'cannot perform here' skip) -> they are not attack attempts.
+    red = [s for s in steps if s.get("role") == "red" and not s.get("skipped")]
     def succ(s):
         return bool((s.get("result") or {}).get("success"))
     attempted = len(red)
@@ -120,6 +122,14 @@ def compute_metrics(trajectories: list[dict]) -> dict:
             **c,
             # raw execution (ignores defense) -- does NOT move with containment
             "attack_success_rate": _rate(c["succeeded"], c["attempted"]),
+            # ASR (Attack Success Rate), the headline red/blue evaluation metric:
+            #   attack_asr  = breaches / attempts   -> RED: how often an attack ultimately
+            #                 succeeds against the current defense (higher = stronger attacker)
+            #   defense_asr = breaches / executions -> BLUE: of attacks that reached the host,
+            #                 the share that defeated the defense (lower = stronger defender,
+            #                 == 1 - containment-given-execution; the ASR seen by the defender)
+            "attack_asr": _rate(c["breached"], c["attempted"]),
+            "defense_asr": _rate(c["breached"], c["succeeded"]),
             # the partition: these three sum to 1.0 and trade off against each other
             "breach_rate": _rate(c["breached"], c["attempted"]),        # net attack success
             "containment_rate": _rate(c["contained"], c["attempted"]),  # 방어(봉쇄)율
@@ -135,6 +145,8 @@ def compute_metrics(trajectories: list[dict]) -> dict:
             "cum_breached": cum["breached"],
             "cum_contained": cum["contained"],
             "cum_attack_success_rate": _rate(cum["succeeded"], cum["attempted"]),
+            "cum_attack_asr": _rate(cum["breached"], cum["attempted"]),
+            "cum_defense_asr": _rate(cum["breached"], cum["succeeded"]),
             "cum_breach_rate": _rate(cum["breached"], cum["attempted"]),
             "cum_containment_rate": _rate(cum["contained"], cum["attempted"]),
             "cum_block_rate": _rate(cum["blocked"], cum["attempted"]),
@@ -144,6 +156,8 @@ def compute_metrics(trajectories: list[dict]) -> dict:
         "iterations": len(trajectories),
         "totals": cum,
         "attack_success_rate": _rate(cum["succeeded"], cum["attempted"]),  # raw execution
+        "attack_asr": _rate(cum["breached"], cum["attempted"]),   # RED ASR (net success)
+        "defense_asr": _rate(cum["breached"], cum["succeeded"]),  # BLUE ASR (residual on exec)
         "breach_rate": _rate(cum["breached"], cum["attempted"]),           # net attack success
         "containment_rate": _rate(cum["contained"], cum["attempted"]),     # defense rate
         "block_rate": _rate(cum["blocked"], cum["attempted"]),
@@ -159,6 +173,15 @@ def compute_metrics(trajectories: list[dict]) -> dict:
         "red_winning_pct": _rate(red_wins, episodes_with_meta),
         "detection": _f1_scores(cum_conf),
     }
+    # command<->technique consistency across all episodes: were the executed commands
+    # actually implementations of the techniques they claimed (vs the same SQLi relabeled)?
+    cc = {"checked": 0, "consistent": 0, "mismatch": 0, "skipped": 0}
+    for traj in trajectories:
+        c = (traj.get("meta") or {}).get("consistency") or {}
+        for k in cc:
+            cc[k] += int(c.get(k, 0))
+    cc["consistency_rate"] = _rate(cc["consistent"], cc["checked"])
+    summary["consistency"] = cc
     return {"summary": summary, "per_iteration": per_iter}
 
 
@@ -188,6 +211,9 @@ def print_metrics(metrics: dict) -> None:
     print("-" * 72)
     print(f"  TOTAL attempts={t['attempted']} breached={t['breached']} "
           f"contained={t['contained']} blocked={t['blocked']} detected={t['detected']}")
+    print(f"  >> ATTACK ASR  (red, breach/attempt)  : {s['attack_asr']*100:.1f}%")
+    print(f"  >> DEFENSE ASR (blue, breach/executed): {s['defense_asr']*100:.1f}%"
+          f"   [lower = stronger defense]")
     print(f"  >> breach rate (net attack success) : {s['breach_rate']*100:.1f}%")
     print(f"  >> containment rate (defense): {s['containment_rate']*100:.1f}%")
     print(f"  >> block rate                       : {s['block_rate']*100:.1f}%")

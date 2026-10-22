@@ -131,11 +131,57 @@ def prerequisite_capability(stage: str) -> Optional[str]:
     return _STAGE_CAPABILITY.get(_TACTIC_ORDER[i - 1])
 
 
+# ---------------------------------------------------------------------------
+# Self-expanding attack dataset: RED-invented techniques accumulate here.
+# ---------------------------------------------------------------------------
+# The canonical attack_dataset.json is the ~7.8MB MITRE ATT&CK export. Rather than
+# rewrite that giant file on every run (a single bad write would corrupt the whole
+# pipeline), RED's newly-invented actions are accumulated in a SEPARATE overlay file
+# and merged on top of the base dataset at load time. The effective attack dataset
+# therefore keeps GROWING across runs (self-diversification) while the base stays safe.
+_GENERATED_OVERLAY = Path(__file__).resolve().parent / "dataset" / "attack_dataset_generated.json"
+# soft cap so an over-eager LLM cannot grow the overlay without bound
+_MAX_GENERATED = int(os.environ.get("RED_MAX_GENERATED", "200"))
+# synthetic sub-technique band (.900-.999): regex-valid ids very unlikely to collide
+# with a real ATT&CK sub-technique, used when a novel action has no exact MITRE id.
+_SYN_SUB_BASE = 900
+
+
+def _load_generated_overlay(path=_GENERATED_OVERLAY) -> dict:
+    try:
+        p = Path(path)
+        if p.exists():
+            with p.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+            return data if isinstance(data, dict) else {}
+    except Exception as e:  # pragma: no cover - a corrupt overlay must not kill the run
+        print(f"[pipeline] could not read generated overlay ({e}); ignoring it.")
+    return {}
+
+
+def _save_generated_overlay(overlay: dict, path=_GENERATED_OVERLAY) -> None:
+    """Persist the invented-technique overlay atomically (temp file + os.replace) so a
+    crash mid-write can never leave a half-written, unparseable dataset behind."""
+    try:
+        p = Path(path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        tmp = Path(str(p) + ".tmp")
+        with tmp.open("w", encoding="utf-8") as f:
+            json.dump(overlay, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, p)
+    except Exception as e:  # pragma: no cover
+        print(f"[pipeline] could not persist generated overlay ({e}).")
+
+
 def load_shared_memory(profile: str = "financial_linux_web") -> dict:
     """ATT&CK techniques shared by both Red and Blue (the 'shared-memory' dataset).
 
     Scoped to the Target `profile` and annotated with `wazuh_covered` so the
     detection step reflects real ATT&CK x Wazuh coverage (see coverage.py).
+
+    RED-invented techniques accumulated in earlier runs (the generated overlay) are
+    merged on top of the base dataset first, so the attack surface red can plan over
+    grows every run instead of being frozen to the original dataset.
     """
     memory = None
     if load_attack_dataset is not None:
@@ -146,6 +192,19 @@ def load_shared_memory(profile: str = "financial_linux_web") -> dict:
     if memory is None:
         print("[pipeline] attack_dataset.json not found -> using built-in ATT&CK sample.")
         memory = dict(_FALLBACK_MEMORY)
+
+    # Merge RED's previously-invented techniques (self-expanded attack dataset). These
+    # are added BEFORE scoping so they get the same platform filter + coverage annotation
+    # as the base techniques. setdefault => the base dataset always wins on a real id.
+    overlay = _load_generated_overlay()
+    if overlay:
+        added = 0
+        for tid, info in overlay.items():
+            if tid not in memory:
+                memory[tid] = info
+                added += 1
+        print(f"[pipeline] merged {added} RED-invented technique(s) from "
+              f"{_GENERATED_OVERLAY.name} (attack dataset self-expanded).")
 
     # Scope to Target platforms + annotate Wazuh coverage when coverage.py is usable.
     covered: set = set()
@@ -201,10 +260,123 @@ def is_covered(tid: str, memory: dict, learned_covered=None) -> bool:
     return base or (learned_covered is not None and tid in learned_covered)
 
 
+# ---------------------------------------------------------------------------
+# RED ideation: invent NEW attack actions and grow the attack dataset
+# ---------------------------------------------------------------------------
+def _parse_json_array(text: str) -> list:
+    """Best-effort parse of a JSON array from an LLM reply (tolerates ``` fences / prose)."""
+    import re as _re
+    if not text:
+        return []
+    m = _re.search(r"\[.*\]", text, _re.DOTALL)
+    blob = m.group(0) if m else text
+    try:
+        data = json.loads(blob)
+        return data if isinstance(data, list) else []
+    except Exception:
+        return []
+
+
+def _mint_technique_id(base_tid: str, memory: dict) -> str:
+    """Give a novel action a regex-valid tech_id (so coverage.py, the MCTS, GRPO export
+    and Wazuh mitre tagging all keep working). A bare technique (T1190) gets a synthetic
+    sub-id in the .900+ band (T1190.900); if no sane base is given, anchor on T1190."""
+    import re as _re
+    root = base_tid if _re.fullmatch(r"T\d{4}", base_tid or "") else "T1190"
+    for n in range(_SYN_SUB_BASE, 1000):
+        cand = f"{root}.{n:03d}"
+        if cand not in memory:
+            return cand
+    return f"{root}.{_SYN_SUB_BASE:03d}"
+
+
+def propose_new_techniques(state: CyberState, memory: dict, llm, objective, stage: str, *,
+                           k: int = 2, persist_path=None) -> list[str]:
+    """RED ideation step: ask the attack LLM to INVENT new actions for the current
+    kill-chain `stage` that are not already in the shared memory, register them in
+    `memory` in place (so MCTS can pick them THIS turn) and persist them to the generated
+    overlay so the attack dataset accumulates across runs.
+
+    This is what makes the attacker diversify itself: instead of only reordering the
+    fixed dataset, red keeps adding genuinely new variations (different endpoints,
+    encodings, tooling, chaining) that blue has not yet learned to detect.
+
+    Returns the list of newly-added tech_ids (possibly empty).
+    """
+    if llm is None or not getattr(llm, "available", False):
+        return []
+    overlay = _load_generated_overlay(persist_path) if persist_path else {}
+    if len(overlay) >= _MAX_GENERATED:
+        return []  # soft cap reached: stop growing the overlay
+    known = sorted(f"{tid}: {info.get('name')}" for tid, info in memory.items()
+                   if stage in (info.get("tactics") or []))
+    known_hint = "; ".join(known[:12]) or "(none yet)"
+    surface = getattr(objective, "attack_surface", "") if objective else ""
+    goal = getattr(objective, "name", "capture the objective") if objective else "capture the objective"
+    system = (
+        "You are the RED strategist in an AUTHORIZED, isolated financial cyber-range used "
+        "for defensive research. INVENT new, concrete attack actions for the given "
+        "kill-chain stage that are DIFFERENT from the already-known techniques and realistic "
+        "for a Linux Flask web app + Postgres + attacker container. Favour genuinely novel "
+        "variations (different endpoints, encodings, tooling, request shapes, chaining) that "
+        "a static signature set would miss, so the defender is forced to adapt. "
+        f"Propose at most {k}. Reply with ONLY a JSON array; each element an object with keys: "
+        "\"base_tid\" (closest real MITRE ATT&CK id like \"T1190\", or \"\" if none), "
+        "\"name\" (short label), \"description\" (how it works and why it advances the goal), "
+        "\"command\" (one concrete shell command to attempt it against the lab target), "
+        "\"detection\" (the log/signal that would reveal it). No text outside the JSON array."
+    )
+    user = (
+        f"Kill-chain stage: {stage}. Campaign objective: {goal}. "
+        f"Attack surface: {surface or 'a standard internal web application'}. "
+        f"Verified capabilities held: {list(state.capabilities)}. "
+        f"Techniques already known for this stage (do NOT repeat these): {known_hint}."
+    )
+    items = _parse_json_array(llm.complete(user, system=system))
+    if not items:
+        return []
+    import re as _re
+    new_ids: list[str] = []
+    room = _MAX_GENERATED - len(overlay)
+    for it in items[:k]:
+        if room <= 0:
+            break
+        if not isinstance(it, dict):
+            continue
+        name = (it.get("name") or "").strip()
+        if not name:
+            continue
+        base = (it.get("base_tid") or "").strip()
+        if _re.fullmatch(r"T\d{4}(?:\.\d{3})?", base) and base not in memory:
+            tid = base                      # a real MITRE id missing from this profile
+        else:
+            tid = _mint_technique_id(base, memory)
+        entry = {
+            "name": name,
+            "description": (it.get("description") or "").strip(),
+            "tactics": [stage],
+            "platforms": ["Linux", "Containers"],
+            "detection_strategies": [{"name": (it.get("detection") or "novel behaviour monitoring").strip()}],
+            "command": (it.get("command") or "").strip(),  # concrete seed for llm_enrich_action
+            "wazuh_covered": False,          # invented => no Wazuh rule yet (blue must learn it)
+            "generated": True,               # provenance marker
+            "origin_stage": stage,
+        }
+        memory[tid] = entry                  # visible to MCTS this turn (shared dict)
+        overlay[tid] = entry                 # persisted for future runs
+        new_ids.append(tid)
+        room -= 1
+    if new_ids and persist_path:
+        _save_generated_overlay(overlay, persist_path)
+        print(f"[red-ideate] stage={stage}: invented {len(new_ids)} new action(s) -> {new_ids}")
+    return new_ids
+
+
 def generate_candidates(role: str, state: CyberState, memory: dict, k: int = 4, llm=None,
                         learned_covered=None, evasive: bool = False,
                         objective: Optional["Objective"] = None,
-                        focus_tid: Optional[str] = None) -> list[dict]:
+                        focus_tid: Optional[str] = None,
+                        allow_novel: bool = False, persist_path=None) -> list[dict]:
     """Produce actionable strategy candidates for red or blue from the ATT&CK memory.
 
     The candidate *set* comes from the shared ATT&CK memory. When an LLM is available
@@ -212,12 +384,24 @@ def generate_candidates(role: str, state: CyberState, memory: dict, k: int = 4, 
     'LLM decides strategy / next action' step); MCTS then simulates to pick the best.
     Falls back to a rule-based ordering with no LLM.
 
+    When `allow_novel` is set (red + LLM), red first INVENTS new actions for the current
+    stage that are not already in the shared memory, registers them (so they can be
+    chosen this very turn) and persists them to the generated overlay so the attack
+    dataset keeps expanding -- this is what lets the attacker diversify itself instead
+    of being confined to the original dataset.
+
     Blue candidates carry `deploy_rule=True` when the technique is NOT yet detectable:
     applying such a defense adds a Wazuh detection rule (coverage expansion), so blue's
     self-improvement grows SIEM coverage over iterations.
     """
     target_tactic = state.tactic_reached()
+    new_ids: list[str] = []
     if role == "red":
+        # IDEATION: let the attack LLM invent brand-new actions for this stage first, so
+        # the pool below (built from memory) already contains them.
+        if allow_novel and llm is not None and getattr(llm, "available", False):
+            new_ids = propose_new_techniques(state, memory, llm, objective, target_tactic,
+                                             persist_path=persist_path)
         all_unexec = [
             {"role": "red", "tech_id": tid, "name": info.get("name", tid),
              "tactics": info.get("tactics", [])}
@@ -254,6 +438,12 @@ def generate_candidates(role: str, state: CyberState, memory: dict, k: int = 4, 
             # drives the "hide in normal logs" behaviour; blue must grow coverage to catch up.
             pool.sort(key=lambda a: (is_covered(a["tech_id"], memory, learned_covered),
                                      a["tech_id"]))
+        # Front-load the techniques invented THIS turn so they are not dropped by the
+        # top-k cut and actually get evaluated by MCTS (otherwise synthetic .9xx ids,
+        # which sort last, would rarely be tried and red would never explore them).
+        if new_ids:
+            front = [a for a in pool if a["tech_id"] in new_ids]
+            pool = front + [a for a in pool if a["tech_id"] not in new_ids]
     else:  # blue: defend what has been executed/detected but not yet defended
         def _mk_defense(tid: str) -> Optional[dict]:
             info = memory.get(tid, {})
@@ -343,35 +533,73 @@ def _llm_reorder_candidates(role: str, state: CyberState, pool: list[dict], llm,
 
 
 def llm_enrich_action(action: dict, state: CyberState, memory: dict, llm=None,
-                      target_ip: str = "target", objective=None) -> dict:
-    """Ask the LLM to turn a chosen ATT&CK technique into a concrete, runnable
-    action (command + rationale) against the Target. Falls back to a plain echo
-    when no LLM is available, so the loop still runs offline.
+                      target_ip: str = "target", objective=None,
+                      mismatch_hints: Optional[dict] = None, stage: str = "") -> dict:
+    """Ask the LLM to turn a chosen ATT&CK technique into a concrete, runnable action
+    (command + rationale) against the Target. Falls back to a plain echo when no LLM is
+    available, so the loop still runs offline.
+
+    TECHNIQUE-FAITHFUL command generation: the command must implement THIS technique's
+    tactic, not collapse into the objective SQL injection every turn. The objective's
+    SQLi attack-surface hint is therefore injected ONLY for SQLi-relevant tactics (and
+    the capture stage); for other tactics the LLM is told to perform that tactic's own
+    action and NOT to substitute the objective injection. The technique's ATT&CK
+    description is passed in so the command reflects the real technique. `mismatch_hints`
+    carries corrections from earlier episodes (per tech_id) so a technique that was
+    previously mis-executed gets an explicit fix-up instruction (self-correction loop).
     """
     if not action or action.get("tech_id") is None:
         return action
-    if llm is None or not getattr(llm, "available", False):
-        action.setdefault("command", f"echo run {action.get('tech_id')}")
-        return action
     info = memory.get(action["tech_id"], {})
+    tactics = action.get("tactics") or info.get("tactics") or []
+    # Frame the command for the KILL-CHAIN stage red is actually on (what the consistency
+    # gate judges against), not just the technique's first-listed tactic -- they differ for
+    # multi-tactic techniques, and a mismatch there would make a faithful command look wrong.
+    stage = stage or (tactics[0] if tactics else "")
+    desc = (info.get("description") or "").strip().replace("\n", " ")
+    if len(desc) > 400:
+        desc = desc[:400] + " ..."
+    # Invented techniques carry a concrete seed command; use it as the fallback so a
+    # novel action is runnable even when the enrich LLM call is unavailable or fails.
+    seed_cmd = info.get("command") or f"echo run {action.get('tech_id')}"
+    if llm is None or not getattr(llm, "available", False):
+        action.setdefault("command", seed_cmd)
+        return action
+
+    capture_tactic = getattr(objective, "capture_tactic", "") if objective else ""
+    sqli_stage = (stage in _SQLI_OK_TACTICS) or (stage and stage == capture_tactic)
     goal = ""
-    if objective is not None:
+    if objective is not None and sqli_stage:
         goal = f" CAMPAIGN OBJECTIVE: {objective.name} — capture {objective.target_file}."
         if getattr(objective, "attack_surface", ""):
             goal += " " + objective.attack_surface
+    elif objective is not None:
+        goal = (f" The overall campaign objective is '{objective.name}', but THIS step must "
+                f"perform the specific technique below (tactic '{stage}'); do NOT substitute "
+                f"the objective SQL injection for it — the command must genuinely implement "
+                f"this technique.")
+    # self-correction: this technique was mis-executed before -> tell the LLM to fix it
+    hint_txt = ""
+    h = (mismatch_hints or {}).get(action["tech_id"])
+    if h:
+        hint_txt = (f" CORRECTION: an earlier run executed a command for this technique that "
+                    f"did NOT implement it (reason: {h.get('reason', 'mismatch')}). Produce a "
+                    f"command that genuinely performs it this time.")
     system = ("You are a red-team operator working ONLY inside an authorized, isolated "
-              "financial cyber-range (Docker). Given one MITRE ATT&CK technique and the "
-              f"engagement state, output ONE shell command to attempt it against the lab "
-              f"target at {target_ip} (use real tools: nmap, curl, nc, hydra, sqlmap...), "
-              "and a one-line rationale." + goal +
-              " Attack ONLY the real endpoints described above and keep every step aimed at the "
-              "objective — do NOT invent URLs or hosts. Respond EXACTLY as two lines: "
-              "'CMD: <command>' then 'WHY: <rationale>'.")
-    user = (f"Technique {action['tech_id']} ({action.get('name')}). "
-            f"Tactics: {info.get('tactics', [])}. Target IP: {target_ip}. "
+              "financial cyber-range (Docker). Output ONE shell command that SPECIFICALLY "
+              f"performs the given MITRE ATT&CK technique against the lab target at {target_ip}, "
+              "using tools appropriate to that technique (nmap for reconnaissance, hydra/sqlmap "
+              "for initial-access, shell/python for execution, cron/systemd for persistence, "
+              "sudo/suid for privilege-escalation, etc.), plus a one-line rationale." + goal +
+              hint_txt +
+              " Attack ONLY real endpoints/hosts — do NOT invent URLs. If the technique genuinely "
+              "cannot be performed against this target, reply EXACTLY 'CMD: SKIP'. "
+              "Respond EXACTLY as two lines: 'CMD: <command>' then 'WHY: <rationale>'.")
+    user = (f"Technique {action['tech_id']} ({action.get('name')}). Tactic: {stage}. "
+            f"ATT&CK definition: {desc or 'n/a'}. Target IP: {target_ip}. "
             f"State: foothold={state.foothold}, executed={list(state.executed)}.")
     text = llm.complete(user, system=system)
-    cmd = f"echo run {action['tech_id']}"
+    cmd = seed_cmd
     why = ""
     for line in (text or "").splitlines():
         if line.upper().startswith("CMD:"):
@@ -469,6 +697,109 @@ def step_reward(role: str, *, success: bool, detected: bool,
 
 
 # ---------------------------------------------------------------------------
+# Command <-> technique consistency ("did we REALLY perform the ATT&CK technique?")
+# ---------------------------------------------------------------------------
+# The attack LLM, pushed hard toward the objective, tends to emit the SAME bank-web
+# SQL injection for every technique -- so a resource-development or persistence
+# technique "succeeds" by running an injection that has nothing to do with it. These
+# helpers detect that: whether the concrete command plausibly implements the technique
+# it claims, and whether 'success'/stage-clear is consistent with that.
+
+# Adversary-side prep tactics: performed on the attacker's OWN infrastructure, never
+# against the victim target. Faking them with a target command is meaningless, so such
+# a stage is honestly SKIPPED rather than "executed".
+_OFF_TARGET_TACTICS = {"resource-development"}
+
+# Tactics whose legitimate action against THIS surface really is the bank-web SQLi
+# (exploit the public web app / read data through it). For any other on-target tactic,
+# the objective SQLi is a mismatch, not a real execution of the technique.
+_SQLI_OK_TACTICS = {"initial-access", "exfiltration", "collection",
+                    "credential-access", "command-and-control"}
+
+# Rough per-tactic command signatures. Deliberately permissive: the goal is to catch
+# "the same injection relabeled as many unrelated techniques", not to grade tradecraft.
+_TACTIC_CMD_SIGNATURES = {
+    "reconnaissance": ["nmap", "masscan", "ping ", "dig ", "host ", "whatweb", "nikto",
+                       "gobuster", "ffuf", "dirb", "-sv", "-p-", "whois", "amass",
+                       "wafw00f", "curl -i", "curl --head", "head "],
+    "initial-access": ["sqlmap", "union select", "' or ", "or 1=1", "--data-urlencode",
+                       "/login", "hydra", "/api/transactions", "' --", "%27"],
+    "execution": ["python", "bash", "/bin/sh", "sh -c", " nc ", "ncat", "perl", "php ",
+                  "powershell", "os.system", "subprocess", "eval ", "exec("],
+    "persistence": ["cron", "crontab", "systemctl", "/etc/rc", "authorized_keys",
+                    "useradd", "adduser", "chkconfig", "/etc/init", ".bashrc", "at now"],
+    "privilege-escalation": ["sudo", "suid", "setuid", "chmod +s", "pkexec", "getcap",
+                             "/etc/passwd", "polkit", "dirtypipe", "gtfobins", "capsh"],
+    "defense-impairment": ["iptables -f", "ufw disable", "systemctl stop", "rm /var/log",
+                           "auditctl", "setenforce 0", "chattr", "history -c",
+                           "service wazuh", "kill "],
+    "credential-access": ["/etc/shadow", "hashcat", "john ", "mimikatz", "secretsdump",
+                          "psql", "mysql", "dump", "password", "union select", "vault"],
+    "discovery": ["whoami", " id", "uname", "netstat", "ss -", "ps aux", "ls -",
+                  "find /", "env", "cat /etc", "ip a", "arp", "getent"],
+    "lateral-movement": ["ssh ", "scp ", "psexec", "smbclient", "wmic", "winrm",
+                         "proxychains", "rdp"],
+    "collection": ["tar ", "zip ", " cp ", "cat ", "psql", "mysqldump", "union select",
+                   "vault", "select "],
+    "command-and-control": ["curl", "wget", " nc ", "ncat", "reverse", "/dev/tcp",
+                            "bash -i", "socat", "beacon"],
+    "exfiltration": ["curl", "wget", "scp ", " nc ", "base64", "union select", "vault",
+                     "--data", "post "],
+}
+
+
+def _looks_like_objective_sqli(cmd: str) -> bool:
+    c = cmd.lower()
+    return (("/api/transactions" in c or "/login" in c) and
+            ("union select" in c or "account_id=" in c or "' or" in c or "%27" in c
+             or "' --" in c or "sqlmap" in c))
+
+
+def command_matches_technique(action: dict, stage: str, memory: dict) -> tuple[bool, str]:
+    """Heuristic: does the concrete command plausibly IMPLEMENT the chosen technique's
+    tactic, or is it just the reused objective SQLi pasted under a different tech_id?
+
+    Returns (matches, reason). This distinguishes 'actually performed the ATT&CK
+    technique' from 'ran the same bank-API injection and relabeled it'.
+    """
+    cmd = (action.get("command") or "").strip().lower()
+    tactics = action.get("tactics") or memory.get(action.get("tech_id"), {}).get("tactics") or []
+    stage = stage or (tactics[0] if tactics else "")
+    if stage in _OFF_TARGET_TACTICS:
+        return False, f"off-target-tactic:{stage}"      # not performable against the victim
+    if not cmd or cmd.startswith("echo run") or cmd == "skip":
+        return False, "empty-or-placeholder-command"
+    if _looks_like_objective_sqli(cmd) and stage not in _SQLI_OK_TACTICS:
+        return False, f"generic-sqli-reused-for:{stage}"
+    sigs = _TACTIC_CMD_SIGNATURES.get(stage)
+    if sigs is None:
+        return True, "no-signature-for-tactic"          # unknown tactic -> don't penalize
+    if any(sig in cmd for sig in sigs):
+        return True, "ok"
+    return False, f"command-does-not-match-tactic:{stage}"
+
+
+def check_execution_consistency(action: dict, result: dict, stage: str, advanced: bool,
+                                memory: dict) -> dict:
+    """Cross-check whether the command's reported success and the kill-chain
+    stage-transition are consistent with the command actually implementing the claimed
+    technique. Flags:
+      * advanced but command mismatch -> a stage 'cleared' by a mislabeled/reused command
+      * reported success but command mismatch -> 'success' that does not evidence the technique
+    `consistent` is False when either holds.
+    """
+    matches, reason = command_matches_technique(action, stage, memory)
+    cmd_success = bool((result or {}).get("success"))
+    issues = []
+    if advanced and not matches:
+        issues.append(f"stage-cleared-but-command-mismatch({reason})")
+    if cmd_success and not matches:
+        issues.append(f"reported-success-but-command-mismatch({reason})")
+    return {"consistent": not issues, "matches_technique": matches, "match_reason": reason,
+            "cmd_success": cmd_success, "advanced": bool(advanced), "issues": issues}
+
+
+# ---------------------------------------------------------------------------
 # MCTS over cyber actions  (action-level search; "MCTS Strategy" box)
 # ---------------------------------------------------------------------------
 class MCTS:
@@ -482,7 +813,8 @@ class MCTS:
     def __init__(self, memory: dict, action_priors: Optional[dict] = None,
                  n_sims: int = 64, c_uct: float = 1.4, rng: Optional[random.Random] = None,
                  llm=None, learned_covered=None, evasive: bool = False,
-                 objective: Optional["Objective"] = None):
+                 objective: Optional["Objective"] = None,
+                 allow_novel: bool = False, generated_path=None):
         self.memory = memory
         self.priors = action_priors or {}
         self.n_sims = n_sims
@@ -492,14 +824,27 @@ class MCTS:
         self.learned_covered = learned_covered  # blue-deployed detection coverage
         self.evasive = evasive  # red plans a stealth campaign that blends into benign noise
         self.objective = objective or Objective()  # the goal MCTS plans toward
+        self.allow_novel = allow_novel  # red may INVENT new actions (grows the attack dataset)
+        self.generated_path = generated_path  # where invented techniques are persisted
+        self._proposed_stages: set = set()  # ideate at most once per stage per episode
 
     def search(self, state: CyberState, role: str = "red",
                focus_tid: Optional[str] = None) -> tuple[dict, float]:
         self._focus_tid = focus_tid  # blue: the live attack technique to contain
+        # Throttle ideation to the FIRST time red reaches a given stage this episode, so
+        # the LLM invents fresh actions per stage without a proposal call every single step.
+        allow_novel = False
+        if role == "red" and self.allow_novel:
+            stg = state.tactic_reached()
+            if stg not in self._proposed_stages:
+                self._proposed_stages.add(stg)
+                allow_novel = True
         candidates = generate_candidates(role, state, self.memory, llm=self.llm,
                                          learned_covered=self.learned_covered,
                                          evasive=self.evasive and role == "red",
-                                         objective=self.objective, focus_tid=focus_tid)
+                                         objective=self.objective, focus_tid=focus_tid,
+                                         allow_novel=allow_novel,
+                                         persist_path=self.generated_path)
         if not candidates:
             return {}, 0.0
         N = {i: 0 for i in range(len(candidates))}
@@ -1040,28 +1385,6 @@ class FinancialTarget:
                                        "permission denied", "no such file", "cannot", "usage:"))
         return {"defense": defense_action, "applied": not failed, "stdout": out or ""}
 
-    def wazuh_detect(self, since, tech_id: str, tech_name: str = "", command: str = "", llm=None):
-        if not (self.wazuh and self.wazuh.available):
-            return None, None
-        import time as _time
-        max_wait = float(os.environ.get("WAZUH_POLL_MAX", "30"))
-        interval = float(os.environ.get("WAZUH_POLL_INTERVAL", "5"))
-        waited, alerts = 0.0, []
-        while True:
-            alerts = self.wazuh.query_alerts(since=since, agent_name=self.agent_name)
-            if self.wazuh.last_error is not None:
-                print(f"[wazuh] indexer unreachable during detection -> proxy fallback for {tech_id}")
-                return None, None
-            if tech_id in self.wazuh.technique_ids(alerts) or waited >= max_wait:
-                break
-            _time.sleep(interval)
-            waited += interval
-        match = next((a for a in alerts if tech_id in self.wazuh.technique_ids([a])), None)
-        ctx = extract_wazuh_context(match or alerts[0]) if alerts else None
-        detected = judge_detection(alerts, tech_id, tech_name, command=command, llm=llm,
-                                   fallback_tids=self.wazuh.technique_ids(alerts))
-        return detected, ctx
-
     def measure_benign_fp(self, benign_events: list[dict]):
         if not (self.wazuh and self.wazuh.available):
             return None
@@ -1242,10 +1565,12 @@ def export_grpo_dataset(trajectories: list[Trajectory], out_path: str, role: str
     rows = []
     for traj in trajectories:
         for st in traj.steps:
-            if st.get("role") != role:
-                continue
+            if st.get("role") != role or st.get("skipped"):
+                continue  # skipped stages were not executed -> no training row
             action = st.get("action", {}) or {}
             tid = action.get("tech_id")
+            if tid is None:
+                continue
             info = memory.get(tid, {}) if tid else {}
             name = action.get("name") or info.get("name") or (tid or "unknown technique")
             tactics = action.get("tactics") or info.get("tactics") or []
@@ -1313,7 +1638,7 @@ def llm_improve(trajectories: list[Trajectory], priors: dict, llm=None,
     new = dict(priors)
     for traj in trajectories:
         for st in traj.steps:
-            if st.get("role") != role:
+            if st.get("role") != role or st.get("skipped"):
                 continue
             key = st["action"].get("tech_id") or st["action"].get("name")
             if key is None:
@@ -1344,7 +1669,9 @@ def llm_improve(trajectories: list[Trajectory], priors: dict, llm=None,
 def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: DefenseGraph,
                 max_steps: Optional[int] = None, dry_run: bool = True,
                 rng: Optional[random.Random] = None, llm=None, learned_covered=None,
-                evasive: bool = False, benign_rate: int = 4) -> Trajectory:
+                evasive: bool = False, benign_rate: int = 4,
+                enforce_consistency: bool = False,
+                mismatch_hints: Optional[dict] = None) -> Trajectory:
     """One red-vs-blue self-play episode. BOTH agents use MCTS to choose actions,
     the LLM turns them into concrete commands, and both actually run against the
     Target (attack / mitigation). Blue can DEPLOY detection rules, which grow
@@ -1375,18 +1702,76 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
     # per-event confusion tally across the whole episode (DefenderBench detection = Macro-F1)
     conf = {"tp": 0, "fp": 0, "fn": 0, "tn": 0}
     fp_base = float(os.environ.get("BLUE_FP_RATE", "0.03"))  # blue's baseline false-alarm rate
+    mismatch_hints = dict(mismatch_hints or {})
+    consistency_tally = {"checked": 0, "consistent": 0, "mismatch": 0, "skipped": 0}
+    episode_mismatches: list[dict] = []
     for _ in range(max_steps):
         # clean the firewall BEFORE each attack so the attack reaches the target and Wazuh
         # can SEE it (detection) -- then blue's block only applies to the re-probe (containment).
         # Otherwise a prior block would keep the attack off the host and it would never be logged.
         if not dry_run and hasattr(target, "reset_defenses"):
             target.reset_defenses()
+
+        # 0) HONEST SKIP of adversary-side prep tactics. When consistency is enforced (LLM
+        #    runs produce real commands), a tactic that is never performed against the victim
+        #    (e.g. resource-development) is SKIPPED -- the stage advances and grants its
+        #    capability, recorded transparently as 'skipped', instead of being faked by a
+        #    bank-API SQLi that has nothing to do with the technique.
+        stage0 = state.tactic_reached()
+        if enforce_consistency and stage0 in _OFF_TARGET_TACTICS:
+            caps = set(state.capabilities)
+            cap = stage_capability(stage0)
+            if cap:
+                caps.add(cap)
+            new_state = CyberState(executed=state.executed, detected=state.detected,
+                                   defended=state.defended, capabilities=tuple(sorted(caps)),
+                                   foothold=state.foothold + 1, flag=state.flag,
+                                   step=state.step + 1)
+            consistency_tally["skipped"] += 1
+            traj.steps.append({
+                "role": "red", "state": asdict(state),
+                "action": {"tech_id": None, "tactics": [stage0],
+                           "name": f"[skipped off-target tactic: {stage0}]"},
+                "result": {"success": False, "stdout": ""},
+                "skipped": True, "stage": stage0, "detected": False, "mitigated": False,
+                "advanced": False, "consistent": True,
+                "consistency": {"consistent": True, "match_reason": f"off-target-tactic:{stage0}",
+                                "issues": [], "skipped": True},
+                "capabilities": list(new_state.capabilities), "reward": 0.0,
+            })
+            print(f"  [step {state.step:>2}] stage={stage0:<20} -> SKIPPED "
+                  f"(off-target: not performed against victim)  "
+                  f"foothold={new_state.foothold}/{len(_TACTIC_ORDER) - 1}")
+            state = new_state
+            continue
+
         # 1) RED: MCTS picks a technique, LLM makes it a command, execute on target
         red_action, _ = red_mcts.search(state, role="red")
         if not red_action:
             break
         red_action = llm_enrich_action(red_action, state, memory, llm=llm, target_ip=tgt_ip,
-                                       objective=objective)
+                                       objective=objective, mismatch_hints=mismatch_hints,
+                                       stage=state.tactic_reached())
+        # LLM may judge a specific technique unperformable against this target -> SKIP: record
+        # it (no fake execution) and let MCTS try a DIFFERENT technique on this stage next step.
+        if (red_action.get("command") or "").strip().upper() == "SKIP":
+            executed = tuple(sorted(set(state.executed) | {red_action["tech_id"]}))
+            consistency_tally["skipped"] += 1
+            traj.steps.append({
+                "role": "red", "state": asdict(state), "action": red_action,
+                "result": {"success": False, "stdout": ""}, "skipped": True,
+                "stage": state.tactic_reached(), "detected": False, "mitigated": False,
+                "advanced": False, "consistent": True,
+                "consistency": {"consistent": True, "match_reason": "llm-skip", "issues": [],
+                                "skipped": True},
+                "capabilities": list(state.capabilities), "reward": 0.0,
+            })
+            print(f"  [step {state.step:>2}] stage={state.tactic_reached():<20} "
+                  f"{red_action.get('tech_id')} -> SKIPPED (LLM: not performable here)")
+            state = CyberState(executed=executed, detected=state.detected,
+                               defended=state.defended, capabilities=state.capabilities,
+                               foothold=state.foothold, flag=state.flag, step=state.step + 1)
+            continue
         from datetime import datetime as _dt, timezone as _tz
 
         # 1b) BENIGN window FIRST (time-separated from the attack). In --live mode these
@@ -1500,7 +1885,31 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
         # An off-stage, caught, or precondition-missing action does not advance the kill
         # chain, so red must work through the tactics in order (no faked progress).
         evaded = bool(result["success"] and not detected and not mitigated)
-        advanced = bool(evaded and on_stage and preconds_met)
+        advanced_raw = bool(evaded and on_stage and preconds_met)
+        # CONSISTENCY GATE: cross-check that the executed command actually implemented this
+        # technique and that 'success'/stage-clear is consistent with that. A relabeled or
+        # reused command (e.g. the objective SQLi tagged as a resource-development technique)
+        # must NOT genuinely clear the stage. Enforcement bites only when commands are real
+        # (LLM mode); in no-LLM simulation the gate records but does not block.
+        consistency = check_execution_consistency(red_action, result, stage_tactic,
+                                                   advanced_raw, memory)
+        consistency_tally["checked"] += 1
+        if consistency["consistent"]:
+            consistency_tally["consistent"] += 1
+        else:
+            consistency_tally["mismatch"] += 1
+            rec = {"tech_id": red_action.get("tech_id"), "name": red_action.get("name"),
+                   "stage": stage_tactic, "reason": consistency["match_reason"],
+                   "command": (red_action.get("command") or "")[:160],
+                   "issues": consistency["issues"]}
+            episode_mismatches.append(rec)
+            # remember the correction so the NEXT episode steers this technique to a faithful
+            # command (self-correction feedback).
+            h = mismatch_hints.get(red_action.get("tech_id"), {"count": 0})
+            mismatch_hints[red_action.get("tech_id")] = {
+                "reason": consistency["match_reason"], "stage": stage_tactic,
+                "count": int(h.get("count", 0)) + 1}
+        advanced = bool(advanced_raw and (consistency["consistent"] or not enforce_consistency))
         foothold = state.foothold + (1 if advanced else 0)
         # grant the stage's capability as a VERIFIED fact carried to the next turn
         caps = set(state.capabilities)
@@ -1544,6 +1953,9 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
             "on_stage": bool(on_stage),   # did the technique belong to the current stage?
             "preconds_met": bool(preconds_met),  # was the stage's prerequisite held?
             "advanced": advanced,         # did this step clear the stage (foothold += 1)?
+            "advanced_raw": advanced_raw,  # would have cleared on success alone (pre-gate)
+            "consistent": consistency["consistent"],  # command actually implemented the technique?
+            "consistency": consistency,   # full command<->technique verdict
             "capabilities": list(new_state.capabilities),  # verified powers after this step
             "is_capture": is_capture,     # was this an objective-capture attempt?
             "captured": captured,         # did the environment confirm the flag was taken?
@@ -1561,6 +1973,7 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
         # turn after real/simulated execution): stage -> technique -> outcome.
         outcome = ("FLAG-CAPTURED" if captured else
                    "ADVANCED" if advanced else
+                   "MISMATCH(not-performed)" if (advanced_raw and not consistency["consistent"]) else
                    "contained" if mitigated else
                    "detected" if detected else
                    "no-precond" if (on_stage and not preconds_met) else
@@ -1597,13 +2010,24 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
         "stages_cleared": stages_cleared,   # ordered kill-chain stages red actually completed
         "kill_chain": list(_TACTIC_ORDER),
         "confusion": conf,
+        # command<->technique consistency for THIS episode (did executions actually perform
+        # the techniques they claimed?) + the mismatches carried forward for next-episode fix.
+        "consistency": {
+            "enforced": bool(enforce_consistency),
+            **consistency_tally,
+            "consistency_rate": round(consistency_tally["consistent"]
+                                      / max(consistency_tally["checked"], 1), 4),
+            "mismatches": episode_mismatches[:50],
+        },
+        "mismatch_hints": mismatch_hints,  # tech_id -> {reason, stage, count} for next episode
     }
     return traj
 
 
 def load_state(out_dir: str) -> dict:
     """Load persisted learning state (priors + blue-deployed coverage) from a prior run."""
-    empty = {"red_priors": {}, "blue_priors": {}, "learned_covered": [], "runs": 0, "history": []}
+    empty = {"red_priors": {}, "blue_priors": {}, "learned_covered": [], "runs": 0,
+             "history": [], "mismatch_hints": {}}
     path = os.path.join(out_dir, "state.json")
     if not os.path.exists(path):
         return dict(empty)
@@ -1619,12 +2043,13 @@ def load_state(out_dir: str) -> dict:
 
 
 def save_state(out_dir: str, red_priors: dict, blue_priors: dict,
-               learned_covered: set, runs: int, history: list) -> None:
+               learned_covered: set, runs: int, history: list,
+               mismatch_hints: Optional[dict] = None) -> None:
     Path(out_dir).mkdir(parents=True, exist_ok=True)
     with open(os.path.join(out_dir, "state.json"), "w", encoding="utf-8") as f:
         json.dump({"red_priors": red_priors, "blue_priors": blue_priors,
                    "learned_covered": sorted(learned_covered), "runs": runs,
-                   "history": history},
+                   "history": history, "mismatch_hints": mismatch_hints or {}},
                   f, ensure_ascii=False, indent=2)
 
 
@@ -1633,7 +2058,8 @@ def run_closed_loop(iterations: int = 3, ctf_name: Optional[str] = None,
                     seed: int = 0, profile: str = "financial_linux_web",
                     use_llm: bool = True, attacker_container: Optional[str] = None,
                     fresh: bool = False, evasive: bool = False,
-                    benign_rate: int = 4, max_steps: Optional[int] = None) -> list[Trajectory]:
+                    benign_rate: int = 4, max_steps: Optional[int] = None,
+                    expand: bool = True) -> list[Trajectory]:
     rng = random.Random(seed)
     memory = load_shared_memory(profile=profile)
 
@@ -1646,6 +2072,9 @@ def run_closed_loop(iterations: int = 3, ctf_name: Optional[str] = None,
     learned_covered: set = set(state0["learned_covered"])
     prior_runs = state0["runs"]
     history: list = list(state0.get("history", []))
+    # command<->technique mismatches accumulated across runs -> steer next episodes to
+    # faithful, technique-appropriate commands (self-correction feedback).
+    mismatch_hints: dict = dict(state0.get("mismatch_hints", {}) or {})
     learned_at_start = len(learned_covered)
     if prior_runs and not fresh:
         print(f"[pipeline] resumed from {out_dir}/state.json: runs={prior_runs}, "
@@ -1665,6 +2094,10 @@ def run_closed_loop(iterations: int = 3, ctf_name: Optional[str] = None,
         target = DockerTarget(ctf_name, attacker_container=attacker_container)
     llm = get_llm() if (use_llm and get_llm is not None) else None
     objective = target.objective() if hasattr(target, "objective") else Objective()
+    # Enforce the command<->technique consistency gate only when commands are real (LLM
+    # mode). In no-LLM simulation commands are placeholders, so the gate records but does
+    # not block (keeps the dry-run/dashboard baseline unchanged).
+    enforce_consistency = bool(llm is not None and getattr(llm, "available", False))
 
     all_traj: list[Trajectory] = []
     red_notes: list[str] = []
@@ -1674,17 +2107,28 @@ def run_closed_loop(iterations: int = 3, ctf_name: Optional[str] = None,
             # Both agents search with their OWN learned priors (self-play). red_mcts is
             # told the objective so it plans toward the flag; blue_mcts sees
             # learned_covered so it won't re-deploy rules it already has.
+            # red_mcts may INVENT new actions (allow_novel) when an LLM is available and
+            # expansion is enabled, growing the attack dataset so the attacker diversifies.
             red_mcts = MCTS(memory, action_priors=red_priors, rng=random.Random(seed + it),
                             llm=llm, learned_covered=learned_covered, evasive=evasive,
-                            objective=objective)
+                            objective=objective,
+                            allow_novel=bool(expand and llm is not None and getattr(llm, "available", False)),
+                            generated_path=str(_GENERATED_OVERLAY))
             blue_mcts = MCTS(memory, action_priors=blue_priors, rng=random.Random(seed + 100 + it),
                              llm=llm, learned_covered=learned_covered, objective=objective)
             traj = run_episode(memory, target, red_mcts, blue_mcts, defense,
                                dry_run=dry_run, rng=rng, llm=llm, learned_covered=learned_covered,
-                               evasive=evasive, benign_rate=benign_rate, max_steps=max_steps)
+                               evasive=evasive, benign_rate=benign_rate, max_steps=max_steps,
+                               enforce_consistency=enforce_consistency, mismatch_hints=mismatch_hints)
             all_traj.append(traj)
+            # carry this episode's command<->technique corrections into the NEXT episode
+            mismatch_hints = dict(traj.meta.get("mismatch_hints", mismatch_hints) or {})
+            cs = traj.meta.get("consistency", {}) or {}
             print(f"[iter {it}] steps={len(traj.steps)} "
-                  f"red_return={traj.red_return:.2f} blue_return={traj.blue_return:.2f}")
+                  f"red_return={traj.red_return:.2f} blue_return={traj.blue_return:.2f} "
+                  f"| consistency={cs.get('consistent', 0)}/{cs.get('checked', 0)} "
+                  f"mismatch={cs.get('mismatch', 0)} skipped={cs.get('skipped', 0)}"
+                  f"{' (enforced)' if cs.get('enforced') else ''}")
 
             # live: apply blue-authored Wazuh rules so NEXT iteration can really detect them
             if not dry_run and hasattr(target, "flush_rules"):
@@ -1737,7 +2181,8 @@ def run_closed_loop(iterations: int = 3, ctf_name: Optional[str] = None,
     })
 
     # persist learned state so the NEXT run resumes and keeps evolving
-    save_state(out_dir, red_priors, blue_priors, learned_covered, prior_runs + 1, history)
+    save_state(out_dir, red_priors, blue_priors, learned_covered, prior_runs + 1, history,
+               mismatch_hints=mismatch_hints)
     print(f"[pipeline] saved state.json: runs={prior_runs + 1}, "
           f"blue rules={learned_n} | coverage target={100*(base_covered+learned_n)/max(target_total,1):.1f}% "
           f"dataset={100*(base_covered+learned_n)/max(dataset_total,1):.1f}%")
@@ -1755,12 +2200,23 @@ def run_closed_loop(iterations: int = 3, ctf_name: Optional[str] = None,
             extra = (f" | RED win%={db['red_winning_pct']*100:.1f}% "
                      f"BLUE Macro-F1={det.get('macro_f1', 0):.3f} "
                      f"(P={det.get('precision', 0):.2f} R={det.get('recall', 0):.2f})")
-        print(f"[pipeline] metrics: breach(net)={s['breach_rate']*100:.1f}% "
-              f"containment={s['containment_rate']*100:.1f}% block={s['block_rate']*100:.1f}% "
+        print(f"[pipeline] metrics: ATTACK-ASR={s['attack_asr']*100:.1f}% "
+              f"DEFENSE-ASR={s['defense_asr']*100:.1f}% "
+              f"| containment={s['containment_rate']*100:.1f}% block={s['block_rate']*100:.1f}% "
               f"detection={s['detection_rate']*100:.1f}%{extra} -> {out_dir}/metrics.json")
+        cc = s.get("consistency", {})
+        if cc.get("checked"):
+            print(f"[pipeline] command<->technique consistency: "
+                  f"{cc['consistent']}/{cc['checked']} ({cc['consistency_rate']*100:.1f}%) "
+                  f"mismatch={cc['mismatch']} skipped={cc['skipped']} "
+                  f"| pending corrections for next run: {len(mismatch_hints)}")
     except Exception as e:  # pragma: no cover
         print(f"[pipeline] metrics computation skipped: {e}")
 
+    gen_overlay = _load_generated_overlay()
+    if gen_overlay:
+        print(f"[pipeline] attack dataset self-expanded: {len(gen_overlay)} RED-invented "
+              f"technique(s) accumulated in {_GENERATED_OVERLAY}")
     print(f"[pipeline] done. artifacts in {out_dir}/")
     return all_traj
 
@@ -1782,7 +2238,9 @@ def parse_args():
                     help="Disable the LLM (rule-based only)")
     ap.add_argument("--fresh", action="store_true",
                     help="Ignore saved state.json and start learning from scratch")
-    ap.set_defaults(dry_run=True, use_llm=True)
+    ap.add_argument("--no-expand", dest="expand", action="store_false",
+                    help="Disable RED ideation (do not invent/accumulate new techniques)")
+    ap.set_defaults(dry_run=True, use_llm=True, expand=True)
     return ap.parse_args()
 
 
@@ -1791,4 +2249,5 @@ if __name__ == "__main__":
     run_closed_loop(iterations=args.iterations, ctf_name=args.ctf_name,
                     dry_run=args.dry_run, out_dir=args.out_dir, seed=args.seed,
                     profile=args.profile, use_llm=args.use_llm,
-                    attacker_container=args.attacker_container, fresh=args.fresh)
+                    attacker_container=args.attacker_container, fresh=args.fresh,
+                    expand=args.expand)

@@ -167,16 +167,15 @@
 
   <section class="panel">
     <div class="panel-head">
-      <h2>비율 추세</h2>
+      <h2>ASR 추세 — 공격 vs 방어</h2>
       <div class="seg" role="group" aria-label="보기 방식">
         <button id="m-cum" aria-pressed="true">누적</button>
         <button id="m-iter" aria-pressed="false">반복별</button>
       </div>
     </div>
     <div class="legend" id="legend">
-      <span><span class="dot" style="--c:var(--red)"></span>순 침투</span>
-      <span><span class="dot" style="--c:var(--aqua)"></span>봉쇄</span>
-      <span><span class="dot" style="--c:var(--blue)"></span>탐지</span>
+      <span><span class="dot" style="--c:var(--red)"></span>공격 ASR (관통/시도)</span>
+      <span><span class="dot" style="--c:var(--aqua)"></span>방어 ASR (관통/실행 · 낮을수록 우수)</span>
     </div>
     <figure class="chartwrap">
       <svg id="chart" viewBox="0 0 760 340" role="img" aria-label="반복별 비율 추세"></svg>
@@ -244,10 +243,19 @@ const EMBED = {"summary": {"iterations": 3, "totals": {"attempted": 117, "succee
 const $ = s => document.querySelector(s);
 const pct = x => (x * 100).toFixed(x === 0 || x === 1 ? 0 : 1) + '%';
 const esc = x => (x == null ? '' : String(x)).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+const RATE = (a, b) => (b ? a / b : 0);
+// Per-iteration graph now plots ASR (Attack Success Rate), computed from counts so it
+// works for every data source without regenerating embedded data:
+//   공격 ASR = breaches / attempts    (RED: attacks that ultimately succeed; higher = stronger)
+//   방어 ASR = breaches / executions  (BLUE: of executed attacks, the share that beat the
+//                                      defense; lower = stronger defender)
 const SERIES = [
-  { key: 'breach_rate',      cum: 'cum_breach_rate',      label: '순 침투', color: 'var(--red)' },
-  { key: 'containment_rate', cum: 'cum_containment_rate', label: '봉쇄',    color: 'var(--aqua)' },
-  { key: 'detection_rate',   cum: 'cum_detection_rate',   label: '탐지',    color: 'var(--blue)' },
+  { label: '공격 ASR', color: 'var(--red)',
+    val:    p => RATE(p.breached, p.attempted),
+    cumVal: p => RATE(p.cum_breached, p.cum_attempted) },
+  { label: '방어 ASR', color: 'var(--aqua)',
+    val:    p => RATE(p.breached, p.succeeded),
+    cumVal: p => RATE(p.cum_breached, p.cum_succeeded) },
 ];
 
 let DATA = EMBED;
@@ -292,6 +300,7 @@ function fromTrajectories(trajs) {
       containment_rate: rate(c.contained, c.attempted),
       block_rate: rate(c.blocked, c.attempted),
       detection_rate: rate(c.detected, c.attempted),
+      cum_attempted: cum.attempted, cum_succeeded: cum.succeeded, cum_breached: cum.breached,
       cum_breach_rate: rate(cum.breached, cum.attempted),
       cum_containment_rate: rate(cum.contained, cum.attempted),
       cum_block_rate: rate(cum.blocked, cum.attempted),
@@ -365,8 +374,8 @@ function renderMeta() {
 function renderTiles() {
   const s = DATA.summary, t = s.totals;
   const tiles = [
-    { c: 'var(--red)', label: '순 침투', val: pct(s.breach_rate), note: `${t.breached}/${t.attempted} 관통 성공` },
-    { c: 'var(--aqua)', label: '봉쇄', val: pct(s.containment_rate), note: `${t.contained}/${t.attempted} 블루가 봉쇄` },
+    { c: 'var(--red)', label: '공격 ASR', val: pct(s.attack_asr ?? RATE(t.breached, t.attempted)), note: `${t.breached}/${t.attempted} 관통 (breach/attempt)` },
+    { c: 'var(--aqua)', label: '방어 ASR', val: pct(s.defense_asr ?? RATE(t.breached, t.succeeded)), note: `${t.breached}/${t.succeeded} 실행 중 관통 · 낮을수록 우수` },
     { c: 'var(--muted)', label: '차단', val: pct(s.block_rate), note: `${t.blocked}/${t.attempted} 실행 실패` },
     { c: 'var(--blue)', label: '탐지', val: pct(s.detection_rate), note: `${t.detected}/${t.attempted} Wazuh 탐지` },
   ];
@@ -415,7 +424,7 @@ function renderChart() {
   });
   const ends = [];
   SERIES.forEach(s => {
-    const vals = per.map(p => mode === 'cum' ? (p[s.cum] ?? 0) : (p[s.key] ?? 0));
+    const vals = per.map(p => (mode === 'cum' ? s.cumVal(p) : s.val(p)) ?? 0);
     const P = per.map((p, i) => [xOf(i), yOf(vals[i])]);
     const d = P.map((pt, i) => (i ? 'L' : 'M') + pt[0].toFixed(1) + ' ' + pt[1].toFixed(1)).join(' ');
     els.push(`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`);
@@ -442,7 +451,7 @@ function renderChart() {
   function showTip(i) {
     const p = per[i];
     const rows = SERIES.map(s => {
-      const v = mode === 'cum' ? p[s.cum] : p[s.key];
+      const v = mode === 'cum' ? s.cumVal(p) : s.val(p);
       return `<div class="row"><span><span class="dot" style="--c:${s.color}"></span> ${s.label}</span><b style="color:${s.color}">${pct(v ?? 0)}</b></div>`;
     }).join('');
     tip.innerHTML = `<h4>반복 ${p.iteration} · ${mode === 'cum' ? '누적' : '이번 반복'}</h4>${rows}
@@ -459,7 +468,7 @@ function renderChart() {
 function renderTable() {
   const per = DATA.per_iteration;
   const head = `<thead><tr><th>반복</th><th>공격</th><th>침투</th><th>봉쇄</th><th>차단</th><th>탐지</th>
-    <th>침투%</th><th>봉쇄%</th><th>차단%</th></tr></thead>`;
+    <th>공격ASR</th><th>방어ASR</th><th>차단%</th></tr></thead>`;
   const body = per.map(p => `<tr>
     <td class="mono">${p.iteration}</td>
     <td class="mono">${p.attempted ?? '–'}</td>
@@ -467,8 +476,8 @@ function renderTable() {
     <td class="mono">${p.contained ?? '–'}</td>
     <td class="mono">${p.blocked ?? '–'}</td>
     <td class="mono">${p.detected ?? '–'}</td>
-    <td class="mono" style="color:var(--red)">${pct(mode === 'cum' ? p.cum_breach_rate : p.breach_rate)}</td>
-    <td class="mono" style="color:var(--aqua)">${pct(mode === 'cum' ? p.cum_containment_rate : p.containment_rate)}</td>
+    <td class="mono" style="color:var(--red)">${pct(mode === 'cum' ? RATE(p.cum_breached, p.cum_attempted) : RATE(p.breached, p.attempted))}</td>
+    <td class="mono" style="color:var(--aqua)">${pct(mode === 'cum' ? RATE(p.cum_breached, p.cum_succeeded) : RATE(p.breached, p.succeeded))}</td>
     <td class="mono" style="color:var(--muted)">${pct(mode === 'cum' ? p.cum_block_rate : p.block_rate)}</td>
   </tr>`).join('');
   $('#table').innerHTML = head + '<tbody>' + body + '</tbody>';

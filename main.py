@@ -79,6 +79,7 @@ def step_loop(args) -> None:
         evasive=args.evasive,
         benign_rate=args.benign_rate,
         max_steps=args.max_steps,
+        expand=args.expand,
     )
 
 
@@ -138,7 +139,11 @@ def parse_args():
     ap.add_argument("--benign-rate", type=int, default=int(os.environ.get("BENIGN_RATE", "4")),
                     help="Normal (benign) log events interleaved per attacker action; "
                          "needed to measure precision/false-alarms, not just recall.")
-    ap.set_defaults(dry_run=True, use_llm=True)
+    ap.add_argument("--no-expand", dest="expand", action="store_false",
+                    help="Disable RED ideation: do NOT invent new attack actions or grow "
+                         "the attack dataset (dataset/attack_dataset_generated.json). "
+                         "Requires the LLM; has no effect with --no-llm.")
+    ap.set_defaults(dry_run=True, use_llm=True, expand=True)
     return ap.parse_args()
 
 
