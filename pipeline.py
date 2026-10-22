@@ -261,6 +261,41 @@ def is_covered(tid: str, memory: dict, learned_covered=None) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Environment feasibility: prune techniques that are IMPOSSIBLE in this range
+# ---------------------------------------------------------------------------
+# The financial range is a headless Linux Flask web app + Postgres + attacker container,
+# reachable over the network. It has NO humans/mailboxes to phish, no third-party/supply
+# chain, no physical access, no removable media, no wireless, no mobile, and no cloud /
+# identity provider. Techniques that REQUIRE those capabilities can never be performed
+# here -- that is an ENVIRONMENT limitation, not an execution failure -- so they are pruned
+# from red's candidate set instead of being offered and SKIPped every step.
+_ENV_INFEASIBLE_NAME_PATTERNS = (
+    "phishing", "spearphishing", "supply chain", "trusted relationship",
+    "hardware additions", "drive-by", "drive by", "removable media",
+    "replication through", "wi-fi", "wifi", "wireless", "bluetooth",
+    "mobile", "android", "ios ", "sms", "voice", "qr code", "physical",
+    "cloud account", "office application", "email",
+)
+# only lab profiles get pruned; "all"/unknown profiles are left untouched.
+_LAB_PROFILE_HINTS = ("financial", "web", "linux", "container", "bank")
+
+
+def environment_infeasible(memory: dict, profile: str) -> set:
+    """Technique ids that cannot be performed in this target environment at all
+    (capability the range simply does not have). Name-pattern based so it is robust to
+    id churn; gated to lab profiles so a generic 'all' profile is unaffected."""
+    p = (profile or "").lower()
+    if not any(h in p for h in _LAB_PROFILE_HINTS):
+        return set()
+    out = set()
+    for tid, info in memory.items():
+        name = (info.get("name") or "").lower()
+        if any(pat in name for pat in _ENV_INFEASIBLE_NAME_PATTERNS):
+            out.add(tid)
+    return out
+
+
+# ---------------------------------------------------------------------------
 # RED ideation: invent NEW attack actions and grow the attack dataset
 # ---------------------------------------------------------------------------
 def _parse_json_array(text: str) -> list:
@@ -376,7 +411,8 @@ def generate_candidates(role: str, state: CyberState, memory: dict, k: int = 4, 
                         learned_covered=None, evasive: bool = False,
                         objective: Optional["Objective"] = None,
                         focus_tid: Optional[str] = None,
-                        allow_novel: bool = False, persist_path=None) -> list[dict]:
+                        allow_novel: bool = False, persist_path=None,
+                        infeasible=None) -> list[dict]:
     """Produce actionable strategy candidates for red or blue from the ATT&CK memory.
 
     The candidate *set* comes from the shared ATT&CK memory. When an LLM is available
@@ -395,6 +431,7 @@ def generate_candidates(role: str, state: CyberState, memory: dict, k: int = 4, 
     self-improvement grows SIEM coverage over iterations.
     """
     target_tactic = state.tactic_reached()
+    infeasible = infeasible or set()
     new_ids: list[str] = []
     if role == "red":
         # IDEATION: let the attack LLM invent brand-new actions for this stage first, so
@@ -402,11 +439,13 @@ def generate_candidates(role: str, state: CyberState, memory: dict, k: int = 4, 
         if allow_novel and llm is not None and getattr(llm, "available", False):
             new_ids = propose_new_techniques(state, memory, llm, objective, target_tactic,
                                              persist_path=persist_path)
+        # exclude techniques that are impossible in THIS environment (pruned once, not
+        # re-offered and SKIPped every step).
         all_unexec = [
             {"role": "red", "tech_id": tid, "name": info.get("name", tid),
              "tactics": info.get("tactics", [])}
             for tid, info in memory.items()
-            if tid not in state.executed
+            if tid not in state.executed and tid not in infeasible
         ]
         # STAGED kill chain WITH PRECONDITIONS: only offer techniques for the stage red
         # is currently on, and only if red actually HOLDS that stage's prerequisite
@@ -814,9 +853,10 @@ class MCTS:
                  n_sims: int = 64, c_uct: float = 1.4, rng: Optional[random.Random] = None,
                  llm=None, learned_covered=None, evasive: bool = False,
                  objective: Optional["Objective"] = None,
-                 allow_novel: bool = False, generated_path=None):
+                 allow_novel: bool = False, generated_path=None, infeasible=None):
         self.memory = memory
         self.priors = action_priors or {}
+        self.infeasible = infeasible if infeasible is not None else set()
         self.n_sims = n_sims
         self.c_uct = c_uct
         self.rng = rng or random.Random(0)
@@ -844,7 +884,8 @@ class MCTS:
                                          evasive=self.evasive and role == "red",
                                          objective=self.objective, focus_tid=focus_tid,
                                          allow_novel=allow_novel,
-                                         persist_path=self.generated_path)
+                                         persist_path=self.generated_path,
+                                         infeasible=self.infeasible)
         if not candidates:
             return {}, 0.0
         N = {i: 0 for i in range(len(candidates))}
@@ -1671,7 +1712,8 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
                 rng: Optional[random.Random] = None, llm=None, learned_covered=None,
                 evasive: bool = False, benign_rate: int = 4,
                 enforce_consistency: bool = False,
-                mismatch_hints: Optional[dict] = None) -> Trajectory:
+                mismatch_hints: Optional[dict] = None,
+                infeasible: Optional[set] = None) -> Trajectory:
     """One red-vs-blue self-play episode. BOTH agents use MCTS to choose actions,
     the LLM turns them into concrete commands, and both actually run against the
     Target (attack / mitigation). Blue can DEPLOY detection rules, which grow
@@ -1703,8 +1745,11 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
     conf = {"tp": 0, "fp": 0, "fn": 0, "tn": 0}
     fp_base = float(os.environ.get("BLUE_FP_RATE", "0.03"))  # blue's baseline false-alarm rate
     mismatch_hints = dict(mismatch_hints or {})
+    if infeasible is None:
+        infeasible = set()
     consistency_tally = {"checked": 0, "consistent": 0, "mismatch": 0, "skipped": 0}
     episode_mismatches: list[dict] = []
+    pruned_this_episode: list[str] = []
     for _ in range(max_steps):
         # clean the firewall BEFORE each attack so the attack reaches the target and Wazuh
         # can SEE it (detection) -- then blue's block only applies to the re-probe (containment).
@@ -1752,22 +1797,29 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
         red_action = llm_enrich_action(red_action, state, memory, llm=llm, target_ip=tgt_ip,
                                        objective=objective, mismatch_hints=mismatch_hints,
                                        stage=state.tactic_reached())
-        # LLM may judge a specific technique unperformable against this target -> SKIP: record
-        # it (no fake execution) and let MCTS try a DIFFERENT technique on this stage next step.
+        # LLM may judge a technique unperformable against this target -> that is an
+        # ENVIRONMENT limitation (not an execution failure), so PRUNE it: add it to the
+        # infeasible set (shared with the MCTS + persisted) so it is removed from the
+        # attack surface and never offered again this run or in future runs.
         if (red_action.get("command") or "").strip().upper() == "SKIP":
-            executed = tuple(sorted(set(state.executed) | {red_action["tech_id"]}))
+            tid = red_action["tech_id"]
+            executed = tuple(sorted(set(state.executed) | {tid}))
             consistency_tally["skipped"] += 1
+            if tid is not None and tid not in infeasible:
+                infeasible.add(tid)
+                pruned_this_episode.append(tid)
             traj.steps.append({
                 "role": "red", "state": asdict(state), "action": red_action,
                 "result": {"success": False, "stdout": ""}, "skipped": True,
+                "pruned": True,  # removed from the attack surface (environment-infeasible)
                 "stage": state.tactic_reached(), "detected": False, "mitigated": False,
                 "advanced": False, "consistent": True,
-                "consistency": {"consistent": True, "match_reason": "llm-skip", "issues": [],
+                "consistency": {"consistent": True, "match_reason": "env-infeasible", "issues": [],
                                 "skipped": True},
                 "capabilities": list(state.capabilities), "reward": 0.0,
             })
             print(f"  [step {state.step:>2}] stage={state.tactic_reached():<20} "
-                  f"{red_action.get('tech_id')} -> SKIPPED (LLM: not performable here)")
+                  f"{tid} -> PRUNED (environment-infeasible, removed from attack surface)")
             state = CyberState(executed=executed, detected=state.detected,
                                defended=state.defended, capabilities=state.capabilities,
                                foothold=state.foothold, flag=state.flag, step=state.step + 1)
@@ -2010,6 +2062,9 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
         "stages_cleared": stages_cleared,   # ordered kill-chain stages red actually completed
         "kill_chain": list(_TACTIC_ORDER),
         "confusion": conf,
+        # techniques pruned this episode as environment-infeasible (removed from the surface)
+        "pruned_infeasible": pruned_this_episode,
+        "infeasible_total": len(infeasible),
         # command<->technique consistency for THIS episode (did executions actually perform
         # the techniques they claimed?) + the mismatches carried forward for next-episode fix.
         "consistency": {
@@ -2027,7 +2082,7 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
 def load_state(out_dir: str) -> dict:
     """Load persisted learning state (priors + blue-deployed coverage) from a prior run."""
     empty = {"red_priors": {}, "blue_priors": {}, "learned_covered": [], "runs": 0,
-             "history": [], "mismatch_hints": {}}
+             "history": [], "mismatch_hints": {}, "infeasible": []}
     path = os.path.join(out_dir, "state.json")
     if not os.path.exists(path):
         return dict(empty)
@@ -2044,12 +2099,13 @@ def load_state(out_dir: str) -> dict:
 
 def save_state(out_dir: str, red_priors: dict, blue_priors: dict,
                learned_covered: set, runs: int, history: list,
-               mismatch_hints: Optional[dict] = None) -> None:
+               mismatch_hints: Optional[dict] = None, infeasible: Optional[set] = None) -> None:
     Path(out_dir).mkdir(parents=True, exist_ok=True)
     with open(os.path.join(out_dir, "state.json"), "w", encoding="utf-8") as f:
         json.dump({"red_priors": red_priors, "blue_priors": blue_priors,
                    "learned_covered": sorted(learned_covered), "runs": runs,
-                   "history": history, "mismatch_hints": mismatch_hints or {}},
+                   "history": history, "mismatch_hints": mismatch_hints or {},
+                   "infeasible": sorted(infeasible or [])},
                   f, ensure_ascii=False, indent=2)
 
 
@@ -2075,6 +2131,14 @@ def run_closed_loop(iterations: int = 3, ctf_name: Optional[str] = None,
     # command<->technique mismatches accumulated across runs -> steer next episodes to
     # faithful, technique-appropriate commands (self-correction feedback).
     mismatch_hints: dict = dict(state0.get("mismatch_hints", {}) or {})
+    # environment-infeasible techniques: a STATIC set for this profile (phishing, supply
+    # chain, physical, wireless, cloud, ... -- capabilities this range lacks) UNION the
+    # ones the LLM pruned in earlier runs. Red never wastes steps re-offering/ SKIPping them.
+    static_infeasible = environment_infeasible(memory, profile)
+    infeasible: set = set(state0.get("infeasible", []) or []) | static_infeasible
+    print(f"[pipeline] environment-infeasible techniques pruned from attack surface: "
+          f"{len(infeasible)} ({len(static_infeasible)} static for '{profile}', "
+          f"{len(infeasible) - len(static_infeasible)} learned)")
     learned_at_start = len(learned_covered)
     if prior_runs and not fresh:
         print(f"[pipeline] resumed from {out_dir}/state.json: runs={prior_runs}, "
@@ -2113,22 +2177,26 @@ def run_closed_loop(iterations: int = 3, ctf_name: Optional[str] = None,
                             llm=llm, learned_covered=learned_covered, evasive=evasive,
                             objective=objective,
                             allow_novel=bool(expand and llm is not None and getattr(llm, "available", False)),
-                            generated_path=str(_GENERATED_OVERLAY))
+                            generated_path=str(_GENERATED_OVERLAY), infeasible=infeasible)
             blue_mcts = MCTS(memory, action_priors=blue_priors, rng=random.Random(seed + 100 + it),
-                             llm=llm, learned_covered=learned_covered, objective=objective)
+                             llm=llm, learned_covered=learned_covered, objective=objective,
+                             infeasible=infeasible)
             traj = run_episode(memory, target, red_mcts, blue_mcts, defense,
                                dry_run=dry_run, rng=rng, llm=llm, learned_covered=learned_covered,
                                evasive=evasive, benign_rate=benign_rate, max_steps=max_steps,
-                               enforce_consistency=enforce_consistency, mismatch_hints=mismatch_hints)
+                               enforce_consistency=enforce_consistency, mismatch_hints=mismatch_hints,
+                               infeasible=infeasible)
             all_traj.append(traj)
             # carry this episode's command<->technique corrections into the NEXT episode
             mismatch_hints = dict(traj.meta.get("mismatch_hints", mismatch_hints) or {})
             cs = traj.meta.get("consistency", {}) or {}
+            newly_pruned = traj.meta.get("pruned_infeasible", [])
             print(f"[iter {it}] steps={len(traj.steps)} "
                   f"red_return={traj.red_return:.2f} blue_return={traj.blue_return:.2f} "
                   f"| consistency={cs.get('consistent', 0)}/{cs.get('checked', 0)} "
                   f"mismatch={cs.get('mismatch', 0)} skipped={cs.get('skipped', 0)}"
-                  f"{' (enforced)' if cs.get('enforced') else ''}")
+                  f"{' (enforced)' if cs.get('enforced') else ''}"
+                  f"{f' | pruned+{len(newly_pruned)} (infeasible, total {len(infeasible)})' if newly_pruned else ''}")
 
             # live: apply blue-authored Wazuh rules so NEXT iteration can really detect them
             if not dry_run and hasattr(target, "flush_rules"):
@@ -2182,7 +2250,7 @@ def run_closed_loop(iterations: int = 3, ctf_name: Optional[str] = None,
 
     # persist learned state so the NEXT run resumes and keeps evolving
     save_state(out_dir, red_priors, blue_priors, learned_covered, prior_runs + 1, history,
-               mismatch_hints=mismatch_hints)
+               mismatch_hints=mismatch_hints, infeasible=infeasible)
     print(f"[pipeline] saved state.json: runs={prior_runs + 1}, "
           f"blue rules={learned_n} | coverage target={100*(base_covered+learned_n)/max(target_total,1):.1f}% "
           f"dataset={100*(base_covered+learned_n)/max(dataset_total,1):.1f}%")

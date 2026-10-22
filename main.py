@@ -130,6 +130,13 @@ def parse_args():
                     help="Ignore saved state.json and start learning from scratch")
     ap.add_argument("--skip-coverage", action="store_true")
     ap.add_argument("--skip-train-hint", action="store_true")
+    ap.add_argument("--skip-reasoning", action="store_true",
+                    help="do not print the per-benchmark reasoning scores "
+                         "(IFEval/GPQA/LiveCodeBench-v5/AIME 2025)")
+    ap.add_argument("--reasoning-results",
+                    default=os.environ.get("REASONING_RESULTS",
+                                           os.path.join("output", "reasoning", "reasoning_results.json")),
+                    help="per-benchmark reasoning results JSON to read")
     ap.add_argument("--evasive", action="store_true",
                     help="Run ONE stealth campaign that blends into benign log noise and "
                          "prefers low-signal (uncovered) techniques, instead of a fresh "
@@ -172,6 +179,12 @@ def main():
     if os.path.exists(traj_path):
         import metrics as _metrics
         _metrics.load_and_report(traj_path, args.out_dir)
+
+    # general-reasoning benchmarks, reported PER BENCHMARK (IFEval / GPQA /
+    # LiveCodeBench-v5 / AIME 2025) to the console.
+    if not args.skip_reasoning:
+        import reasoning_eval as _reason
+        _reason.print_reasoning_scores(path=args.reasoning_results)
 
     if not args.skip_train_hint:
         step_train_hint(args)
