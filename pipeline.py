@@ -466,9 +466,15 @@ def generate_candidates(role: str, state: CyberState, memory: dict, k: int = 4, 
                 if pool:
                     break
         if not pool:
-            # current stage has no untried technique AND we may not skip: retry the
-            # current stage's techniques (campaign stalls here rather than faking progress).
-            pool = [a for a in all_unexec if _on_stage(a, target_tactic)] or all_unexec
+            # Current stage is exhausted of UNTRIED techniques and no reachable look-ahead.
+            # Retry THIS stage's own techniques (including already-executed ones) so red keeps
+            # pushing the stage it is stuck on. Do NOT fall back to all_unexec: offering
+            # unrelated off-stage techniques here just gets them SKIPped and wrongly pruned
+            # as environment-infeasible (removing techniques later stages still need).
+            pool = [{"role": "red", "tech_id": tid, "name": info.get("name", tid),
+                     "tactics": info.get("tactics", [])}
+                    for tid, info in memory.items()
+                    if target_tactic in (info.get("tactics") or []) and tid not in infeasible]
         pool.sort(key=lambda a: a["tech_id"])
         if evasive:
             # EVASIVE campaign: among the stage's techniques, prefer the lowest-signal
@@ -1798,28 +1804,35 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
                                        objective=objective, mismatch_hints=mismatch_hints,
                                        stage=state.tactic_reached())
         # LLM may judge a technique unperformable against this target -> that is an
-        # ENVIRONMENT limitation (not an execution failure), so PRUNE it: add it to the
-        # infeasible set (shared with the MCTS + persisted) so it is removed from the
-        # attack surface and never offered again this run or in future runs.
+        # ENVIRONMENT limitation (not an execution failure). PRUNE it permanently ONLY when
+        # it was offered FOR ITS OWN STAGE (the current kill-chain stage is in its tactics):
+        # then "not performable here" means "not performable in this environment". An
+        # off-stage technique that happens to be offered is just "not performable at THIS
+        # stage yet" and must NOT be pruned (it may be valid later), so it is only skipped.
         if (red_action.get("command") or "").strip().upper() == "SKIP":
             tid = red_action["tech_id"]
+            cur_stage = state.tactic_reached()
+            on_stage_skip = cur_stage in (red_action.get("tactics") or [])
             executed = tuple(sorted(set(state.executed) | {tid}))
             consistency_tally["skipped"] += 1
-            if tid is not None and tid not in infeasible:
+            pruned = False
+            if on_stage_skip and tid is not None and tid not in infeasible:
                 infeasible.add(tid)
                 pruned_this_episode.append(tid)
+                pruned = True
             traj.steps.append({
                 "role": "red", "state": asdict(state), "action": red_action,
                 "result": {"success": False, "stdout": ""}, "skipped": True,
-                "pruned": True,  # removed from the attack surface (environment-infeasible)
-                "stage": state.tactic_reached(), "detected": False, "mitigated": False,
+                "pruned": pruned,  # True only if removed from the attack surface
+                "stage": cur_stage, "detected": False, "mitigated": False,
                 "advanced": False, "consistent": True,
-                "consistency": {"consistent": True, "match_reason": "env-infeasible", "issues": [],
-                                "skipped": True},
+                "consistency": {"consistent": True,
+                                "match_reason": "env-infeasible" if pruned else "off-stage-skip",
+                                "issues": [], "skipped": True},
                 "capabilities": list(state.capabilities), "reward": 0.0,
             })
-            print(f"  [step {state.step:>2}] stage={state.tactic_reached():<20} "
-                  f"{tid} -> PRUNED (environment-infeasible, removed from attack surface)")
+            tag = "PRUNED (environment-infeasible)" if pruned else "skipped (off-stage, not pruned)"
+            print(f"  [step {state.step:>2}] stage={cur_stage:<20} {tid} -> {tag}")
             state = CyberState(executed=executed, detected=state.detected,
                                defended=state.defended, capabilities=state.capabilities,
                                foothold=state.foothold, flag=state.flag, step=state.step + 1)
