@@ -47,6 +47,21 @@ SYSTEM_PROMPT = {
     }
 }
 
+# System prompt for the BLUE defense policy's GRPO rows. The reward (reward.py
+# reward_func_for_blue_defense) scores the produced command for being a TARGETED,
+# effective, NON-BLANKET containment of the given attack -- so training optimises real
+# host remediation, not a generic 'safe answer'.
+BLUE_DEFENSE_SYSTEM = (
+    "task:blue You are a blue-team incident responder with root shell on the victim host "
+    "(Flask web app on tcp:5000 + Postgres 'bank-db'). Given a detected attack, output ONE "
+    "attack-specific shell command that stops THAT attack on re-test while keeping the service "
+    "available -- e.g. a WAF rule matching the payload, revoking the exact DB privilege abused, "
+    "or the app's hot patch `touch /var/lib/bank-web/patch_<endpoint>` (endpoint=transactions|login) "
+    "which switches that endpoint to injection-safe parameterized queries with no downtime. Never "
+    "block all traffic/a whole port or source, never stop or kill the service (such blanket "
+    "actions are rejected). Respond EXACTLY as 'CMD: <command>'."
+)
+
 try:
     from dataset.dataset_loader import load_attack_dataset  # shared memory box
 except Exception:  # pragma: no cover - dataset package import guard
@@ -708,7 +723,8 @@ def defense_is_blanket(command: str) -> tuple[bool, str]:
 
 def llm_enrich_defense(defense: dict, state: CyberState, memory: dict, llm=None,
                        target_ip: str = "target", attack_command: str = "",
-                       attacker_ip: str = "", wazuh_desc: str = "") -> dict:
+                       attacker_ip: str = "", wazuh_desc: str = "",
+                       attempts_memory: Optional[list] = None) -> dict:
     """Ask the LLM to REASON about the detected attack and pick a TARGETED mitigation that
     neutralizes THIS specific technique -- a host WAF rule on the attack's payload signature,
     revoking the abused DB privilege, locking an account, killing a specific malicious process,
@@ -746,18 +762,30 @@ def llm_enrich_defense(defense: dict, state: CyberState, memory: dict, llm=None,
               "retried, while keeping the service available to everyone else. It MUST be "
               "attack-specific (e.g. a WAF rule matching the attack's payload, revoking the exact "
               "DB privilege it abuses, locking the targeted account, killing the specific malicious "
-              "process, removing the malicious file). You MUST NOT take the service down or block "
-              "broadly: no stopping/killing the web or DB service, no dropping all traffic or a "
-              "whole port/source, no default-DROP policy -- such blanket or availability-harming "
-              "actions are REJECTED and count as no defense. Output the real command (not "
-              "pseudo-code); if no attack-specific host fix exists, reply EXACTLY 'CMD: NODEF'. "
+              "process, removing the malicious file). The app also supports a HOT PATCH you can "
+              "enable without downtime: creating the sentinel file `/var/lib/bank-web/patch_<endpoint>` "
+              "(endpoint = `transactions` or `login`) switches that endpoint to injection-safe "
+              "parameterized queries. You MUST NOT take the service down or block broadly: no "
+              "stopping/killing the web or DB service, no dropping all traffic or a whole "
+              "port/source, no default-DROP policy -- such blanket or availability-harming actions "
+              "are REJECTED and count as no defense. Output the real command (not pseudo-code); if "
+              "no attack-specific host fix exists, reply EXACTLY 'CMD: NODEF'. "
               "Respond EXACTLY as: 'CMD: <command>' then 'WHY: <rationale>'.")
+    # ITERATIVE REASONING MEMORY: prior attempts this incident that did NOT work, so the
+    # agent reasons toward a DIFFERENT, more specific action instead of repeating a rejected
+    # blanket ban or an ineffective command.
+    tried = ""
+    if attempts_memory:
+        lines = "\n".join(f"  - tried `{a.get('command','')}` -> {a.get('outcome','')}"
+                          for a in attempts_memory[-5:])
+        tried = ("\nYour PREVIOUS attempts this incident FAILED -- do NOT repeat them; reason "
+                 f"toward a different, more specific fix:\n{lines}")
     user = (f"Detected technique: {defense['tech_id']} ({info.get('name')}).\n"
             f"Attacker command observed in the logs: {attack_command or 'n/a'}\n"
             f"Wazuh alert: {wazuh_desc or 'n/a'}\n"
             f"Attacker source IP: {attacker_ip or 'unknown'}\n"
             f"SIEM detection context (ATT&CK data): {strat}\n"
-            f"Defenses already applied this engagement: {list(state.defended)}")
+            f"Defenses already applied this engagement: {list(state.defended)}{tried}")
     text = llm.complete(user, system=system)
     cmd = fallback_cmd
     why = ""
@@ -1425,6 +1453,20 @@ class FinancialTarget:
                 return line
         return out.strip().splitlines()[0].strip() if out.strip() else ""
 
+    def health_probe(self) -> bool:
+        """Availability check: does bank-web answer a NORMAL request? Used to score real
+        service uptime (not the breach proxy). A legitimate client request from the attacker
+        box to /health; True iff HTTP 200. Blue blanket/service-killing actions make this fail
+        (and are rejected anyway), so availability reflects genuine uptime under the engagement."""
+        import redtools
+        url = f"http://{self.WEB_DMZ_IP}:5000/health"
+        cmd = f'curl -s -m 5 -o /dev/null -w "%{{http_code}}" {url}'
+        try:
+            out = (redtools.run_command(cmd, container=self.attacker_container) or "").strip()
+        except Exception:
+            return False
+        return out.endswith("200")
+
     # ---- target interface (matches DockerTarget) ----
     def target_ip(self) -> str:
         return self.WEB_DMZ_IP
@@ -1705,7 +1747,9 @@ def export_grpo_dataset(trajectories: list[Trajectory], out_path: str, role: str
     rows = []
     for traj in trajectories:
         for st in traj.steps:
-            if st.get("role") != role or st.get("skipped"):
+            # BOTH policies train from the RED steps (the real attacks): red learns to
+            # generate the next attack; blue learns to produce a mitigation for that attack.
+            if st.get("role") != "red" or st.get("skipped"):
                 continue  # skipped stages were not executed -> no training row
             action = st.get("action", {}) or {}
             tid = action.get("tech_id")
@@ -1743,15 +1787,26 @@ def export_grpo_dataset(trajectories: list[Trajectory], out_path: str, role: str
                     "tech_id": tid,
                     "mcts_reward": float(st.get("reward", 0.0)),  # analytics only; GRPO ignores it
                 })
-            else:  # blue -> qa-positive (safe responder)
-                attack = (
-                    f"An attacker is attempting {tid} ({name}) against a financial-system host. "
-                    f"Explain, as a defender, how to detect and contain this safely."
+            else:  # blue -> DEFENSE policy: produce a targeted mitigation for the real attack
+                atk_cmd = action.get("command", "") or ""
+                sig = _defense_signature(atk_cmd)
+                alert_desc = ((st.get("wazuh") or {}).get("event", {}) or {}).get("description", "")
+                user = (
+                    f"A {tid} ({name}) attack was DETECTED on bank-web (Flask on tcp:5000 backed by "
+                    f"Postgres 'bank-db').\n"
+                    f"Attacker command observed: {atk_cmd or 'n/a'}\n"
+                    f"Wazuh alert: {alert_desc or 'n/a'}\n"
+                    f"Produce ONE attack-specific shell mitigation that stops THIS attack on re-test "
+                    f"while keeping the service available (e.g. a WAF rule matching the payload, "
+                    f"revoking the exact DB privilege it abuses, locking the targeted account, "
+                    f"killing the specific malicious process). Do NOT block all traffic/a whole "
+                    f"port/source and do NOT stop the service. Respond EXACTLY as 'CMD: <command>'."
                 )
                 rows.append({
-                    "prompt": [{"role": "system", "content": SYSTEM_PROMPT["en"]["qa"]},
-                               {"role": "user", "content": attack}],
-                    "ground_truth": "P",  # a helpful, safe defensive answer is the positive class
+                    "prompt": [{"role": "system", "content": BLUE_DEFENSE_SYSTEM},
+                               {"role": "user", "content": user}],
+                    "attack_command": atk_cmd,     # scored by reward_func_for_blue_defense
+                    "attack_signature": sig,
                     "topic": topic,
                     "tech_id": tid,
                     "mcts_reward": float(st.get("reward", 0.0)),  # analytics only; GRPO ignores it
@@ -1813,7 +1868,8 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
                 enforce_consistency: bool = False,
                 mismatch_hints: Optional[dict] = None,
                 infeasible: Optional[set] = None,
-                red_llm=None, blue_llm=None) -> Trajectory:
+                red_llm=None, blue_llm=None,
+                match_seconds: Optional[float] = None) -> Trajectory:
     """One red-vs-blue self-play episode. BOTH agents use MCTS to choose actions,
     the LLM turns them into concrete commands, and both actually run against the
     Target (attack / mitigation). Blue can DEPLOY detection rules, which grow
@@ -1855,6 +1911,16 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
     consistency_tally = {"checked": 0, "consistent": 0, "mismatch": 0, "skipped": 0}
     episode_mismatches: list[dict] = []
     pruned_this_episode: list[str] = []
+    # TIMED MATCH: like an A/D CTF round, the match runs for a wall-clock budget (env
+    # MATCH_SECONDS, e.g. 900 = 15 min). 0/None -> time limit off (bounded only by max_steps).
+    import time as _time
+    if match_seconds is None:
+        match_seconds = float(os.environ.get("MATCH_SECONDS", "0") or 0)
+    match_start = _time.time()
+    # AVAILABILITY: real service-uptime probes taken through the match (live only); each
+    # bool = did bank-web answer a normal request. Availability Points are scored from these.
+    availability_samples: list[bool] = []
+    can_probe = (not dry_run) and hasattr(target, "health_probe")
     # DEFENSE PERSISTENCE: clean the firewall/rules ONCE at the start of the match (a fresh
     # slate per match), NOT before every step. Within the match blue's mitigations PERSIST
     # and accumulate, so a contained technique stays contained and red must find a different
@@ -1862,6 +1928,16 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
     if not dry_run and hasattr(target, "reset_defenses"):
         target.reset_defenses()
     for _ in range(max_steps):
+        # TIMED MATCH: stop when the wall-clock budget is spent (A/D CTF round length).
+        if match_seconds and (_time.time() - match_start) > match_seconds:
+            print(f"  [episode] match time budget ({match_seconds:.0f}s) reached -> ending match.")
+            break
+        # AVAILABILITY PROBE: sample real service uptime at the start of each turn.
+        if can_probe:
+            try:
+                availability_samples.append(bool(target.health_probe()))
+            except Exception:
+                availability_samples.append(False)
         # 0) HONEST SKIP of adversary-side prep tactics. When consistency is enforced (LLM
         #    runs produce real commands), a tactic that is never performed against the victim
         #    (e.g. resource-development) is SKIPPED -- the stage advances and grants its
@@ -2005,52 +2081,68 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
         mid_state = CyberState(executed=executed, detected=det, defended=state.defended,
                                foothold=state.foothold, step=state.step)
 
-        # 3) BLUE: MCTS picks a defense for the LIVE incoming attack (focus_tid = the
-        #    technique red just used), LLM makes it a mitigation command, apply it.
-        #    A defense on an uncovered technique DEPLOYS a detection rule (coverage++).
-        defense_action, _ = blue_mcts.search(mid_state, role="blue",
-                                             focus_tid=red_action["tech_id"])
+        # 3+4) BLUE as an ITERATIVE REMEDIATION AGENT (tool loop + reasoning + memory):
+        #    MCTS picks which live technique to defend (focus_tid); blue then tries up to
+        #    BLUE_MAX_TRIES attack-specific mitigations, each APPLIED on the host and VERIFIED
+        #    by re-probing the SAME attack. It REMEMBERS what failed (a rejected blanket ban or
+        #    an applied-but-ineffective command) and reasons toward a different, more specific
+        #    fix next try. Containment counts ONLY when the re-probe confirms the attack no
+        #    longer works (not detection, not a blanket wall).
+        base_defense, _ = blue_mcts.search(mid_state, role="blue",
+                                           focus_tid=red_action["tech_id"])
+        defense_action = base_defense
         applied = False
         rule_deployed = False
-        if defense_action and defense_action.get("tech_id") is not None:
-            defense_action = llm_enrich_defense(
-                defense_action, mid_state, memory, llm=blue_llm, target_ip=tgt_ip,
-                attack_command=red_action.get("command", ""),
-                attacker_ip=(target.attacker_ip() if hasattr(target, "attacker_ip") else ""),
-                wazuh_desc=str((ctx or {}).get("event", {}).get("description", "")))
-            # the defender may reason that no host action can neutralise this attack (NODEF):
-            # then nothing is applied -> no containment this step (an honest defensive miss).
-            if (defense_action.get("command") or "").strip().upper() == "NODEF":
-                dres = {"applied": False, "stdout": "[blue] no viable host mitigation (NODEF)"}
-            else:
-                dres = target.defend(defense_action)
-            applied = dres.get("applied", False)
-            if applied and defense_action.get("deploy_rule"):
-                # blue authored a new Wazuh rule -> this technique is now detectable
-                tid = defense_action["tech_id"]
-                if tid not in learned_covered:
-                    learned_covered.add(tid)
-                    rule_deployed = True
-                    # live: author a REAL Wazuh rule (applied at the iteration boundary),
-                    # matching the attacker's actual command so it detects the same TTP next round
-                    if not dry_run and hasattr(target, "deploy_wazuh_rule"):
-                        target.deploy_wazuh_rule(tid, defense_action.get("name", tid),
-                                                 red_action.get("command", ""))
-
-        # 4) VERIFY the defense: re-attempt the same attack. Containment counts ONLY if
-        #    the attack no longer succeeds after the defense (reliable, ground-truth
-        #    criterion), not merely because the mitigation command ran. The blue MCTS
-        #    already targets the LIVE technique (focus_tid), so we do NOT additionally
-        #    require the defense's tech_id to equal red's -- the re-probe is the real test
-        #    and a strict id match only produced false negatives (blue blocked the attacker
-        #    but it was not scored as contained).
         mitigated = False
         reverified = None
-        if (applied and defense_action and defense_action.get("tech_id") is not None
-                and result["success"]):
-            reprobe = target.run(red_action, defended=True)
-            reverified = not reprobe["success"]
-            mitigated = bool(reverified)
+        attempts_memory: list[dict] = []
+        if base_defense and base_defense.get("tech_id") is not None:
+            max_tries = max(1, int(os.environ.get("BLUE_MAX_TRIES", "3")))
+            for _try in range(max_tries):
+                defense_action = llm_enrich_defense(
+                    dict(base_defense), mid_state, memory, llm=blue_llm, target_ip=tgt_ip,
+                    attack_command=red_action.get("command", ""),
+                    attacker_ip=(target.attacker_ip() if hasattr(target, "attacker_ip") else ""),
+                    wazuh_desc=str((ctx or {}).get("event", {}).get("description", "")),
+                    attempts_memory=attempts_memory)
+                cmd = (defense_action.get("command") or "").strip()
+                if cmd.upper() == "NODEF":          # blue judges no host fix exists
+                    attempts_memory.append({"command": "NODEF", "outcome": "gave up (no host fix)"})
+                    break
+                dres = target.defend(defense_action)
+                if not dres.get("applied", False):  # rejected (blanket/disruptive) or errored
+                    attempts_memory.append({"command": cmd[:120],
+                        "outcome": "rejected/failed: " + str(dres.get("rejected") or "command error")})
+                    continue
+                applied = True
+                if defense_action.get("deploy_rule"):   # author a real Wazuh detection rule once
+                    tid = defense_action["tech_id"]
+                    if tid not in learned_covered:
+                        learned_covered.add(tid)
+                        rule_deployed = True
+                        if not dry_run and hasattr(target, "deploy_wazuh_rule"):
+                            target.deploy_wazuh_rule(tid, defense_action.get("name", tid),
+                                                     red_action.get("command", ""))
+                if not result["success"]:
+                    break   # the attack did not succeed; blue has acted, nothing to contain
+                reprobe = target.run(red_action, defended=True)   # ground-truth containment test
+                # Containment = the attack no longer achieves its effect on re-test. A WAF drop
+                # makes the re-probe fail outright; a patch/DB-revoke keeps the endpoint UP (200)
+                # but the attack no longer yields the secret -- that is ALSO containment (and it
+                # preserves availability). So if the original attack leaked the objective, require
+                # the re-probe to no longer leak it.
+                still = bool(reprobe.get("success"))
+                _vf = getattr(target, "verify_flag", None)
+                if _vf and _vf(result.get("stdout", "")):
+                    still = still and _vf(reprobe.get("stdout", ""))
+                if not still:
+                    reverified = True
+                    mitigated = True
+                    break
+                attempts_memory.append({"command": cmd[:120],
+                                        "outcome": "applied but the attack still succeeded"})
+            if applied and result["success"] and not mitigated:
+                reverified = False
         defd = tuple(sorted(set(state.defended) |
                             ({defense_action["tech_id"]} if (applied and defense_action and defense_action.get("tech_id")) else set())))
         # STAGED progression: a stage is cleared only by an ON-STAGE technique that
@@ -2151,6 +2243,8 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
                 "applied": bool(applied), "mitigated": bool(mitigated),
                 "verified": reverified,  # True/False if a re-probe confirmed the block; None if not tested
                 "rule_deployed": bool(rule_deployed), "reward": round(blue_reward, 3),
+                "tries": len(attempts_memory) + (1 if mitigated else 0),  # remediation attempts
+                "attempts": attempts_memory,   # agent loop memory (what failed before success)
             })
 
         # Per-step execution summary (ordered account of what actually happened this
@@ -2200,6 +2294,11 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
         "stages_cleared": stages_cleared,   # ordered kill-chain stages red actually completed
         "kill_chain": list(_TACTIC_ORDER),
         "confusion": conf,
+        # real service-uptime samples taken during the match (live); Availability Points are
+        # scored from these when present (else the breach proxy is used for dry-run).
+        "availability_samples": availability_samples,
+        "match_seconds": match_seconds,
+        "match_elapsed": round(_time.time() - match_start, 1),
         # techniques pruned this episode as environment-infeasible (removed from the surface)
         "pruned_infeasible": pruned_this_episode,
         "infeasible_total": len(infeasible),
@@ -2293,7 +2392,7 @@ def close_grpo_loop(iteration: int, out_dir: str, red_jsonl: str, blue_jsonl: st
     import subprocess as _sp, sys as _sys
     model_default = os.environ.get("QWEN_MODEL", "Qwen/Qwen3-8B")
     reward_url = os.environ.get("REWARD_MODEL_URL") or os.environ.get("QWEN_ENDPOINT") or ""
-    for role, mode, ds in (("red", "red", red_jsonl), ("blue", "qa-positive", blue_jsonl)):
+    for role, mode, ds in (("red", "red", red_jsonl), ("blue", "blue", blue_jsonl)):
         if not (ds and os.path.exists(ds)):
             print(f"[grpo] {role}: dataset {ds} missing -> skip"); continue
         ckpt = os.path.join(out_dir, "checkpoints", f"{role}_iter{iteration}")

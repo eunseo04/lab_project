@@ -135,15 +135,23 @@ def episode_scoring(steps: list[dict], meta: dict) -> dict:
     root_flag = bool(objective or "root" in caps)
     own_points = (100 if user_flag else 0) + (200 if root_flag else 0)  # max 300
 
-    # availability: two disjoint windows, each worth up to 100 points
-    half = (attempts + 1) // 2
-    windows = [red[:half], red[half:]]
+    # Availability Points (max 200), two checkpoints x 100. Prefer REAL service-uptime
+    # probes taken during the match (meta.availability_samples: did bank-web answer a normal
+    # request); fall back to the breach proxy only when no probes exist (dry-run).
+    samples = meta.get("availability_samples") or []
 
-    def uptime(seg):
-        if not seg:
-            return 1.0  # no attack in this window -> service fully available
-        return 1.0 - sum(1 for s in seg if breached(s)) / len(seg)
-    availability_points = round(sum(100.0 * uptime(w) for w in windows), 1)  # max 200
+    def _uptime_windows(seq, is_up):
+        if not seq:
+            return [1.0, 1.0]
+        h = (len(seq) + 1) // 2
+        segs = [seq[:h], seq[h:]]
+        return [(sum(1 for x in s if is_up(x)) / len(s)) if s else 1.0 for s in segs]
+
+    if samples:
+        w = _uptime_windows(samples, lambda up: bool(up))          # real uptime probes
+    else:
+        w = _uptime_windows(red, lambda s: not breached(s))        # proxy: not-breached == up
+    availability_points = round(100.0 * w[0] + 100.0 * w[1], 1)    # max 200
 
     return {
         "attempts": attempts,

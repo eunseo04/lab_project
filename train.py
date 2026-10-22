@@ -15,12 +15,13 @@ from reward import (
     RewardModelHandler,
     RewardModelHandlerForRed,
     reward_func_for_eval_model,
+    reward_func_for_blue_defense,
 )
 
 def parse_args():
     parser = argparse.ArgumentParser(description="GRPO Self-RL Training Script")
 
-    parser.add_argument("--mode", type=str, default="qa-positive", choices=["qa-positive", "red", "eval"], help="Training mode, can be qa-positive, red, or eval.")
+    parser.add_argument("--mode", type=str, default="qa-positive", choices=["qa-positive", "red", "eval", "blue"], help="Training mode: qa-positive, red, eval, or blue (targeted-defense reward).")
     parser.add_argument('--iteration', type=int, default=1, help='Training iteration number, used for splitting and selecting dataset')
     parser.add_argument("--fsdp", type=lambda x: x.lower() == "true", help="Use FSDP for distributed training.", default=False)
     parser.add_argument('--deepspeed_config', type=str, default=None, help='Use DeepSpeed for distributed training.')
@@ -111,10 +112,12 @@ def main():
     if args.fsdp and args.deepspeed_config is not None:
         raise ValueError("Cannot use both FSDP and DeepSpeed. Please choose one.")
     
-    if len(args.qa_model_url) != len(args.qa_model_name):
-        raise ValueError("Length of qa_model_url must match length of qa_model_name.")
-    if len(args.eval_model_url) != len(args.eval_model_name):
-        raise ValueError("Length of eval_model_url must match length of eval_model_name.")
+    # blue mode uses a deterministic targeted-defense reward and needs no QA/eval judge models.
+    if args.mode != "blue":
+        if len(args.qa_model_url) != len(args.qa_model_name):
+            raise ValueError("Length of qa_model_url must match length of qa_model_name.")
+        if len(args.eval_model_url) != len(args.eval_model_name):
+            raise ValueError("Length of eval_model_url must match length of eval_model_name.")
     
     
     if args.deepspeed_config is None and not args.fsdp:
@@ -235,6 +238,10 @@ def main():
         )
     elif args.mode == "eval":
         reward_func = reward_func_for_eval_model
+
+    elif args.mode == "blue":
+        # realigned defense reward: reward targeted, effective, non-blanket containment
+        reward_func = reward_func_for_blue_defense
 
     elif args.mode == "red":
         reward_func = RewardModelHandlerForRed(

@@ -52,6 +52,27 @@ PAGE = '''
 </form>
 '''
 
+# --- BLUE hot-patch toggle (availability-preserving remediation) ----------------------
+# Blue (root on this host) can PATCH a vulnerable endpoint at runtime by creating a sentinel
+# file -- no restart, service stays up. When patched, the endpoint uses a parameterized query
+# (injection-safe) instead of the vulnerable string-built one. This gives the defender a real,
+# surgical remediation (vs a blanket firewall/service-stop). Checked per request so a blue
+# `touch` takes effect on the next call.
+_PATCH_DIR = os.environ.get("PATCH_DIR", "/var/lib/bank-web")
+try:
+    os.makedirs(_PATCH_DIR, exist_ok=True)  # so blue's `touch <flag>` works without mkdir
+except Exception:
+    pass
+
+
+def _patched(endpoint: str) -> bool:
+    try:
+        return (os.path.exists(os.path.join(_PATCH_DIR, "patched")) or
+                os.path.exists(os.path.join(_PATCH_DIR, f"patch_{endpoint}")))
+    except Exception:
+        return False
+
+
 def connect():
     return psycopg2.connect(**DB)
 
@@ -63,14 +84,16 @@ def index():
 def login():
     username = request.form.get("username", "")
     password = request.form.get("password", "")
-    # Intentionally vulnerable: this endpoint is a CTF attack surface.
-    query = (
-        "SELECT id, username FROM users "
-        f"WHERE username = '{username}' AND password = '{password}'"
-    )
     with connect() as conn:
         with conn.cursor() as cur:
-            cur.execute(query)
+            if _patched("login"):
+                # BLUE patched: parameterized query (injection-safe), service still up.
+                cur.execute("SELECT id, username FROM users "
+                            "WHERE username = %s AND password = %s", (username, password))
+            else:
+                # Intentionally vulnerable: this endpoint is a CTF attack surface.
+                cur.execute("SELECT id, username FROM users "
+                            f"WHERE username = '{username}' AND password = '{password}'")
             row = cur.fetchone()
     if row:
         return jsonify(authenticated=True, user=row[1])
@@ -79,14 +102,16 @@ def login():
 @app.get("/api/transactions")
 def transactions():
     account_id = request.args.get("account_id", "")
-    # Intentionally vulnerable: this endpoint is a CTF attack surface.
-    query = (
-        "SELECT id, account_id, amount, merchant, status "
-        f"FROM transactions WHERE account_id = '{account_id}'"
-    )
     with connect() as conn:
         with conn.cursor() as cur:
-            cur.execute(query)
+            if _patched("transactions"):
+                # BLUE patched: parameterized query (injection-safe), service still up.
+                cur.execute("SELECT id, account_id, amount, merchant, status "
+                            "FROM transactions WHERE account_id = %s", (account_id,))
+            else:
+                # Intentionally vulnerable: this endpoint is a CTF attack surface.
+                cur.execute("SELECT id, account_id, amount, merchant, status "
+                            f"FROM transactions WHERE account_id = '{account_id}'")
             rows = cur.fetchall()
     return jsonify([
         {"id": r[0], "account_id": r[1], "amount": float(r[2]),

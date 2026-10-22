@@ -207,6 +207,91 @@ def reward_func_for_eval_model(prompts: list[list[dict[str, str]]], completions:
     return rewards
 
 
+# ---------------------------------------------------------------------------
+# BLUE defense reward (REALIGNED): reward a TARGETED, effective, NON-BLANKET host
+# mitigation of the given attack -- NOT a generic 'safe' explanation. This is the signal
+# that actually teaches blue to contain attacks (vs the old qa-positive safety judge).
+# ---------------------------------------------------------------------------
+def _blue_extract_cmd(text: str) -> str:
+    """Pull the shell command from a blue completion ('CMD: <cmd>' or the raw line)."""
+    if not text:
+        return ""
+    t = text
+    if "</think>" in t:
+        t = t.rsplit("</think>", 1)[1]
+    for line in t.splitlines():
+        s = line.strip()
+        if s.upper().startswith("CMD:"):
+            return s.split(":", 1)[1].strip()
+    return t.strip().splitlines()[0].strip() if t.strip() else ""
+
+
+def _blue_is_blanket(cmd: str) -> bool:
+    """Blanket/service-disrupting (rejected in the environment) -> must be penalised."""
+    c = (cmd or "").lower()
+    for k in ("systemctl stop", "systemctl disable", "service ", "/etc/init.d", "shutdown",
+              "reboot", "halt", "poweroff", "docker stop", "docker kill", "docker-compose down",
+              "nginx -s stop", "supervisorctl stop", "drop table", "drop database", "truncate ",
+              "rm -rf", "mkfs", "iptables -f", "iptables --flush", "-p input drop", "policy drop",
+              "-p drop"):
+        if k in c:
+            return True
+    if any(k in c for k in ("pkill", "killall", "kill ", "fuser -k")) and \
+       any(p in c for p in ("gunicorn", "uvicorn", "flask", "nginx", "postgres", "app.py",
+                            ":5000", "5000/tcp", "python")):
+        return True
+    if "iptables" in c and ("-j drop" in c or "-j reject" in c):
+        if "-m string" not in c and "--string" not in c:
+            return True
+    return False
+
+
+def reward_func_for_blue_defense(prompts, completions, completion_ids, **kwargs) -> list[float]:
+    """GRPO reward for the BLUE DEFENSE policy. For each generated mitigation command, scored
+    deterministically by how well it is a TARGETED, attack-specific containment:
+      -2.0  empty / unparseable
+      -2.0  blanket block or service disruption (would be rejected; harms availability)
+      -0.5  NODEF (gave up)
+      +0.5  a targeted command (baseline), plus:
+      +2.5  it matches THIS attack's payload/path signature (really stops this attack)
+      +1.0  a real WAF signature rule (iptables -m string --string ...)
+      +1.5  revokes the abused DB privilege (REVOKE ...)
+      +1.0  locks the targeted account
+    Capped at 5.0. `attack_signature`/`attack_command` columns are passed through by GRPO.
+    """
+    logger.info(f'example blue prompt:\n {prompts[0]}')
+    logger.info(f'example blue completion:\n {completions[0]}')
+    sigs = kwargs.get("attack_signature", [""] * len(completions))
+    atks = kwargs.get("attack_command", [""] * len(completions))
+    rewards: list[float] = []
+    for i, completion in enumerate(completions):
+        try:
+            text = completion[0]["content"]
+        except Exception:
+            rewards.append(-2.0); continue
+        cmd = _blue_extract_cmd(text)
+        sig = (sigs[i] if i < len(sigs) else "") or ""
+        if not cmd:
+            rewards.append(-2.0); continue
+        if cmd.strip().upper() == "NODEF":
+            rewards.append(-0.5); continue
+        if _blue_is_blanket(cmd):
+            rewards.append(-2.0); continue
+        lc = cmd.lower()
+        r = 0.5
+        if sig and sig.lower() in lc:
+            r += 2.5
+        if "-m string" in lc and "--string" in lc:
+            r += 1.0
+        if "revoke" in lc:
+            r += 1.5
+        if any(k in lc for k in ("passwd -l", "usermod -l", "usermod --lock", "chage -e 0")):
+            r += 1.0
+        rewards.append(min(r, 5.0))
+    logger.info(f'blue defense rewards: {rewards}')
+    return rewards
+
+
 class RewardModelHandlerForRed(RewardModelHandler):
     """
     RewardModelHandlerForRed is a subclass of RewardModelHandler specifically for handling the reward model
