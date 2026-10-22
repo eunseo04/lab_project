@@ -1761,7 +1761,8 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
                 evasive: bool = False, benign_rate: int = 4,
                 enforce_consistency: bool = False,
                 mismatch_hints: Optional[dict] = None,
-                infeasible: Optional[set] = None) -> Trajectory:
+                infeasible: Optional[set] = None,
+                red_llm=None, blue_llm=None) -> Trajectory:
     """One red-vs-blue self-play episode. BOTH agents use MCTS to choose actions,
     the LLM turns them into concrete commands, and both actually run against the
     Target (attack / mitigation). Blue can DEPLOY detection rules, which grow
@@ -1773,6 +1774,11 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
     the malicious event apart from the benign baseline (precision/recall -> Macro-F1),
     not merely on how often it alarms. Red prefers low-signal (uncovered) techniques,
     so it hides in the noise until blue grows detection coverage to catch up."""
+    # per-role policies (so a GRPO-trained red and blue can diverge); default to the shared
+    # llm when role-specific endpoints are not configured. The detection JUDGE is the blue
+    # (SIEM analyst) policy.
+    red_llm = red_llm if red_llm is not None else llm
+    blue_llm = blue_llm if blue_llm is not None else llm
     rng = rng or random.Random(2)
     if learned_covered is None:
         learned_covered = set()
@@ -1798,13 +1804,13 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
     consistency_tally = {"checked": 0, "consistent": 0, "mismatch": 0, "skipped": 0}
     episode_mismatches: list[dict] = []
     pruned_this_episode: list[str] = []
+    # DEFENSE PERSISTENCE: clean the firewall/rules ONCE at the start of the match (a fresh
+    # slate per match), NOT before every step. Within the match blue's mitigations PERSIST
+    # and accumulate, so a contained technique stays contained and red must find a different
+    # vector to get through -- this is what reduces the attacker's structural advantage.
+    if not dry_run and hasattr(target, "reset_defenses"):
+        target.reset_defenses()
     for _ in range(max_steps):
-        # clean the firewall BEFORE each attack so the attack reaches the target and Wazuh
-        # can SEE it (detection) -- then blue's block only applies to the re-probe (containment).
-        # Otherwise a prior block would keep the attack off the host and it would never be logged.
-        if not dry_run and hasattr(target, "reset_defenses"):
-            target.reset_defenses()
-
         # 0) HONEST SKIP of adversary-side prep tactics. When consistency is enforced (LLM
         #    runs produce real commands), a tactic that is never performed against the victim
         #    (e.g. resource-development) is SKIPPED -- the stage advances and grants its
@@ -1842,7 +1848,7 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
         red_action, _ = red_mcts.search(state, role="red")
         if not red_action:
             break
-        red_action = llm_enrich_action(red_action, state, memory, llm=llm, target_ip=tgt_ip,
+        red_action = llm_enrich_action(red_action, state, memory, llm=red_llm, target_ip=tgt_ip,
                                        objective=objective, mismatch_hints=mismatch_hints,
                                        stage=state.tactic_reached())
         # LLM may judge a technique unperformable against this target -> that is an
@@ -1907,7 +1913,7 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
             # wazuh_detect now polls internally until the alert lands (or times out)
             live_detect, live_ctx = target.wazuh_detect(
                 attack_time, red_action["tech_id"], red_action.get("name", ""),
-                command=red_action.get("command", ""), llm=llm)
+                command=red_action.get("command", ""), llm=blue_llm)
         if live_detect is not None:
             # REAL Wazuh: detected iff an alert tagged with this technique actually fired
             detected = bool(live_detect)
@@ -1957,7 +1963,7 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
         rule_deployed = False
         if defense_action and defense_action.get("tech_id") is not None:
             defense_action = llm_enrich_defense(
-                defense_action, mid_state, memory, llm=llm, target_ip=tgt_ip,
+                defense_action, mid_state, memory, llm=blue_llm, target_ip=tgt_ip,
                 attack_command=red_action.get("command", ""),
                 attacker_ip=(target.attacker_ip() if hasattr(target, "attacker_ip") else ""),
                 wazuh_desc=str((ctx or {}).get("event", {}).get("description", "")))
@@ -2043,7 +2049,14 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
         # actually obtained the secret (the simulated target only emits the flag on the
         # designated capture move, so both backends behave consistently).
         verify = getattr(target, "verify_flag", None)
-        captured = bool(evaded and verify and verify(result.get("stdout", "")))
+        # CAI alignment: the crown-jewel capture only counts when red actually REACHED the
+        # objective stage (is_capture = on the capture tactic with its preconditions held),
+        # i.e. it worked through the kill chain -- not a one-shot read at an early stage. This
+        # gives blue interception points, like owning user->root in an A/D CTF. Toggle off
+        # with OBJECTIVE_STAGE_GATED=0 to score any evaded read as capture (old behaviour).
+        stage_gated = os.environ.get("OBJECTIVE_STAGE_GATED", "1").strip().lower() not in ("0", "false", "no")
+        capture_ok = is_capture or not stage_gated
+        captured = bool(evaded and capture_ok and verify and verify(result.get("stdout", "")))
         flag = bool(state.flag or captured)
         if captured:
             caps.add("exfil")
@@ -2191,13 +2204,81 @@ def save_state(out_dir: str, red_priors: dict, blue_priors: dict,
                   f, ensure_ascii=False, indent=2)
 
 
+def _build_role_llm(role: str, shared_llm):
+    """Return an LLM client for `role` ('red'/'blue') pointing at a role-specific vLLM
+    endpoint when one is configured (RED_ENDPOINT/RED_ENDPOINT_MODEL or BLUE_ENDPOINT/
+    BLUE_ENDPOINT_MODEL) -- so a GRPO-trained red and blue policy can be served separately
+    and the loop actually reflects training. Falls back to the shared client otherwise."""
+    if get_llm is None:
+        return shared_llm
+    ep = os.environ.get(f"{role.upper()}_ENDPOINT", "").strip()
+    if not ep:
+        return shared_llm
+    try:
+        client = get_llm()
+        client.config.endpoint = ep
+        client.config.endpoint_model = os.environ.get(
+            f"{role.upper()}_ENDPOINT_MODEL", client.config.endpoint_model).strip()
+        client._endpoint_ok = None  # force a recheck against the new endpoint
+        print(f"[llm] {role} policy -> endpoint={ep} model={client.config.endpoint_model}")
+        return client
+    except Exception as e:  # pragma: no cover
+        print(f"[llm] could not build {role} role client ({e}); using shared llm.")
+        return shared_llm
+
+
+def close_grpo_loop(iteration: int, out_dir: str, red_jsonl: str, blue_jsonl: str, shared_llm):
+    """Close the RL loop at an iteration boundary: GRPO-train the red and blue policies on
+    this iteration's exported datasets, then REDEPLOY each to its vLLM endpoint so the NEXT
+    iteration's agents reflect the training. Returns the (possibly updated) (red_llm, blue_llm).
+
+    Best-effort and guarded -- it shells out to train.py (needs trl/torch/GPU) and to a
+    user-supplied redeploy command, and on any failure it logs and leaves policies unchanged.
+    Redeploy is environment-specific: set REDEPLOY_CMD to a shell template that (re)starts the
+    role's vLLM server on its endpoint serving the new checkpoint (placeholders: {role} {ckpt}
+    {port}); role endpoints come from RED_ENDPOINT/BLUE_ENDPOINT. Without REDEPLOY_CMD the
+    checkpoint is produced and its path reported for manual serving.
+    """
+    import subprocess as _sp, sys as _sys
+    model_default = os.environ.get("QWEN_MODEL", "Qwen/Qwen3-8B")
+    reward_url = os.environ.get("REWARD_MODEL_URL") or os.environ.get("QWEN_ENDPOINT") or ""
+    for role, mode, ds in (("red", "red", red_jsonl), ("blue", "qa-positive", blue_jsonl)):
+        if not (ds and os.path.exists(ds)):
+            print(f"[grpo] {role}: dataset {ds} missing -> skip"); continue
+        ckpt = os.path.join(out_dir, "checkpoints", f"{role}_iter{iteration}")
+        model = os.environ.get(f"{role.upper()}_MODEL", model_default)
+        cmd = [_sys.executable or "python", "train.py", "--mode", mode,
+               "--iteration", str(iteration), "--model_path", model,
+               "--traindataset_path", ds, "--output_dir", ckpt, "--num_train_epochs", "1"]
+        if reward_url:
+            cmd += ["--qa_model_url", reward_url, "--eval_model_url", reward_url,
+                    "--qa_model_name", model, "--eval_model_name", model, "--qa_model_weights", "1.0"]
+        print(f"[grpo] train {role} ({mode}) on {ds} -> {ckpt}")
+        try:
+            _sp.run(cmd, check=True, timeout=float(os.environ.get("GRPO_TRAIN_TIMEOUT", "36000")))
+        except Exception as e:  # pragma: no cover
+            print(f"[grpo] {role} training skipped/failed ({e}); keeping current policy."); continue
+        redeploy = os.environ.get("REDEPLOY_CMD", "").strip()
+        if not redeploy:
+            print(f"[grpo] REDEPLOY_CMD unset -> {role} checkpoint ready at {ckpt} (serve manually)")
+            continue
+        try:
+            rcmd = redeploy.format(role=role, ckpt=ckpt, port=os.environ.get(f"{role.upper()}_PORT", ""))
+            _sp.run(rcmd, shell=True, check=True, timeout=float(os.environ.get("REDEPLOY_TIMEOUT", "900")))
+            os.environ[f"{role.upper()}_ENDPOINT_MODEL"] = ckpt  # serve the new checkpoint
+            print(f"[grpo] redeployed {role} policy from {ckpt}")
+        except Exception as e:  # pragma: no cover
+            print(f"[grpo] {role} redeploy failed ({e}); keeping current policy.")
+    return _build_role_llm("red", shared_llm), _build_role_llm("blue", shared_llm)
+
+
 def run_closed_loop(iterations: int = 3, ctf_name: Optional[str] = None,
                     dry_run: bool = True, out_dir: str = "output/pipeline",
                     seed: int = 0, profile: str = "financial_linux_web",
                     use_llm: bool = True, attacker_container: Optional[str] = None,
                     fresh: bool = False, evasive: bool = False,
                     benign_rate: int = 4, max_steps: Optional[int] = None,
-                    expand: bool = True) -> list[Trajectory]:
+                    expand: bool = True, train_loop: bool = False) -> list[Trajectory]:
     rng = random.Random(seed)
     memory = load_shared_memory(profile=profile)
 
@@ -2239,6 +2320,10 @@ def run_closed_loop(iterations: int = 3, ctf_name: Optional[str] = None,
     else:
         target = DockerTarget(ctf_name, attacker_container=attacker_container)
     llm = get_llm() if (use_llm and get_llm is not None) else None
+    # per-role policies: a GRPO-trained red and blue served on their own endpoints (if
+    # configured) so the loop reflects training; otherwise both share `llm`.
+    red_llm = _build_role_llm("red", llm) if llm is not None else None
+    blue_llm = _build_role_llm("blue", llm) if llm is not None else None
     objective = target.objective() if hasattr(target, "objective") else Objective()
     # Enforce the command<->technique consistency gate only when commands are real (LLM
     # mode). In no-LLM simulation commands are placeholders, so the gate records but does
@@ -2256,18 +2341,18 @@ def run_closed_loop(iterations: int = 3, ctf_name: Optional[str] = None,
             # red_mcts may INVENT new actions (allow_novel) when an LLM is available and
             # expansion is enabled, growing the attack dataset so the attacker diversifies.
             red_mcts = MCTS(memory, action_priors=red_priors, rng=random.Random(seed + it),
-                            llm=llm, learned_covered=learned_covered, evasive=evasive,
+                            llm=red_llm, learned_covered=learned_covered, evasive=evasive,
                             objective=objective,
-                            allow_novel=bool(expand and llm is not None and getattr(llm, "available", False)),
+                            allow_novel=bool(expand and red_llm is not None and getattr(red_llm, "available", False)),
                             generated_path=str(_GENERATED_OVERLAY), infeasible=infeasible)
             blue_mcts = MCTS(memory, action_priors=blue_priors, rng=random.Random(seed + 100 + it),
-                             llm=llm, learned_covered=learned_covered, objective=objective,
+                             llm=blue_llm, learned_covered=learned_covered, objective=objective,
                              infeasible=infeasible)
             traj = run_episode(memory, target, red_mcts, blue_mcts, defense,
                                dry_run=dry_run, rng=rng, llm=llm, learned_covered=learned_covered,
                                evasive=evasive, benign_rate=benign_rate, max_steps=max_steps,
                                enforce_consistency=enforce_consistency, mismatch_hints=mismatch_hints,
-                               infeasible=infeasible)
+                               infeasible=infeasible, red_llm=red_llm, blue_llm=blue_llm)
             all_traj.append(traj)
             # carry this episode's command<->technique corrections into the NEXT episode
             mismatch_hints = dict(traj.meta.get("mismatch_hints", mismatch_hints) or {})
@@ -2285,8 +2370,15 @@ def run_closed_loop(iterations: int = 3, ctf_name: Optional[str] = None,
                 target.flush_rules()
 
             # GRPO export for BOTH roles -> train.py consumes each policy's dataset
-            export_grpo_dataset([traj], os.path.join(out_dir, f"grpo_red_iter{it}.jsonl"), role="red", memory=memory)
-            export_grpo_dataset([traj], os.path.join(out_dir, f"grpo_blue_iter{it}.jsonl"), role="blue", memory=memory)
+            red_jsonl = os.path.join(out_dir, f"grpo_red_iter{it}.jsonl")
+            blue_jsonl = os.path.join(out_dir, f"grpo_blue_iter{it}.jsonl")
+            export_grpo_dataset([traj], red_jsonl, role="red", memory=memory)
+            export_grpo_dataset([traj], blue_jsonl, role="blue", memory=memory)
+
+            # CLOSE THE RL LOOP: train both policies on this iteration's datasets and
+            # redeploy them so the NEXT iteration's red/blue actually reflect the training.
+            if train_loop and it < iterations:
+                red_llm, blue_llm = close_grpo_loop(it, out_dir, red_jsonl, blue_jsonl, llm)
 
             # LLM improve each role independently (value/winrate recompute + notes)
             red_priors, rnote = llm_improve([traj], red_priors, llm=llm, role="red")
@@ -2396,6 +2488,9 @@ def parse_args():
                     help="Ignore saved state.json and start learning from scratch")
     ap.add_argument("--no-expand", dest="expand", action="store_false",
                     help="Disable RED ideation (do not invent/accumulate new techniques)")
+    ap.add_argument("--train-loop", action="store_true",
+                    help="Close the RL loop: GRPO-train red+blue on each iteration's datasets "
+                         "and redeploy to their vLLM endpoints (needs trl/GPU + REDEPLOY_CMD).")
     ap.set_defaults(dry_run=True, use_llm=True, expand=True)
     return ap.parse_args()
 
@@ -2406,4 +2501,4 @@ if __name__ == "__main__":
                     dry_run=args.dry_run, out_dir=args.out_dir, seed=args.seed,
                     profile=args.profile, use_llm=args.use_llm,
                     attacker_container=args.attacker_container, fresh=args.fresh,
-                    expand=args.expand)
+                    expand=args.expand, train_loop=args.train_loop)

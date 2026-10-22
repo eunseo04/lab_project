@@ -80,6 +80,7 @@ def step_loop(args) -> None:
         benign_rate=args.benign_rate,
         max_steps=args.max_steps,
         expand=args.expand,
+        train_loop=args.train_loop,
     )
 
 
@@ -139,6 +140,9 @@ def parse_args():
     ap.add_argument("--benign-rate", type=int, default=int(os.environ.get("BENIGN_RATE", "4")),
                     help="Normal (benign) log events interleaved per attacker action; "
                          "needed to measure precision/false-alarms, not just recall.")
+    ap.add_argument("--train-loop", action="store_true",
+                    help="Close the RL loop: GRPO-train red+blue each iteration and redeploy "
+                         "to their vLLM endpoints (needs trl/GPU + REDEPLOY_CMD env).")
     ap.add_argument("--no-expand", dest="expand", action="store_false",
                     help="Disable RED ideation: do NOT invent new attack actions or grow "
                          "the attack dataset (dataset/attack_dataset_generated.json). "
