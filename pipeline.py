@@ -2076,6 +2076,14 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
         },
         "mismatch_hints": mismatch_hints,  # tech_id -> {reason, stage, count} for next episode
     }
+    # CAI Attack/Defense CTF per-match scoring (arXiv:2510.17521): Initial Access,
+    # Vulnerability Detected/Patched, Own Points, Availability Points (computed from the
+    # steps + the meta just built). Stored so metrics/dashboard read it directly.
+    try:
+        import metrics as _metrics
+        traj.meta["scoring"] = _metrics.episode_scoring(traj.steps, traj.meta)
+    except Exception as e:  # pragma: no cover
+        print(f"[pipeline] scoring computation skipped: {e}")
     return traj
 
 
@@ -2263,15 +2271,16 @@ def run_closed_loop(iterations: int = 3, ctf_name: Optional[str] = None,
         s = m["summary"]
         db = s.get("defenderbench", {})
         det = db.get("detection", {})
-        extra = ""
-        if db.get("episodes_scored"):
-            extra = (f" | RED win%={db['red_winning_pct']*100:.1f}% "
-                     f"BLUE Macro-F1={det.get('macro_f1', 0):.3f} "
-                     f"(P={det.get('precision', 0):.2f} R={det.get('recall', 0):.2f})")
-        print(f"[pipeline] metrics: ATTACK-ASR={s['attack_asr']*100:.1f}% "
-              f"DEFENSE-ASR={s['defense_asr']*100:.1f}% "
-              f"| containment={s['containment_rate']*100:.1f}% block={s['block_rate']*100:.1f}% "
-              f"detection={s['detection_rate']*100:.1f}%{extra} -> {out_dir}/metrics.json")
+        comp = s.get("competition", {})
+        extra = (f" | BLUE Macro-F1={det.get('macro_f1', 0):.3f}"
+                 if db.get("episodes_scored") else "")
+        print(f"[pipeline] CTF scoring: InitAccess={comp.get('initial_access_rate', 0)*100:.0f}% "
+              f"VulnDet={comp.get('vuln_detected_rate', 0)*100:.0f}% "
+              f"VulnPatch={comp.get('vuln_patched_rate', 0)*100:.0f}% "
+              f"| Own={comp.get('own_points_mean', 0)}/300 "
+              f"Avail={comp.get('availability_points_mean', 0)}/200 "
+              f"(RED {comp.get('red_wins', 0)} / BLUE {comp.get('blue_wins', 0)} / tie {comp.get('ties', 0)})"
+              f"{extra} -> {out_dir}/metrics.json")
         cc = s.get("consistency", {})
         if cc.get("checked"):
             print(f"[pipeline] command<->technique consistency: "
