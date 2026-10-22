@@ -129,10 +129,10 @@ def compute_metrics(trajectories: list[dict]) -> dict:
             #                 the share that defeated the defense (lower = stronger defender,
             #                 == 1 - containment-given-execution; the ASR seen by the defender)
             "attack_asr": _rate(c["breached"], c["attempted"]),
-            "defense_asr": _rate(c["breached"], c["succeeded"]),
+            "defense_asr": _rate(c["breached"], c["attempted"]),
             # the partition: these three sum to 1.0 and trade off against each other
             "breach_rate": _rate(c["breached"], c["attempted"]),        # net attack success
-            "containment_rate": _rate(c["contained"], c["attempted"]),  # 방어(봉쇄)율
+            "containment_rate": _rate(c["contained"], c["attempted"]),  # 방어율
             "block_rate": _rate(c["blocked"], c["attempted"]),
             "detection_rate": _rate(c["detected"], c["attempted"]),
             # DefenderBench-style detection quality for THIS episode (needs benign events)
@@ -146,7 +146,7 @@ def compute_metrics(trajectories: list[dict]) -> dict:
             "cum_contained": cum["contained"],
             "cum_attack_success_rate": _rate(cum["succeeded"], cum["attempted"]),
             "cum_attack_asr": _rate(cum["breached"], cum["attempted"]),
-            "cum_defense_asr": _rate(cum["breached"], cum["succeeded"]),
+            "cum_defense_asr": _rate(cum["breached"], cum["attempted"]),
             "cum_breach_rate": _rate(cum["breached"], cum["attempted"]),
             "cum_containment_rate": _rate(cum["contained"], cum["attempted"]),
             "cum_block_rate": _rate(cum["blocked"], cum["attempted"]),
@@ -157,7 +157,7 @@ def compute_metrics(trajectories: list[dict]) -> dict:
         "totals": cum,
         "attack_success_rate": _rate(cum["succeeded"], cum["attempted"]),  # raw execution
         "attack_asr": _rate(cum["breached"], cum["attempted"]),   # RED ASR (net success)
-        "defense_asr": _rate(cum["breached"], cum["succeeded"]),  # BLUE ASR (residual on exec)
+        "defense_asr": _rate(cum["breached"], cum["attempted"]),  # BLUE ASR (residual on exec)
         "breach_rate": _rate(cum["breached"], cum["attempted"]),           # net attack success
         "containment_rate": _rate(cum["contained"], cum["attempted"]),     # defense rate
         "block_rate": _rate(cum["blocked"], cum["attempted"]),
