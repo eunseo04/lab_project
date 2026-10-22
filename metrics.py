@@ -214,7 +214,8 @@ def compute_metrics(trajectories: list[dict]) -> dict:
     comp = _new_comp()       # live only
     simcomp = _new_comp()    # simulated (reference only, excluded from real stats)
     # FinancialTarget-measured performance (live): attack / defense / objective exfiltration
-    live = {"matches": 0, "attempts": 0, "breached": 0, "defended": 0, "exfil_matches": 0}
+    live = {"matches": 0, "attempts": 0, "breached": 0, "contained": 0, "blocked": 0,
+            "exfil_matches": 0}
     for i, traj in enumerate(trajectories, 1):
         c = _episode_counts(traj.get("steps", []))
         for k in cum:
@@ -249,7 +250,8 @@ def compute_metrics(trajectories: list[dict]) -> dict:
             live["matches"] += 1
             live["attempts"] += c["attempted"]
             live["breached"] += c["breached"]
-            live["defended"] += c["contained"] + c["blocked"]
+            live["contained"] += c["contained"]   # executed then NEUTRALISED by a verified defense
+            live["blocked"] += c["blocked"]        # never executed (NOT credited as defense)
             live["exfil_matches"] += 1 if meta.get("objective_achieved") else 0
         per_iter.append({
             "iteration": i,
@@ -299,14 +301,19 @@ def compute_metrics(trajectories: list[dict]) -> dict:
     # simulated episodes kept separately for reference (NOT real performance).
     summary["simulated"] = _comp_summary(simcomp)
     summary["backends"] = {"live_matches": comp["matches"], "simulated_matches": simcomp["matches"]}
-    # FinancialTarget/Docker real performance, aggregated separately: attack success rate,
-    # defense success rate, and whether the objective data was exfiltrated.
+    # FinancialTarget/Docker real performance, aggregated separately.
+    # DEFENSE SUCCESS counts ONLY attacks that were actually stopped BY A PERFORMED DEFENSE
+    # that the re-probe verified (contained/mitigated) -- NOT detection, and NOT attempts that
+    # merely failed to execute (blocked), which can come from a blanket wall or a self-failing
+    # command rather than a real, technique-specific mitigation.
     la = live["attempts"]
     summary["live_performance"] = {
         "matches": live["matches"],
         "attempts": la,
-        "attack_success_rate": _rate(live["breached"], la),      # executed & not contained
-        "defense_success_rate": _rate(live["defended"], la),     # contained or blocked
+        "attack_success_rate": _rate(live["breached"], la),       # executed & not contained
+        "defense_success_rate": _rate(live["contained"], la),     # verified containment ONLY
+        "contained": live["contained"], "breached": live["breached"], "blocked": live["blocked"],
+        "blocked_rate": _rate(live["blocked"], la),               # did NOT execute (NOT a defense win)
         "objective_exfiltration_rate": _rate(live["exfil_matches"], live["matches"]),
         "objective_exfiltrated": bool(live["exfil_matches"] > 0),
         "objective_exfiltration_matches": live["exfil_matches"],
@@ -368,9 +375,14 @@ def print_metrics(metrics: dict) -> None:
     if lp:
         print("  FINANCIAL TARGET — REAL PERFORMANCE (simulated runs excluded)")
         print(f"  over {lp['matches']} live match(es), {lp['attempts']} attempt(s):")
-        print(f"  >> Attack success rate (breach)   : {lp['attack_success_rate']*100:.1f}%")
-        print(f"  >> Defense success rate (stopped) : {lp['defense_success_rate']*100:.1f}%")
-        print(f"  >> Objective data exfiltrated     : "
+        print(f"  >> Attack success rate (breach)            : {lp['attack_success_rate']*100:.1f}%"
+              f"  ({lp.get('breached', 0)}/{lp['attempts']})")
+        print(f"  >> Defense success rate (verified contain) : {lp['defense_success_rate']*100:.1f}%"
+              f"  ({lp.get('contained', 0)}/{lp['attempts']})  "
+              f"[only attacks stopped by a performed, re-probe-verified defense]")
+        print(f"  >> (not counted) attack did not execute    : {lp.get('blocked_rate', 0)*100:.1f}%"
+              f"  ({lp.get('blocked', 0)}/{lp['attempts']})  [blanket/self-fail, not a defense win]")
+        print(f"  >> Objective data exfiltrated              : "
               f"{'YES' if lp['objective_exfiltrated'] else 'NO'}  "
               f"({lp['objective_exfiltration_matches']}/{lp['matches']} match, "
               f"{lp['objective_exfiltration_rate']*100:.1f}%)")

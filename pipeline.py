@@ -673,15 +673,49 @@ def _defense_signature(command: str) -> str:
     return ""
 
 
+def defense_is_blanket(command: str) -> tuple[bool, str]:
+    """True if a blue action is a BLANKET block or SERVICE-DISRUPTING change rather than an
+    attack-specific mitigation. Such actions are rejected so blue cannot 'win' by walling off
+    the whole attacker or taking the service down (which also stops attacks from executing, so
+    per-technique containment could never be measured). Returns (is_blanket, reason).
+
+    Allowed (targeted): a WAF rule matching the attack payload (iptables ... -m string ...),
+    a DB-privilege revoke, locking a specific account, killing a specific malicious process,
+    removing a specific malicious file. Rejected (blanket / availability harm): dropping all
+    traffic or a whole port/source without a payload match, a default DROP policy, flushing
+    rules, or stopping/killing the web/DB service or the host.
+    """
+    c = (command or "").lower()
+    # service / availability disruption
+    for k in ("systemctl stop", "systemctl disable", "service ", "/etc/init.d", "shutdown",
+              "reboot", "halt", "poweroff", "docker stop", "docker kill", "docker-compose down",
+              "nginx -s stop", "supervisorctl stop", "drop table", "drop database", "truncate ",
+              "rm -rf", "mkfs", "iptables -f", "iptables --flush", "-p input drop",
+              "policy drop", "-p drop"):
+        if k in c:
+            return True, f"service-disruption:{k.strip()}"
+    # killing the web/DB SERVER process (not a specific malicious process)
+    if any(k in c for k in ("pkill", "killall", "kill ", "fuser -k")) and \
+       any(p in c for p in ("gunicorn", "uvicorn", "flask", "nginx", "postgres", "app.py",
+                            ":5000", "5000/tcp", "python")):
+        return True, "kills-service-process"
+    # blanket firewall: a DROP/REJECT that is NOT narrowed by a payload string match
+    if "iptables" in c and ("-j drop" in c or "-j reject" in c):
+        if "-m string" not in c and "--string" not in c:
+            return True, "blanket-firewall-drop (no payload match)"
+    return False, ""
+
+
 def llm_enrich_defense(defense: dict, state: CyberState, memory: dict, llm=None,
                        target_ip: str = "target", attack_command: str = "",
                        attacker_ip: str = "", wazuh_desc: str = "") -> dict:
     """Ask the LLM to REASON about the detected attack and pick a TARGETED mitigation that
     neutralizes THIS specific technique -- a host WAF rule on the attack's payload signature,
-    revoking the abused DB privilege, locking an account, killing a process, removing a file,
-    etc. Blanket blocking of the attacker's source IP is only the LAST RESORT, used when no
-    targeted fix fits. It is fed the real attack command + Wazuh alert + attacker IP + the
-    dataset detection strategy so the mitigation matches what actually happened.
+    revoking the abused DB privilege, locking an account, killing a specific malicious process,
+    removing a malicious file, etc. BLANKET blocks (dropping the whole attacker/port) and
+    SERVICE-DISRUPTING actions (stopping/killing the web or DB service) are NOT allowed: they
+    are rejected at apply time, so blue must contain each technique specifically and attacks
+    keep executing (so per-technique containment is actually measurable).
     """
     if not defense or defense.get("tech_id") is None:
         defense.setdefault("command", f"echo apply {defense.get('defense','hardening')}")
@@ -689,15 +723,14 @@ def llm_enrich_defense(defense: dict, state: CyberState, memory: dict, llm=None,
     info = memory.get(defense["tech_id"], {})
     strat = (info.get("detection_strategies") or [{}])[0].get("name", "monitoring")
     sig = _defense_signature(attack_command)
-    # deterministic fallback (no LLM): a TARGETED host-WAF drop on the attack signature;
-    # the attacker-IP ban is only the final fallback when there is no usable signature.
+    # deterministic fallback (no LLM): a TARGETED host-WAF drop on the attack payload signature
+    # ONLY. No blanket attacker-IP ban (that would wall off all techniques); if there is no
+    # usable payload signature blue has no host containment here (a harmless no-op).
     if sig:
         fallback_cmd = (f'iptables -I INPUT -p tcp --dport 5000 -m string --string "{sig}" '
                         f'--algo bm -j DROP')
-    elif attacker_ip:
-        fallback_cmd = f"iptables -I INPUT -s {attacker_ip} -j DROP"   # LAST RESORT
     else:
-        fallback_cmd = f"echo defend {defense['tech_id']}"
+        fallback_cmd = f"echo no-targeted-mitigation {defense['tech_id']}"
     if llm is None or not getattr(llm, "available", False):
         defense.setdefault("command", fallback_cmd)
         return defense
@@ -709,12 +742,16 @@ def llm_enrich_defense(defense: dict, state: CyberState, memory: dict, llm=None,
               "host (Linux; a Flask web app on tcp:5000 backed by a Postgres database 'bank-db' "
               "that you can also reach). An intrusion has been DETECTED. Using ONLY the attack "
               "evidence below and your own reasoning, DECIDE how to respond and output ONE concrete "
-              "shell command you judge will stop THIS attack from succeeding if it is retried. You "
-              "are NOT limited to any preset list of actions -- choose whatever host action your "
-              "analysis of the evidence justifies, from the most surgical fix to, only if nothing "
-              "narrower will work, blocking the source. Output the real command to run (not "
-              "pseudo-code); if you conclude no host action can neutralise it, reply EXACTLY "
-              "'CMD: NODEF'. Respond EXACTLY as: 'CMD: <command>' then 'WHY: <rationale>'.")
+              "shell command you judge will stop THIS SPECIFIC attack from succeeding if it is "
+              "retried, while keeping the service available to everyone else. It MUST be "
+              "attack-specific (e.g. a WAF rule matching the attack's payload, revoking the exact "
+              "DB privilege it abuses, locking the targeted account, killing the specific malicious "
+              "process, removing the malicious file). You MUST NOT take the service down or block "
+              "broadly: no stopping/killing the web or DB service, no dropping all traffic or a "
+              "whole port/source, no default-DROP policy -- such blanket or availability-harming "
+              "actions are REJECTED and count as no defense. Output the real command (not "
+              "pseudo-code); if no attack-specific host fix exists, reply EXACTLY 'CMD: NODEF'. "
+              "Respond EXACTLY as: 'CMD: <command>' then 'WHY: <rationale>'.")
     user = (f"Detected technique: {defense['tech_id']} ({info.get('name')}).\n"
             f"Attacker command observed in the logs: {attack_command or 'n/a'}\n"
             f"Wazuh alert: {wazuh_desc or 'n/a'}\n"
@@ -1308,9 +1345,15 @@ class DockerTarget:
             return 0
 
     def defend(self, defense_action: dict) -> dict:
-        """Blue defense: mitigation runs ON the target host (containment/hardening)."""
+        """Blue defense: mitigation runs ON the target host (containment/hardening).
+        Blanket/service-disrupting actions are rejected (targeted containment only)."""
         import redtools
         cmd = defense_action.get("command") or f"echo apply {defense_action.get('defense')}"
+        blanket, why = defense_is_blanket(cmd)
+        if blanket:
+            print(f"  [blue] REJECTED non-targeted defense ({why}): {cmd[:80]}")
+            return {"defense": defense_action, "applied": False, "rejected": why,
+                    "stdout": f"[blue] rejected blanket/availability-harming action: {why}"}
         out = redtools.run_command(cmd, ctf=self.ctf)
         return {"defense": defense_action, "applied": bool(out and "error" not in out.lower()),
                 "stdout": out or ""}
@@ -1458,12 +1501,20 @@ class FinancialTarget:
         """Blue defense/mitigation runs on the bank-web host (hardening/containment).
 
         Blue applies the TARGETED mitigation its reasoning chose (a host WAF rule on the
-        attack signature, a DB-privilege revoke, killing a process, etc.) -- NOT a blanket
-        attacker-IP ban (that is only blue's last-resort choice). The command is run as-is;
-        a DB-level action (psql ...) is routed to the bank-db container.
+        attack signature, a DB-privilege revoke, a specific process/file action, etc.).
+        BLANKET blocks (dropping the whole attacker/port, default-DROP) and SERVICE-DISRUPTING
+        actions (stopping/killing the web or DB service) are REJECTED -- not applied -- so blue
+        cannot 'win' by walling off the attacker or taking the service down, and attacks keep
+        executing so per-technique containment can be measured. A DB action (psql) is routed
+        to the bank-db container.
         """
         import redtools
         cmd = defense_action.get("command") or f"echo apply {defense_action.get('defense')}"
+        blanket, why = defense_is_blanket(cmd)
+        if blanket:
+            print(f"  [blue] REJECTED non-targeted defense ({why}): {cmd[:80]}")
+            return {"defense": defense_action, "applied": False, "rejected": why,
+                    "stdout": f"[blue] rejected blanket/availability-harming action: {why}"}
         # route DB-privilege mitigations to the database container; everything else to web
         container = self.DB if (cmd.strip().startswith("psql") or " psql " in cmd) else self.WEB
         out = redtools.run_command(cmd, container=container) or ""

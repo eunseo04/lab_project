@@ -383,7 +383,10 @@ function fromTrajectories(trajs) {
   const live_performance = liveRows.length ? {
     matches: liveRows.length, attempts: la,
     attack_success_rate: R(liveRows.reduce((a, p) => a + (p.breached || 0), 0), la),
-    defense_success_rate: R(liveRows.reduce((a, p) => a + ((p.contained || 0) + (p.blocked || 0)), 0), la),
+    // verified containment ONLY (attacks executed then neutralised by a performed defense);
+    // 'blocked' (did not execute) is NOT counted as a defense win.
+    defense_success_rate: R(liveRows.reduce((a, p) => a + (p.contained || 0), 0), la),
+    blocked_rate: R(liveRows.reduce((a, p) => a + (p.blocked || 0), 0), la),
     objective_exfiltration_matches: liveRows.filter(p => p.objective_achieved).length,
     objective_exfiltration_rate: R(liveRows.filter(p => p.objective_achieved).length, liveRows.length),
     objective_exfiltrated: liveRows.some(p => p.objective_achieved),
@@ -438,7 +441,8 @@ function fromCSV(text) {
   const live_performance = liveRows.length ? {
     matches: liveRows.length, attempts: la,
     attack_success_rate: R(liveRows.reduce((a, r) => a + (+r.breached || 0), 0), la),
-    defense_success_rate: R(liveRows.reduce((a, r) => a + ((+r.contained || 0) + (+r.blocked || 0)), 0), la),
+    defense_success_rate: R(liveRows.reduce((a, r) => a + (+r.contained || 0), 0), la),  // verified containment only
+    blocked_rate: R(liveRows.reduce((a, r) => a + (+r.blocked || 0), 0), la),
     objective_exfiltration_matches: liveRows.filter(r => truthy(r.objective_achieved)).length,
     objective_exfiltration_rate: R(liveRows.filter(r => truthy(r.objective_achieved)).length, liveRows.length),
     objective_exfiltrated: liveRows.some(r => truthy(r.objective_achieved)),
@@ -481,7 +485,7 @@ function renderTiles() {
   const simNote = live ? '' : ' · 시뮬레이션(실제 통계 제외)';
   const tiles = lp ? [
     { c: 'var(--red)', label: '공격 성공률', val: pct(lp.attack_success_rate), note: `FinancialTarget ${lp.attempts}시도 중 관통` },
-    { c: 'var(--aqua)', label: '방어 성공률', val: pct(lp.defense_success_rate), note: `차단+봉쇄 / 시도` },
+    { c: 'var(--aqua)', label: '방어 성공률', val: pct(lp.defense_success_rate), note: `실제 봉쇄(검증) / 시도 · 탐지·비실행 제외` },
     { c: 'var(--blue)', label: '목표 데이터 유출', val: lp.objective_exfiltrated ? 'YES' : 'NO', note: `${lp.objective_exfiltration_matches}/${lp.matches} 매치 유출` },
     { c: 'var(--red)', label: 'Own Points', val: `${cm.own_points_mean ?? 0}`, note: `공격 HTB 점수 (평균/매치 · 최대 300)` },
     { c: 'var(--aqua)', label: 'Availability', val: `${cm.availability_points_mean ?? 0}`, note: `방어 가용성 점수 (평균/매치 · 최대 200)` },
