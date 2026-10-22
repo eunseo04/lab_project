@@ -1936,7 +1936,11 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
         # succeeds AND evades detection/containment, AND whose precondition is met.
         # An off-stage, caught, or precondition-missing action does not advance the kill
         # chain, so red must work through the tactics in order (no faked progress).
-        evaded = bool(result["success"] and not detected and not mitigated)
+        # EVADE = executed successfully AND not contained. Detection alone does NOT block
+        # the advance: blue seeing the attack in the logs does not stop the foothold; only
+        # actually CONTAINING it (mitigated) does. So a detected-but-uncontained exploit
+        # still clears the stage (and still counts as 'detected' for the blue metrics).
+        evaded = bool(result["success"] and not mitigated)
         advanced_raw = bool(evaded and on_stage and preconds_met)
         # CONSISTENCY GATE: cross-check that the executed command actually implemented this
         # technique and that 'success'/stage-clear is consistent with that. A relabeled or
@@ -2050,6 +2054,12 @@ def run_episode(memory: dict, target, red_mcts: MCTS, blue_mcts: MCTS, defense: 
     objective_achieved = bool(state.flag)
     traj.meta = {
         "evasive": bool(evasive),
+        # Which backend produced this episode. SimulatedTarget outcomes are PROBABILISTIC
+        # (rng-based), so they are excluded from the real performance statistics; only
+        # FinancialTarget/DockerTarget episodes (real command execution + real/Wazuh
+        # measurement) are counted as live performance.
+        "backend": type(target).__name__,
+        "simulated": type(target).__name__ == "SimulatedTarget",
         "objective": {"name": objective.name, "target_file": objective.target_file,
                       "capture_tactic": objective.capture_tactic},
         "objective_achieved": objective_achieved,  # ENVIRONMENT-verified flag capture
@@ -2271,16 +2281,21 @@ def run_closed_loop(iterations: int = 3, ctf_name: Optional[str] = None,
         s = m["summary"]
         db = s.get("defenderbench", {})
         det = db.get("detection", {})
-        comp = s.get("competition", {})
+        bk = s.get("backends", {})
+        lp = s.get("live_performance")
         extra = (f" | BLUE Macro-F1={det.get('macro_f1', 0):.3f}"
                  if db.get("episodes_scored") else "")
-        print(f"[pipeline] CTF scoring: InitAccess={comp.get('initial_access_rate', 0)*100:.0f}% "
-              f"VulnDet={comp.get('vuln_detected_rate', 0)*100:.0f}% "
-              f"VulnPatch={comp.get('vuln_patched_rate', 0)*100:.0f}% "
-              f"| Own={comp.get('own_points_mean', 0)}/300 "
-              f"Avail={comp.get('availability_points_mean', 0)}/200 "
-              f"(RED {comp.get('red_wins', 0)} / BLUE {comp.get('blue_wins', 0)} / tie {comp.get('ties', 0)})"
-              f"{extra} -> {out_dir}/metrics.json")
+        if lp:
+            print(f"[pipeline] REAL (FinancialTarget {lp['matches']} match): "
+                  f"attack-success={lp['attack_success_rate']*100:.0f}% "
+                  f"defense-success={lp['defense_success_rate']*100:.0f}% "
+                  f"objective-exfiltrated={'YES' if lp['objective_exfiltrated'] else 'NO'} "
+                  f"({lp['objective_exfiltration_matches']}/{lp['matches']})"
+                  f"{extra} -> {out_dir}/metrics.json")
+        else:
+            print(f"[pipeline] simulated run ({bk.get('simulated_matches', 0)} match) — "
+                  f"excluded from real performance stats (use --live for FinancialTarget)"
+                  f"{extra} -> {out_dir}/metrics.json")
         cc = s.get("consistency", {})
         if cc.get("checked"):
             print(f"[pipeline] command<->technique consistency: "
