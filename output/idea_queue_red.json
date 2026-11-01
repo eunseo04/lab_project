@@ -1,0 +1,34 @@
+{
+  "role": "red",
+  "total_evaluations": 2,
+  "stats": {
+    "dynamic_action_selection": {
+      "idea": {
+        "idea_id": "dynamic_action_selection",
+        "hypothesis": "Introducing a dynamic action selection mechanism that prioritizes high-reward, low-detection actions can improve attack effectiveness while reducing the likelihood of early containment.",
+        "change_to_test": "Replace static action selection with a dynamic policy that weights actions based on real-time reward estimation and detection probability signals.",
+        "implementation_point": "During action selection phase, integrate a heuristic that modulates action probabilities using a combination of immediate reward and estimated detection risk.",
+        "evaluation_metric": "Average attack success rate before containment, normalized by detection rate during the same period.",
+        "expected_effect": "Increased attack success rate while maintaining or reducing detection probability, leading to longer engagement and higher overall effectiveness.",
+        "role": "red"
+      },
+      "count": 1,
+      "improvement_sum": 0.0,
+      "mean_improvement": 0.0
+    },
+    "adaptive_action_prioritization": {
+      "idea": {
+        "idea_id": "adaptive_action_prioritization",
+        "hypothesis": "Prioritizing actions based on a combination of immediate reward and uncertainty in detection probability will improve attack effectiveness while reducing the likelihood of early detection.",
+        "change_to_test": "Modify the action selection mechanism to use a weighted priority queue that factors in both the estimated reward and the uncertainty of detection for each action.",
+        "implementation_point": "In the action selection module, during the decision-making phase, calculate a composite score for each action using a weighted sum of immediate reward and detection uncertainty, then select the action with the highest composite score.",
+        "evaluation_metric": "Change in attack success rate (objective_achieved) and change in detection rate (det_rate) over a series of episodes.",
+        "expected_effect": "The agent should achieve a higher objective_achieved rate while maintaining or reducing the det_rate, indicating more effective attacks with lower risk of detection.",
+        "role": "red"
+      },
+      "count": 1,
+      "improvement_sum": 0.0,
+      "mean_improvement": 0.0
+    }
+  }
+}

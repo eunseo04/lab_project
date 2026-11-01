@@ -35,11 +35,15 @@ class CosineSentenceEmbeddingReward(object):
         print("Cossim implementation: ", self.impl)
         print("Cossim n_samples: ", n_samples)
         print("Cossim device: ", self.device)
+        # model path configurable; default to the public HF id (the old hardcoded
+        # 'models/all-MiniLM-L6-v2' local folder does not exist on every host).
+        import os as _os
+        _emb = _os.environ.get("SENTENCE_EMB_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
         if self.impl == "huggingface":
-            self.tokenizer = AutoTokenizer.from_pretrained('models/all-MiniLM-L6-v2', device=device)
-            self.model = AutoModel.from_pretrained('models/all-MiniLM-L6-v2').to(device)
+            self.tokenizer = AutoTokenizer.from_pretrained(_emb, device=device)
+            self.model = AutoModel.from_pretrained(_emb).to(device)
         elif self.impl == "sentencetransformer":
-            self.model = SentenceTransformer('models/all-MiniLM-L6-v2')
+            self.model = SentenceTransformer(_emb)
         self.sentence_embeddings = None
         
     def compute_similarity(self, X: List[str], Y: List[str]) -> torch.Tensor:

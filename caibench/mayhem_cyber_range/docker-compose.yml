@@ -1,0 +1,52 @@
+# CAI Cyber-Mayhem-style local replica (HTB Battlegrounds is proprietary and cannot be run
+# locally, so this reproduces its STRUCTURE): two IDENTICAL vulnerable Linux hosts, one per
+# team; each team has a Kali box running its Red (attacks the opponent host) and Blue (defends
+# its own host via root SSH) agents. 1v1 mutual Attack/Defense. Model = Qwen3-8B (agents),
+# not Sonnet 4. Machines are our own vuln image (not HTB's pool).
+services:
+  host-a:                     # Team 1's machine (Blue1 defends, Red2 attacks)
+    build: ./host
+    container_name: mayhem-host-a
+    environment:
+      WAZUH_MANAGER: host.docker.internal
+      WAZUH_AGENT_NAME: mayhem-host-a
+      FLAG_INTERVAL: "60"
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    cap_add: ["NET_ADMIN"]
+    networks: { mayhem_net: { ipv4_address: 172.32.10.10 } }
+    restart: unless-stopped
+
+  host-b:                     # Team 2's machine (Blue2 defends, Red1 attacks)
+    build: ./host
+    container_name: mayhem-host-b
+    environment:
+      WAZUH_MANAGER: host.docker.internal
+      WAZUH_AGENT_NAME: mayhem-host-b
+      FLAG_INTERVAL: "60"
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    cap_add: ["NET_ADMIN"]
+    networks: { mayhem_net: { ipv4_address: 172.32.10.20 } }
+    restart: unless-stopped
+
+  kali-t1:                    # Team 1 Kali: Red1 -> host-b, Blue1 -> host-a (root SSH)
+    build: ./attacker
+    container_name: mayhem-kali-t1
+    networks: { mayhem_net: { ipv4_address: 172.32.10.101 } }
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+  kali-t2:                    # Team 2 Kali: Red2 -> host-a, Blue2 -> host-b (root SSH)
+    build: ./attacker
+    container_name: mayhem-kali-t2
+    networks: { mayhem_net: { ipv4_address: 172.32.10.102 } }
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+networks:
+  mayhem_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.32.10.0/24

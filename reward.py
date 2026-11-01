@@ -20,7 +20,17 @@ from transformers import (
     PreTrainedModel,
     PreTrainedTokenizerBase
 )
-from vllm import LLM, SamplingParams
+# NOTE: the reward models are queried over their OpenAI-compatible HTTP endpoints
+# (qa_model_url / eval_model_url), so the local vLLM classes below are not actually used
+# by the closed-loop reward path. Importing them unconditionally forced `vllm` to be
+# installed in the pipeline env just to load reward.py -- which broke GRPO training
+# (train.py imports reward.py) on a host where vLLM runs in a SEPARATE env. Make it
+# optional so training works against the endpoints without vllm installed here.
+try:
+    from vllm import LLM, SamplingParams
+except Exception:  # pragma: no cover - only needed for a local-vLLM reward backend
+    LLM = None
+    SamplingParams = None
 
 from my_utils import (
     SYSTEM_PROMPT,
@@ -280,6 +290,15 @@ def reward_func_for_blue_defense(prompts, completions, completion_ids, **kwargs)
         lc = cmd.lower()
         r = 0.5
         if sig and sig.lower() in lc:
+            r += 2.5
+        # the app's availability-preserving HOT PATCH (sentinel -> parameterized query) is the
+        # definitive, downtime-free fix for the SQLi surface; reward it like a precise match so
+        # the GRPO blue policy actually learns to patch the injection, not just firewall it.
+        if "/var/lib/bank-web/patch_" in lc or "patch_transactions" in lc or "patch_login" in lc:
+            r += 2.5
+        # SHELL-range targeted containment: remove the sudo-find privesc misconfig, or enable
+        # the RCE input-sanitizing hot patch -> the correct availability-preserving fixes.
+        if "/etc/sudoers.d/ctf" in lc or "/var/lib/shell-target/patched" in lc:
             r += 2.5
         if "-m string" in lc and "--string" in lc:
             r += 1.0

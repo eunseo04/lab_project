@@ -1,0 +1,59 @@
+<!--
+  shell-target host-level detection rules (shell cyber-range).
+  Source: /var/log/shell-target/cmd.log lines of the form
+    "<ts> shell-target shelltarget[<pid>]: EXEC user=<u> cmd=<shell string>"
+  tailed by the Wazuh agent (syslog format -> program_name 'shelltarget').
+  These turn RCE / privilege-escalation / sensitive-file access into REAL MITRE-tagged alerts.
+  NOTE: plain recon (bare `ping -c 1 -W 1 <ip>`, /health, /) intentionally does NOT match any
+  rule below, so detection recall is realistic (graded), not trivially 100%.
+-->
+<group name="shell-target,attack,">
+
+  <rule id="100700" level="0">
+    <program_name>shelltarget</program_name>
+    <description>shell-target command audit (base)</description>
+  </rule>
+
+  <!-- RCE / command injection: the ping argument carries a second command (an injected tool) -->
+  <!-- STRUCTURE-BASED RCE detection: the app parses the host parameter (incl. url/base64
+       decoding) and tags inj=1 on any shell-command structure. Fires on EXEC and on BLOCKED
+       (post-patch) lines alike, independent of the specific payload encoding -> stable recall. -->
+  <rule id="100714" level="10">
+    <if_sid>100700</if_sid>
+    <regex>inj=1</regex>
+    <description>shell-target command injection attempt (structure-based, encoding-agnostic)</description>
+    <mitre><id>T1190</id></mitre>
+  </rule>
+
+  <rule id="100710" level="10">
+    <if_sid>100700</if_sid>
+    <regex>;|wget|curl|nc |/bin/|bash|python|perl|/etc/|whoami|uname| id$</regex>
+    <description>shell-target command injection / RCE via diagnostics endpoint</description>
+    <mitre><id>T1190</id></mitre>
+  </rule>
+
+  <!-- privilege escalation: sudo / find -exec / SUID / sudoers edits -->
+  <rule id="100711" level="12">
+    <if_sid>100700</if_sid>
+    <regex>sudo |find \S+ -exec| -exec |chmod +s|/etc/sudoers</regex>
+    <description>shell-target privilege-escalation attempt (sudo/SUID/find -exec)</description>
+    <mitre><id>T1548.003</id></mitre>
+  </rule>
+
+  <!-- sensitive / flag file access -->
+  <rule id="100712" level="10">
+    <if_sid>100700</if_sid>
+    <regex>/root/|root.txt|user.txt|/etc/shadow|id_rsa</regex>
+    <description>shell-target sensitive-file / flag access</description>
+    <mitre><id>T1083</id></mitre>
+  </rule>
+
+  <!-- reverse shell / interpreter execution -->
+  <rule id="100713" level="10">
+    <if_sid>100700</if_sid>
+    <regex>bash -i|/dev/tcp/|nc |ncat |python -c|perl -e|sh -i</regex>
+    <description>shell-target reverse-shell / interpreter execution</description>
+    <mitre><id>T1059.004</id></mitre>
+  </rule>
+
+</group>

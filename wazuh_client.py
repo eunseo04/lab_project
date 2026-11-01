@@ -72,6 +72,10 @@ class WazuhClient:
             return []
         must = []
         if since is not None:
+            # accept either a datetime or an epoch-seconds number (time.time()); callers such as
+            # mayhem._detect pass a float, so coerce it rather than crash on `.astimezone`.
+            if isinstance(since, (int, float)):
+                since = datetime.fromtimestamp(since, tz=timezone.utc)
             iso = since.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
             must.append({"range": {"timestamp": {"gte": iso}}})
         agent = agent_name or self.config.agent_name

@@ -1,0 +1,146 @@
+{
+  "role": "red_playbook",
+  "total_evaluations": 10,
+  "stats": {
+    "dynamic_action_thresholding": {
+      "idea": {
+        "idea_id": "dynamic_action_thresholding",
+        "hypothesis": "Adjusting the action selection threshold based on environmental feedback can improve the agent's ability to evade detection while maintaining offensive efficiency.",
+        "change_to_test": "Implement a dynamic threshold for action selection that adapts based on real-time detection and containment signals.",
+        "implementation_point": "During action selection phase, use a weighted threshold that increases when detection signals are high and decreases when containment is weak.",
+        "evaluation_metric": "Success rate of undetected attacks over a fixed number of episodes, combined with attack efficiency (damage done vs. resource cost).",
+        "expected_effect": "The agent should perform better at evading detection without sacrificing attack effectiveness, leading to higher undetected attack rates and better resource utilization.",
+        "role": "red"
+      },
+      "count": 1,
+      "improvement_sum": 0.0,
+      "mean_improvement": 0.0
+    },
+    "adaptive_action_sequence_learning": {
+      "idea": {
+        "idea_id": "adaptive_action_sequence_learning",
+        "hypothesis": "Adapting action sequences based on learned patterns from previous interactions can improve attack effectiveness while reducing detectability.",
+        "change_to_test": "Introduce a reinforcement learning module that dynamically adjusts action sequences based on observed system responses and historical success rates.",
+        "implementation_point": "During action selection phase, after evaluating immediate action impact, the agent uses a learned policy to choose a sequence of actions that maximizes long-term success while minimizing detection signals.",
+        "evaluation_metric": "Change in mean attack success rate over 10 consecutive episodes, normalized by detection score.",
+        "expected_effect": "The agent should demonstrate increased attack success with lower detection scores compared to static action selection methods.",
+        "role": "red"
+      },
+      "count": 1,
+      "improvement_sum": 0.0,
+      "mean_improvement": 0.0
+    },
+    "action_stochasticization": {
+      "idea": {
+        "idea_id": "action_stochasticization",
+        "hypothesis": "Introducing stochasticity in action selection can improve the agent's ability to evade detection by making its behavior less predictable and more resilient to containment strategies.",
+        "change_to_test": "Modify the action selection process to include a probabilistic component that introduces randomness in action execution, even when optimal actions are known.",
+        "implementation_point": "During the action selection phase, after evaluating the best action based on reward and risk, apply a small probability to select an alternative action from a predefined set of nearby actions.",
+        "evaluation_metric": "Average success rate of evading detection and containment over 100 episodes, measured by the number of successful attacks without triggering containment.",
+        "expected_effect": "The agent's actions will become less predictable, increasing its ability to avoid detection and containment, leading to a measurable improvement in attack success rates.",
+        "role": "red"
+      },
+      "count": 1,
+      "improvement_sum": 0.0,
+      "mean_improvement": 0.0
+    },
+    "contextual_action_weighting": {
+      "idea": {
+        "idea_id": "contextual_action_weighting",
+        "hypothesis": "By incorporating contextual information from the environment into action selection weights, the agent can better balance attack efficiency with evasion and persistence.",
+        "change_to_test": "Modify the action selection process to use a weighted decision model that dynamically adjusts action priorities based on real-time environmental context such as system state, detection likelihood, and resource availability.",
+        "implementation_point": "In the action selection module, integrate a contextual weighting function that modifies action probabilities based on observed system behavior and threat indicators.",
+        "evaluation_metric": "Mean improvement in attack success rate while maintaining evasion and persistence over 100 episodes.",
+        "expected_effect": "The agent should demonstrate improved attack efficiency and reduced detection rates by making more context-aware decisions during action execution.",
+        "role": "red"
+      },
+      "count": 1,
+      "improvement_sum": 0.0,
+      "mean_improvement": 0.0
+    },
+    "contextual_action_weighting_v2": {
+      "idea": {
+        "idea_id": "contextual_action_weighting_v2",
+        "hypothesis": "By incorporating real-time system state and threat intelligence into action weighting, the agent can prioritize actions that maximize attack progress while minimizing detection and containment risk.",
+        "change_to_test": "Modify the contextual action weighting module to include a hybrid weighting function that integrates both system state metrics (e.g., process execution, network traffic) and known threat intelligence (e.g., MITRE ATT&CK techniques, known indicators of compromise).",
+        "implementation_point": "During the action selection phase, apply a hybrid weighting function to dynamically adjust action priorities based on current system state and threat intelligence.",
+        "evaluation_metric": "Change in attack success rate (measured as successful persistence or data exfiltration) while maintaining a low detection score (measured as system alerts or containment triggers).",
+        "expected_effect": "Improved balance between attack efficiency and evasion, leading to higher attack success rates with lower detection risk.",
+        "role": "red"
+      },
+      "count": 1,
+      "improvement_sum": 0.0,
+      "mean_improvement": 0.0
+    },
+    "action_sequence_elasticity": {
+      "idea": {
+        "idea_id": "action_sequence_elasticity",
+        "hypothesis": "Introducing an action sequence elasticity mechanism will allow the agent to adapt its attack strategy in response to system state changes while maintaining evasion effectiveness.",
+        "change_to_test": "Implement a modular action sequence elasticity module that dynamically reorders or replaces actions based on real-time system state feedback and threat model updates.",
+        "implementation_point": "During action selection phase, after evaluating contextual weights and detection risk, apply elasticity rules to adjust the action sequence.",
+        "evaluation_metric": "Average success rate of attacks across 100 episodes with varying system response patterns",
+        "expected_effect": "Improved attack success rate while maintaining or reducing detection probability, due to more flexible and context-aware action execution.",
+        "role": "red"
+      },
+      "count": 1,
+      "improvement_sum": 0.0,
+      "mean_improvement": 0.0
+    },
+    "action_sequence_elasticity_v2": {
+      "idea": {
+        "idea_id": "action_sequence_elasticity_v2",
+        "hypothesis": "Introducing a more sophisticated action sequence elasticity module that dynamically reorders or replaces actions based on real-time system state and adversary response patterns will improve attack effectiveness while reducing the likelihood of detection and containment.",
+        "change_to_test": "Replace the current action sequence elasticity module with a version that uses a hybrid decision-making framework combining heuristic-based action prioritization with reinforcement learning to adapt to system responses in real-time.",
+        "implementation_point": "Within the action execution pipeline, during the action selection phase, after evaluating system state and adversary responses.",
+        "evaluation_metric": "Mean improvement in attack success rate while maintaining a lower detection and containment rate over 100 episodes.",
+        "expected_effect": "The hybrid elasticity module is expected to result in a statistically significant increase in attack success while reducing the rate of system detection and containment compared to the baseline.",
+        "role": "red"
+      },
+      "count": 1,
+      "improvement_sum": 0.0,
+      "mean_improvement": 0.0
+    },
+    "action_sequence_elasticity_v3": {
+      "idea": {
+        "idea_id": "action_sequence_elasticity_v3",
+        "hypothesis": "Introducing a predictive action sequence elasticity module that uses historical system response data to anticipate containment strategies and proactively adjust attack sequences to evade detection.",
+        "change_to_test": "Replace the current action sequence elasticity module with a predictive version that uses historical data to forecast system responses and adjust attack sequences accordingly.",
+        "implementation_point": "During the action selection phase, integrate a predictive model that uses past system responses to modify the action sequence in real-time.",
+        "evaluation_metric": "Average success rate of attacks while remaining undetected over 100 episodes.",
+        "expected_effect": "The predictive elasticity should improve the agent's ability to adapt to containment strategies, leading to higher attack success rates with lower detection probabilities.",
+        "role": "red"
+      },
+      "count": 1,
+      "improvement_sum": 0.0,
+      "mean_improvement": 0.0
+    },
+    "action_sequence_elasticity_v4": {
+      "idea": {
+        "idea_id": "action_sequence_elasticity_v4",
+        "hypothesis": "Introducing a predictive action sequence elasticity module that uses both historical data and real-time system state to anticipate containment responses and adjust action sequences proactively.",
+        "change_to_test": "Replace the current action sequence elasticity module with a predictive version that integrates historical attack patterns and real-time system state to forecast and adapt to containment strategies.",
+        "implementation_point": "Action selection module during attack execution phase",
+        "evaluation_metric": "Mean time to containment evasion and attack success rate",
+        "expected_effect": "Improved ability to evade detection and containment by proactively adapting attack sequences based on anticipated system responses.",
+        "role": "red"
+      },
+      "count": 1,
+      "improvement_sum": 0.0,
+      "mean_improvement": 0.0
+    },
+    "action_sequence_elasticity_v5": {
+      "idea": {
+        "idea_id": "action_sequence_elasticity_v5",
+        "hypothesis": "Integrating real-time system state analysis with predictive models will improve the agent's ability to adapt action sequences while evading detection and containment.",
+        "change_to_test": "Replace the current action sequence elasticity module with one that uses real-time system state analysis combined with predictive models to dynamically reorder or replace actions.",
+        "implementation_point": "During action sequence execution, the agent will analyze real-time system state data and use a predictive model to forecast system responses to potential action changes, then adjust the sequence accordingly.",
+        "evaluation_metric": "Improvement in attack success rate while maintaining low detection and containment scores over 100 episodes.",
+        "expected_effect": "The agent should demonstrate improved adaptability in action sequences, leading to higher attack success while evading system responses more effectively.",
+        "role": "red"
+      },
+      "count": 1,
+      "improvement_sum": 0.0,
+      "mean_improvement": 0.0
+    }
+  }
+}

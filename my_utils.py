@@ -243,6 +243,10 @@ def call_llm(
     _api_key = os.environ.get("OPENAI_API_KEY", "").strip()
     if _api_key:
         headers["Authorization"] = f"Bearer {_api_key}"
+    # The reward/judge only needs a short verdict; a huge max_tokens (e.g. 4096) EXCEEDS a
+    # small-context server's max_model_len (vLLM Qwen3-8B here is 2048) and the server returns
+    # HTTP 400, silently failing every reward. Cap it so prompt+completion fit the context.
+    max_tokens = min(int(max_tokens), int(os.environ.get("REWARD_MAX_TOKENS", "512")))
     payload = {
         "model": model_name,
         "prompt": prompts,
@@ -252,9 +256,29 @@ def call_llm(
         "max_tokens": max_tokens,
     }
 
+    import re as _re
     for attempt in range(1, max_retries + 1):
         try:
             resp = requests.post(endpoint, json=payload, headers=headers, timeout=timeout)
+            # A small-context server (e.g. vLLM max_model_len=2048) rejects prompt+max_tokens
+            # over its limit with HTTP 400. That is a FITTING problem, not a transient fault:
+            # shrink max_tokens (and, if the prompt alone overflows, truncate it) from the
+            # server's own numbers in the error, then retry IMMEDIATELY instead of waiting.
+            if resp.status_code == 400 and "context length" in (resp.text or "").lower():
+                mx = _re.search(r"maximum context length is (\d+)", resp.text)
+                inp = _re.search(r"contains at least (\d+)", resp.text) or _re.search(r"prompt contains (\d+)", resp.text)
+                limit = int(mx.group(1)) if mx else 2048
+                in_tok = int(inp.group(1)) if inp else None
+                if in_tok is not None and in_tok < limit - 16:
+                    payload["max_tokens"] = max(16, limit - in_tok - 8)
+                    print(f"⚙️ 400 context: refit max_tokens={payload['max_tokens']} (input~{in_tok}/{limit})")
+                else:
+                    # prompt itself overflows -> truncate each prompt to a safe char budget
+                    keep = int((limit - 64) * 3.5)
+                    payload["prompt"] = [p[-keep:] if isinstance(p, str) else p for p in prompts]
+                    payload["max_tokens"] = min(payload["max_tokens"], 64)
+                    print(f"⚙️ 400 context: truncated prompt to ~{keep} chars, max_tokens={payload['max_tokens']}")
+                resp = requests.post(endpoint, json=payload, headers=headers, timeout=timeout)
             resp.raise_for_status()  # Raise exception for HTTP errors
             data = resp.json()
             # KeyError / TypeError are caught in try block, will trigger retry

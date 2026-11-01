@@ -51,6 +51,12 @@ def parse_args():
     parser.add_argument("--weight_decay", type=float, default=0.01, help="Weight decay")
     parser.add_argument("--max_completion_length", type=int, default=8192, help="Maximum completion length")
     parser.add_argument('--max_prompt_length', type=int, default=1024, help='Maximum prompt length')
+    parser.add_argument('--num_generations', type=int, default=8, help='GRPO completions sampled per prompt (global batch must be divisible by this)')
+    parser.add_argument('--use_lora', type=lambda x: str(x).lower() == 'true', default=False, help='Train with LoRA adapters (lets an 8B policy fit on a 24GB GPU)')
+    parser.add_argument('--lora_r', type=int, default=16, help='LoRA rank')
+    parser.add_argument('--lora_alpha', type=int, default=32, help='LoRA alpha')
+    parser.add_argument('--lora_dropout', type=float, default=0.05, help='LoRA dropout')
+    parser.add_argument('--lora_target_modules', type=str, default='', help='comma-separated target modules (default: attn+mlp proj)')
     parser.add_argument('--qa_max_tokens', type=int, default=4096, help="Maximum generation tokens for QA model")
     parser.add_argument('--eval_max_tokens', type=int, default=4096, help="Maximum generation tokens for evaluation model")
 
@@ -184,12 +190,38 @@ def main():
             "Please reduce chunks, change iteration, or verify traindataset_path."
         )
 
+    # THINKING vs LENGTH: Qwen3 defaults to a long <think> block that consumes the whole
+    # completion budget, so the policy never reaches its JSON answer within a bounded
+    # max_completion_length and every row scores fail_reward. Unless --think is set, append
+    # the Qwen soft switch '/no_think' to the last user turn so the policy emits the answer
+    # directly (short, parseable) -- giving a real reward signal at a modest length.
+    if args.mode == 'red' and not args.think:
+        def _nothink(ex):
+            p = ex.get("prompt")
+            if isinstance(p, list) and p and isinstance(p[-1], dict) and "content" in p[-1]:
+                if "/no_think" not in p[-1]["content"]:
+                    p[-1]["content"] = p[-1]["content"].rstrip() + " /no_think"
+            return {"prompt": p}
+        traindataset = traindataset.map(_nothink)
+        print("[train.py] red: appended '/no_think' to prompts (bounded, parseable completions)")
+
     #traindataset.shuffle(seed=int(time.time()) % 10000)
 
     # transformers>=4.40: TrainingArguments.fsdp must be str/list of options, not bool (DeepSpeed 时常为 False 触发 TypeError)
     fsdp_arg: str | list[str] = ["full_shard", "auto_wrap"] if args.fsdp else ""
 
+    # `max_prompt_length` was removed from GRPOConfig in newer trl; pass it only if supported
+    # so this script runs across trl versions (the installed one handles prompt length itself).
+    import dataclasses as _dc
+    _grpo_fields = {f.name for f in _dc.fields(GRPOConfig)}
+    _opt_kwargs = {}
+    if "max_prompt_length" in _grpo_fields:
+        _opt_kwargs["max_prompt_length"] = args.max_prompt_length
+    if "num_generations" in _grpo_fields:
+        _opt_kwargs["num_generations"] = args.num_generations
+
     grpo_config = GRPOConfig(
+        **_opt_kwargs,
         output_dir=args.output_dir,
         logging_dir=args.logging_dir,
         per_device_train_batch_size=args.per_device_train_batch_size,
@@ -207,7 +239,6 @@ def main():
         weight_decay=args.weight_decay,
         report_to="tensorboard",
         max_completion_length=args.max_completion_length,
-        max_prompt_length=args.max_prompt_length,
         fsdp=fsdp_arg,
         deepspeed=args.deepspeed_config if args.deepspeed_config is not None else None,
         mask_truncated_completions=True,
@@ -219,7 +250,8 @@ def main():
         vllm_server_timeout=args.vllm_server_timeout,
         repetition_penalty=args.repetition_penalty,
         temperature=args.temperature,
-        gradient_checkpointing=True if isinstance(model, str) else False,
+        gradient_checkpointing=True if (isinstance(model, str) or args.use_lora) else False,
+        gradient_checkpointing_kwargs={"use_reentrant": False} if args.use_lora else None,
         # distributed_backend='nccl',
         # world_size=torch.cuda.device_count() if args.ddp else 1,
     )
@@ -272,12 +304,26 @@ def main():
             f"Unsupported mode: {args.mode}"
         )
 
+    # LoRA: full-parameter GRPO of an 8B policy needs ~96GB just for Adam states, which does
+    # not fit on 24GB-class GPUs. LoRA trains only small adapters (optimizer state is tiny), so
+    # an 8B policy fits on a single 24GB card (bf16 base + adapters + gradient checkpointing).
+    peft_config = None
+    if args.use_lora:
+        from peft import LoraConfig
+        _targets = [t for t in (args.lora_target_modules or "").split(",") if t] or \
+            ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+        peft_config = LoraConfig(r=args.lora_r, lora_alpha=args.lora_alpha,
+                                 lora_dropout=args.lora_dropout, target_modules=_targets,
+                                 task_type="CAUSAL_LM", bias="none")
+        print(f"[train.py] LoRA enabled: r={args.lora_r} alpha={args.lora_alpha} targets={_targets}")
+
     grpo_trainer = GRPOTrainer(
         model=model,
         reward_funcs=reward_func,
         args=grpo_config,
         train_dataset=traindataset,
         processing_class=tokenizer,
+        peft_config=peft_config,
         callbacks=[SaveBestRewardCallback(top_k=args.save_total_limit, save_dir=args.output_dir, tokenizer=tokenizer)] if args.how_to_save == 'best_reward' else None,
     )
     

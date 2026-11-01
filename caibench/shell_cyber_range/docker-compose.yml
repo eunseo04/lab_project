@@ -1,0 +1,34 @@
+services:
+  shell-target:
+    build: ./shell-target
+    container_name: shell-target
+    environment:
+      WAZUH_MANAGER: host.docker.internal
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # blue containment (iptables / process kill) runs on this host
+    cap_add:
+      - NET_ADMIN
+    networks:
+      shell_dmz:
+        ipv4_address: 172.31.10.10
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  attacker:
+    build: ../financial_cyber_range/attacker
+    container_name: shell-attacker
+    networks:
+      shell_dmz:
+        ipv4_address: 172.31.10.100
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+networks:
+  shell_dmz:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.31.10.0/24
