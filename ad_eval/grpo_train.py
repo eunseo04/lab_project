@@ -14,6 +14,7 @@ from .inference import InferenceSettings
 from .models import checkpoint_info
 from .replay_lab import ReplayLab
 from .trajectory import sanitize
+from .grpo_rewards import RedRewardConfig, RedTrainingReward, build_red_reward
 
 
 def completion_text(completion) -> str:
@@ -47,25 +48,41 @@ def grpo_parameters(job: dict, policy: InferenceSettings) -> dict:
 
 
 class RolloutRewards:
-    def __init__(self, trajectory: dict, lab: ReplayLab, log: Path, num_generations: int):
+    def __init__(self, trajectory: dict, lab: ReplayLab, log: Path, num_generations: int,
+                 *, red_reward: RedTrainingReward | None = None):
         self.rows = {row["row_id"]: row for row in trajectory["steps"]}
         self.team, self.role = trajectory["team"], trajectory["role"]
         self.lab, self.log, self.group = lab, log, num_generations
+        self.trajectory_id = trajectory.get("trajectory_id", "unknown")
+        if (self.role == "red") != (red_reward is not None):
+            raise ValueError("Red GRPO requires an explicit training reward; Blue must use only its environment reward")
+        self.red_reward = red_reward
         self.samples, self.nonzero_spread_groups = 0, 0
 
     def evaluate(self, completions, row_ids: list[str]) -> list[float]:
         if len(completions) != len(row_ids):
             raise ValueError("GRPO samples and trajectory row IDs must align")
         rewards = []
+        pending = []
+        history = self.red_reward.snapshot() if self.red_reward else []
         for completion, row_id in zip(completions, row_ids):
             text = completion_text(completion)
             reward, evidence = self.lab.reward(self.rows[row_id], text, self.team, self.role)
+            components = None
+            if self.red_reward:
+                reward, components = self.red_reward.score(self.rows[row_id], text, reward, evidence, history)
             rewards.append(float(reward))
-            self.samples += 1
-            with self.log.open("a", encoding="utf-8") as handle:
-                self.log.chmod(0o600)
-                handle.write(json.dumps({"row_id": row_id, "completion": sanitize(text),
-                                         "reward": reward, "evidence": evidence}) + "\n")
+            pending.append({"trajectory_id": self.trajectory_id, "row_id": row_id, "completion": sanitize(text),
+                            "reward": reward, "evidence": evidence, "components": components})
+        # A single frozen history per reward batch prevents arbitrary candidate
+        # order from changing group-relative advantages.
+        if self.red_reward:
+            self.red_reward.commit_successes(pending)
+        self.samples += len(pending)
+        with self.log.open("a", encoding="utf-8") as handle:
+            self.log.chmod(0o600)
+            for sample in pending:
+                handle.write(json.dumps(sanitize(sample), ensure_ascii=False) + "\n")
         for offset in range(0, len(rewards), self.group):
             group = rewards[offset:offset + self.group]
             if len(group) == self.group and max(group) > min(group):
@@ -75,8 +92,19 @@ class RolloutRewards:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--job", type=Path, required=True)
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--job", type=Path)
+    mode.add_argument("--check-red-reward", type=Path)
     args = parser.parse_args()
+    if args.check_red_reward:
+        config = RedRewardConfig(**json.loads(args.check_red_reward.read_text(encoding="utf-8")))
+        # Read-only component preparation, without Docker, student weights or history writes.
+        from tempfile import TemporaryDirectory
+        with TemporaryDirectory() as temporary:
+            reward = build_red_reward(config, Path(temporary) / "successes.json")
+            reward.prepare()
+        print(json.dumps({"red_reward": config.to_dict(), "backends_prepared": True}))
+        return
     job = json.loads(args.job.read_text(encoding="utf-8"))
     trajectory = json.loads(Path(job["trajectory"]).read_text(encoding="utf-8"))
     if not trajectory["steps"]:
@@ -86,6 +114,12 @@ def main() -> None:
     previous = checkpoint_info(job["input_checkpoint"])
     policy = InferenceSettings(**trajectory["inference"]).for_role(trajectory["team"], trajectory["role"])
     parameters = grpo_parameters(job, policy)
+    red_reward = None
+    if trajectory["role"] == "red":
+        if "red_reward" not in job:
+            raise ValueError("Red GRPO job must declare the research reward configuration")
+        red_reward = build_red_reward(RedRewardConfig(**job["red_reward"]),
+                                      Path(job["red_success_memory"]) if job.get("red_success_memory") else None)
 
     import torch
     from datasets import Dataset
@@ -99,6 +133,8 @@ def main() -> None:
         raise RuntimeError(f"installed TRL cannot enforce required GRPO settings: {sorted(missing)}")
     if not torch.cuda.is_available():
         raise RuntimeError("the Qwen GRPO training job requires an allocated CUDA device")
+    if red_reward:
+        red_reward.prepare()  # fail before loading the large student policy
     output = Path(job["output_dir"])
     if output.exists() and any(output.iterdir()):
         raise FileExistsError("refusing to overwrite a prior trajectory training result")
@@ -118,7 +154,8 @@ def main() -> None:
     dataset = Dataset.from_list([{"prompt": row["prompt"], "row_id": row["row_id"]}
                                  for row in trajectory["steps"]])
     with ReplayLab(Path(job["replay_directory"])) as lab:
-        rewards = RolloutRewards(trajectory, lab, output / "rollout_rewards.jsonl", job["num_generations"])
+        rewards = RolloutRewards(trajectory, lab, output / "rollout_rewards.jsonl", job["num_generations"],
+                                 red_reward=red_reward)
 
         def environment_reward(prompts, completions, row_id, **_kwargs):
             return rewards.evaluate(completions, row_id)
@@ -143,6 +180,8 @@ def main() -> None:
                   "optimizer_steps": trainer.state.global_step, "sampled_completions": rewards.samples,
                   "reward_groups_with_variation": rewards.nonzero_spread_groups,
                   "parameters_changed": old_weights != new_weights, "training_parameters": parameters,
+                  "red_reward": red_reward.config.to_dict() if red_reward else None,
+                  "red_success_memory": str(red_reward.memory.path) if red_reward and red_reward.memory else None,
                   "algorithm": "on-policy GRPO, newly sampled commands evaluated in private reset/replay twins"}
         (output / "training_result.json").write_text(json.dumps(result, ensure_ascii=False, indent=2))
 

@@ -14,6 +14,7 @@ from .learning import empty_planner_state, trajectory_reward, update_planner
 from .models import ModelSpec, checkpoint_info, load_adapter, select_model, verify_model
 from .llm import served_model
 from .trajectory import export_trajectories
+from .grpo_rewards import config_from_args
 
 
 def save(path: Path, value: dict):
@@ -62,6 +63,7 @@ def validate_learning_args(args):
         raise ValueError("invalid GRPO epochs, learning rate, beta, or max steps")
     if args.frequency_penalty or args.presence_penalty:
         raise ValueError("the adaptive Transformers sampler currently requires zero frequency/presence penalties")
+    config_from_args(args, required=not args.dry_run)
 
 
 def learning_preflight(args) -> dict:
@@ -81,7 +83,16 @@ def learning_preflight(args) -> dict:
     required = {"chat_template_kwargs", "loss_type", "scale_rewards", "num_generations", "min_p"}
     if required - set(info.pop("grpo_fields")):
         raise RuntimeError("training TRL lacks required on-policy GRPO settings")
-    return {"initial_role_checkpoints": initial, "training_runtime": info,
+    config = config_from_args(args)
+    from tempfile import TemporaryDirectory
+    with TemporaryDirectory(prefix="ad-eval-reward-preflight-") as temporary:
+        path = Path(temporary) / "red_reward.json"
+        path.write_text(json.dumps(config.to_dict()))
+        checked = subprocess.run([args.training_python, "-m", "ad_eval.grpo_train", "--check-red-reward", str(path)],
+                                 cwd=ROOT, env=training_environment(args), capture_output=True, text=True, timeout=120)
+        if checked.returncode:
+            raise RuntimeError("Red GRPO reward backend check failed: " + checked.stderr[-1200:])
+    return {"initial_role_checkpoints": initial, "training_runtime": info, "red_reward": config.to_dict(),
             "training_python": args.training_python, "updates_per_match": 4,
             "planned_updates": 4 * args.repeats, "policy_updates": "after_each_complete_team_role_trajectory"}
 
@@ -93,6 +104,7 @@ class AdaptiveExperiment:
         self.prefix = served_model(args.trained_model) + "-online-" + hashlib.sha256(str(self.directory).encode()).hexdigest()[:8]
         self.state_path = self.directory / "state.json"
         self.initial = initial_checkpoints(args)
+        self.red_reward = config_from_args(args)
         self.state = {"schema_version": 1, "planners": empty_planner_state(), "policies": {}, "updates": []}
         if self.state_path.exists():
             self.state = json.loads(self.state_path.read_text(encoding="utf-8"))
@@ -141,6 +153,9 @@ class AdaptiveExperiment:
                    "num_generations": self.args.grpo_num_generations, "epochs": self.args.grpo_epochs,
                    "max_steps": self.args.grpo_max_steps, "learning_rate": self.args.grpo_learning_rate,
                    "beta": self.args.grpo_beta}
+            if role == "red":
+                job["red_reward"] = self.red_reward.to_dict()
+                job["red_success_memory"] = str(self.directory / "red_successes.json")
             job_path = self.directory / "jobs" / (slug + ".json")
             save(job_path, job)
             log_path = job_path.with_suffix(".log")
@@ -155,6 +170,8 @@ class AdaptiveExperiment:
             report = json.loads((output / "training_result.json").read_text(encoding="utf-8"))
             if report.get("trajectory_id") != trajectory["trajectory_id"] or report.get("optimizer_steps", 0) < 1:
                 raise RuntimeError("trainer did not report an optimization step for this trajectory")
+            if report.get("red_reward") != job.get("red_reward"):
+                raise RuntimeError("trainer did not apply the declared Red research reward configuration")
             before = checkpoint_info(current.checkpoint)
             after = checkpoint_info(report["checkpoint"])
             before_weights = {key: value for key, value in before["sha256"].items() if key.startswith("adapter_model.")}
@@ -171,6 +188,7 @@ class AdaptiveExperiment:
                       "parameters_changed": report["parameters_changed"],
                       "optimizer_steps": report["optimizer_steps"],
                       "reward_groups_with_variation": report["reward_groups_with_variation"],
+                      "red_reward": self.red_reward.to_dict() if role == "red" else None,
                       "deployed_checkpoint": deployed.get("checkpoint_artifact")}
             self.state["planners"] = planner
             self.state["policies"][role] = asdict(spec)

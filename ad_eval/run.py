@@ -24,6 +24,7 @@ from .models import select_model, verify_model
 from .inference import DEFAULT_INFERENCE, InferenceSettings
 from .scoring import score_match, summarize_matches
 from .adaptive import AdaptiveExperiment, enabled as adaptive_enabled, learning_preflight, validate_learning_args
+from .grpo_rewards import config_from_args as red_reward_config
 
 
 def dump(path: Path, obj: object) -> None:
@@ -96,13 +97,15 @@ def campaign_plan(args) -> list[dict]:
 
 def closed_loop_configuration(args) -> dict:
     adaptive = "proposed" in args.conditions and adaptive_enabled(args)
+    red_reward = red_reward_config(args, required=False) if adaptive else None
     return {"feedback_within_match": True,
             "model_weights": {condition: "trajectory_grpo" if adaptive and condition == "proposed" else "fixed"
                               for condition in args.conditions},
             "mcts_reward_updates": adaptive, "reset_environment_between_matches": True,
             "preserve_proposed_planner_and_weights": adaptive,
             "grpo_updates_per_proposed_match": 4 if adaptive else 0,
-            "planned_grpo_updates": 4 * args.repeats if adaptive else 0}
+            "planned_grpo_updates": 4 * args.repeats if adaptive else 0,
+            "red_grpo_reward": red_reward.to_dict() if red_reward else None}
 
 
 def inference_audit(events: list[dict], expected: InferenceSettings) -> dict:
@@ -369,6 +372,17 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--grpo-max-steps", type=int, default=-1, help="-1 trains the whole trajectory dataset")
     parser.add_argument("--grpo-learning-rate", type=float, default=1e-5)
     parser.add_argument("--grpo-beta", type=float, default=0., help="GRPO KL coefficient; 0 uses no extra reference model")
+    parser.add_argument("--red-reward-alpha", type=float, help="explicit experimental weight for verified attack reward")
+    parser.add_argument("--red-reward-beta", type=float, help="explicit experimental semantic weight; separate from --grpo-beta KL")
+    parser.add_argument("--red-reward-gamma", type=float, help="explicit experimental successful-history duplication penalty weight")
+    parser.add_argument("--red-semantic-model", help="frozen judge model; defaults to the base model")
+    parser.add_argument("--red-semantic-endpoint", help="frozen judge endpoint; defaults to the base endpoint")
+    parser.add_argument("--red-embedding-model", help="frozen local/cached SentenceTransformer, or served embedding model ID")
+    parser.add_argument("--red-embedding-endpoint", help="optional /v1/embeddings server instead of a local encoder")
+    parser.add_argument("--red-embedding-revision", help="pinned revision for a cached local embedding model")
+    parser.add_argument("--red-diversity-cosine-weight", type=float, default=.5)
+    parser.add_argument("--red-diversity-success-threshold", type=float, default=.2)
+    parser.add_argument("--red-diversity-history-limit", type=int, default=0, help="0 compares against all verified successful commands")
     parser.add_argument("--dry-run", action="store_true", help="print model/execution plan, without network or Docker")
     parser.add_argument("--preflight-only", action="store_true", help="check dependencies, served models and Indexer, without resetting hosts")
     return parser

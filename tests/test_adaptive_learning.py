@@ -20,6 +20,7 @@ from ad_eval.models import checkpoint_info
 from ad_eval.replay_lab import ReplayLab, TRAIN_HOSTS, TRAIN_KALI
 from ad_eval.run import build_parser, inference_settings, run_campaign, validate_args
 from ad_eval.trajectory import export_trajectories, utc_now
+from ad_eval.grpo_rewards import RedRewardConfig, build_red_reward
 
 
 def adapter(path, weights=b"initial"):
@@ -32,7 +33,8 @@ def adapter(path, weights=b"initial"):
 def args_for(root):
     initial = adapter(root / "initial")
     args = build_parser().parse_args(["--base-model", "Qwen/Qwen3-8B", "--trained-model", "grpo",
-                                     "--grpo-checkpoint", str(initial), "--out-dir", str(root / "campaign")])
+                                     "--grpo-checkpoint", str(initial), "--out-dir", str(root / "campaign"),
+                                     "--red-reward-alpha", "1", "--red-reward-beta", "0", "--red-reward-gamma", "0"])
     validate_args(args)
     return args
 
@@ -114,7 +116,8 @@ class AdaptivePipelineTests(unittest.TestCase):
         output = adapter(Path(job["output_dir"]) / "adapter", f"trained-{len(self.jobs)}".encode())
         (output.parent / "training_result.json").write_text(json.dumps({
             "trajectory_id": trajectory["trajectory_id"], "checkpoint": str(output),
-            "optimizer_steps": 1, "parameters_changed": True, "reward_groups_with_variation": 1}))
+            "optimizer_steps": 1, "parameters_changed": True, "reward_groups_with_variation": 1,
+            "red_reward": job.get("red_reward")}))
         return SimpleNamespace(returncode=0)
 
     def test_each_trajectory_continues_its_role_chain_and_deploys_before_next_match(self):
@@ -130,6 +133,10 @@ class AdaptivePipelineTests(unittest.TestCase):
             updates = learner.update(match, output, events)
             next_models, next_snapshot = learner.prepare(2)
         self.assertEqual(len(updates), 4)
+        self.assertEqual(self.jobs[0]["red_reward"]["alpha"], 1.)
+        self.assertIn("red_success_memory", self.jobs[2])
+        self.assertNotIn("red_reward", self.jobs[1])
+        self.assertNotIn("red_success_memory", self.jobs[3])
         self.assertEqual(self.jobs[2]["input_checkpoint"], str(Path(self.jobs[0]["output_dir"]) / "adapter"))
         self.assertEqual(self.jobs[3]["input_checkpoint"], str(Path(self.jobs[1]["output_dir"]) / "adapter"))
         self.assertTrue(next_models["red"].model.endswith("-red-r001-t2"))
@@ -233,7 +240,8 @@ class TrajectoryAndRewardTests(unittest.TestCase):
             lab = Mock()
             lab.reward.side_effect = [(0., {"environment_executed": True}), (1., {"environment_executed": True})]
             trajectory = {"role": "red", "team": "1", "terminal_reward": 1., "steps": [{"row_id": "a"}]}
-            rewards = RolloutRewards(trajectory, lab, Path(directory) / "rewards.jsonl", 2)
+            reward = build_red_reward(RedRewardConfig(1., 0., 0.), None)
+            rewards = RolloutRewards(trajectory, lab, Path(directory) / "rewards.jsonl", 2, red_reward=reward)
             result = rewards.evaluate([[{"content": "CMD: candidate-A"}], [{"content": "CMD: candidate-B"}]], ["a", "a"])
             self.assertEqual(result, [0., 1.])
             self.assertEqual(rewards.nonzero_spread_groups, 1)

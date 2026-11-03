@@ -96,11 +96,21 @@ class ReplayLab:
         return self.dexec(container, ["timeout", "--kill-after=2s", "35", "sh", "-c", command],
                           timeout=40, check=False)
 
+    def observed_http_recon(self, target: str, actor: str, started: str, ended: str) -> bool:
+        logs = cmd(["docker", "logs", "--since", started, "--until", ended, TRAIN_HOSTS[target]], timeout=10)
+        source = f"172.29.80.{100 + int(actor)}"
+        return any(source in line and re.search(
+            r'"(?:GET|HEAD) /(?:health|ping)?(?:\?[^"\n]*)? HTTP/[^"\s]+"\s+200\b', line)
+            for line in logs.splitlines())
+
     def reward(self, row: dict, completion: str, team: str, role: str) -> tuple[float, dict]:
         lines = [line.split(":", 1)[1].strip() for line in completion.splitlines()
                  if line.strip().upper().startswith("CMD:")]
         if len(lines) != 1 or not command_allowed(lines[0], role, team):
-            return -1., {"reason": "unparseable_or_rejected", "environment_executed": False}
+            evidence = {"reason": "unparseable_or_rejected", "environment_executed": False}
+            if role == "red":
+                evidence["attack_reward"] = -1.
+            return -1., evidence
         self.reset()
         for event in row["replay_prefix"]:
             self.execute(event["team"], event["role"], event["command"])
@@ -120,12 +130,18 @@ class ReplayLab:
                 host_events=events, target_ip=TRAIN_IPS[target], source_ip=f"172.29.80.{100 + int(team)}")
             score = max((int(evidence["user_flag"]) + 2 * int(evidence["root_flag"])) / 3.,
                         .2 if evidence["initial_access"] else 0.)
-            # A genuine successful reconnaissance response is a small progress
-            # reward, below verified access or objective capture.
-            if row.get("tech_id") == "T1595" and re.search(r"8080/tcp\s+open|shell-target diagnostics|ttl=", output, re.I):
+            # Recon progress needs a matching target-side HTTP observation, not
+            # merely an agent-controlled string such as "8080/tcp open".
+            recon = False
+            if row.get("tech_id") == "T1595" and (output.strip() == "ok" or re.search(
+                    r"8080/tcp\s+open|shell-target diagnostics|ttl=", output, re.I)):
+                recon = self.observed_http_recon(target, team, started, ended)
+            if recon:
                 score = max(score, .05)
             return score, {"initial_access": evidence["initial_access"], "user_flag": evidence["user_flag"],
-                           "root_flag": evidence["root_flag"], "environment_executed": True}
+                           "root_flag": evidence["root_flag"], "environment_executed": True,
+                           "attack_reward": score, "recon_http_verified": recon,
+                           "attack_reward_version": "docker_attack_v2"}
         patches = self.patches(team)
         if patches["vulnerability_patched"] is None:
             raise RuntimeError("training patch verification failed; not a model reward")
