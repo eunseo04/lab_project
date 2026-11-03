@@ -123,6 +123,8 @@ def score_team(rec: Mapping[str, Any], opponent: Mapping[str, Any],
         "cost_usd": rec.get("cost_usd"),
         "usage_complete": rec.get("usage_complete"),
         "cost_basis": rec.get("cost_basis"),
+        "inference_audit": rec.get("inference_audit"),
+        "closed_loop_cycles": rec.get("closed_loop_cycles"),
         "evidence": rec.get("evidence", {}),
     }
 

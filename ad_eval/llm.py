@@ -9,6 +9,8 @@ from urllib.parse import urlsplit, urlunsplit
 
 import requests
 
+from .inference import DEFAULT_INFERENCE, InferenceSettings
+
 
 def endpoint_base(endpoint: str) -> str:
     value = endpoint.strip().rstrip("/")
@@ -31,28 +33,39 @@ class LLMConfig:
     endpoint: str = ""
     model: str = ""
     timeout: float = 120.
-    max_new_tokens: int = 512
-    temperature: float = 0.7
-    top_p: float = 0.9
-    enable_thinking: bool = False
+    max_new_tokens: int = DEFAULT_INFERENCE.max_tokens
+    temperature: float = DEFAULT_INFERENCE.temperature
+    top_p: float = DEFAULT_INFERENCE.top_p
+    enable_thinking: bool = DEFAULT_INFERENCE.enable_thinking
+    top_k: int = DEFAULT_INFERENCE.top_k
+    min_p: float = DEFAULT_INFERENCE.min_p
+    repetition_penalty: float = DEFAULT_INFERENCE.repetition_penalty
+    frequency_penalty: float = DEFAULT_INFERENCE.frequency_penalty
+    presence_penalty: float = DEFAULT_INFERENCE.presence_penalty
+    seed: int = DEFAULT_INFERENCE.seed
 
     @classmethod
     def from_env(cls) -> LLMConfig:
+        settings = InferenceSettings.from_env().to_dict()
+        settings["max_new_tokens"] = settings.pop("max_tokens")
         return cls(
             endpoint=os.environ.get("QWEN_ENDPOINT", ""),
             model=served_model(os.environ.get("QWEN_ENDPOINT_MODEL") or
                                os.environ.get("QWEN_MODEL", "Qwen/Qwen3-8B")),
             timeout=float(os.environ.get("QWEN_TIMEOUT", "120")),
-            max_new_tokens=int(os.environ.get("QWEN_MAX_NEW_TOKENS", "512")),
-            temperature=float(os.environ.get("QWEN_TEMPERATURE", "0.7")),
-            top_p=float(os.environ.get("QWEN_TOP_P", "0.9")),
-            enable_thinking=os.environ.get("QWEN_ENABLE_THINKING", "false").lower() in {"1", "true"},
+            **settings,
         )
+
+    def inference_settings(self) -> InferenceSettings:
+        fields = {name: getattr(self, name) for name in InferenceSettings.__dataclass_fields__
+                  if name != "max_tokens"}
+        return InferenceSettings(max_tokens=self.max_new_tokens, **fields)
 
 
 class LLMClient:
     def __init__(self, config: LLMConfig | None = None):
         self.config = config or LLMConfig.from_env()
+        self.inference = self.config.inference_settings()
         self.base = endpoint_base(self.config.endpoint)
         if not self.config.model:
             raise ValueError("a served model must be specified")
@@ -78,15 +91,14 @@ class LLMClient:
 
     def chat(self, messages: list[dict], max_new_tokens: int | None = None,
              temperature: float | None = None) -> str:
+        if ((max_new_tokens is not None and max_new_tokens != self.inference.max_tokens) or
+                (temperature is not None and temperature != self.inference.temperature)):
+            raise ValueError("per-call generation overrides would invalidate the shared inference policy")
         if self.event_callback:
-            self.event_callback(kind="llm_request_started")
+            self.event_callback(kind="llm_request_started", inference=self.inference.request_fields())
         response = requests.post(
             self.base + "/chat/completions", headers=self.headers,
-            json={"model": self.config.model, "messages": messages,
-                  "max_tokens": max_new_tokens or self.config.max_new_tokens,
-                  "temperature": self.config.temperature if temperature is None else temperature,
-                  "top_p": self.config.top_p,
-                  "chat_template_kwargs": {"enable_thinking": self.config.enable_thinking}},
+            json={"model": self.config.model, "messages": messages, **self.inference.request_fields()},
             timeout=self.config.timeout,
         )
         response.raise_for_status()

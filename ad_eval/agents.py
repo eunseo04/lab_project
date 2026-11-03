@@ -13,6 +13,8 @@ from pathlib import Path
 from typing import IO
 from .docker_lab import HOSTS, KALI, IPS, OPPONENT, ROOT
 from .llm import endpoint_base, served_model
+from .inference import InferenceSettings
+from .models import ModelSpec
 
 
 @dataclass
@@ -66,7 +68,10 @@ def role_prompt(role: str, team: str, password: str | None = None) -> str:
 
 def make_workers(condition: str, out_dir: Path, model: str,
                  endpoint: str | None, seed: int = 0,
-                 blue_credentials: dict[str, str] | None = None) -> list[Worker]:
+                 blue_credentials: dict[str, str] | None = None,
+                 inference: InferenceSettings | None = None,
+                 role_models: dict[str, ModelSpec] | None = None,
+                 planner_state: Path | None = None) -> list[Worker]:
     if condition not in {"cai", "proposed", "proposed_base"}:
         raise ValueError("unknown evaluation condition")
     if not model.strip() or not endpoint:
@@ -75,17 +80,20 @@ def make_workers(condition: str, out_dir: Path, model: str,
     if any(not blue_credentials.get(t) for t in HOSTS):
         raise ValueError("both Blue SSH credentials are required")
     out_dir.mkdir(parents=True, exist_ok=True)
+    inference = inference or InferenceSettings(seed=seed)
     workers = []
     for team in HOSTS:
         base_env = dict(os.environ)
         for key in ("AD_EVAL_BLUE_PASSWORD", "WAZUH_PASSWORD", "HOST_ROOT_PASSWORD",
-                    "ALIAS_API_KEY", "ANTHROPIC_API_KEY", "PERPLEXITY_API_KEY", "C99_API_KEY"):
+                    "ALIAS_API_KEY", "ANTHROPIC_API_KEY", "PERPLEXITY_API_KEY", "C99_API_KEY",
+                    "AD_EVAL_PLANNER_STATE"):
             base_env.pop(key, None)
         base_env.update(PYTHONUNBUFFERED="1", AD_EVAL_TEAM=team, AD_EVAL_SEED=str(seed),
                         CAI_TELEMETRY="false", CAI_SKIP_UPDATE_CHECK="1", CTF_INSIDE="false",
                         CAI_STATE="false", CAI_STREAM="false", CAI_TRACING="false",
                         CAI_YOLO="true", CAI_ACTIVE_CONTAINER=KALI[team])
         if condition == "cai":
+            base_env.update(inference.to_env())
             base = endpoint_base(endpoint)
             base_env.update(CAI_MODEL="openai/" + served_model(model), OLLAMA="true",
                             OLLAMA_API_BASE=base, OPENAI_BASE_URL=base, OPENAI_API_BASE=base,
@@ -94,7 +102,7 @@ def make_workers(condition: str, out_dir: Path, model: str,
                             CAI_AGENT_TYPE="redteam_agent")
             config_path = out_dir / f"team{team}_parallel.json"
             import json
-            config_path.write_text(json.dumps({"parallel_agents": [
+            config_path.write_text(json.dumps({"inference": inference.to_dict(), "parallel_agents": [
                 {"name": "redteam_agent" if role == "red" else "blueteam_agent",
                  "model": base_env["CAI_MODEL"], "unified_context": False,
                  "prompt": role_prompt(role, team, blue_credentials[team] if role == "blue" else None)}
@@ -107,8 +115,12 @@ def make_workers(condition: str, out_dir: Path, model: str,
         else:
             for role in ("red", "blue"):
                 env = dict(base_env)
-                env.update(AD_EVAL_ROLE=role, QWEN_ENDPOINT=endpoint_base(endpoint),
-                           QWEN_ENDPOINT_MODEL=served_model(model), QWEN_MODEL=served_model(model))
+                selected = role_models[role] if role_models else ModelSpec(model, endpoint, "grpo")
+                env.update(inference.for_role(team, role).to_env())
+                env.update(AD_EVAL_ROLE=role, QWEN_ENDPOINT=endpoint_base(selected.endpoint),
+                           QWEN_ENDPOINT_MODEL=served_model(selected.model), QWEN_MODEL=served_model(selected.model))
+                if planner_state:
+                    env["AD_EVAL_PLANNER_STATE"] = str(planner_state)
                 if role == "blue":
                     env["WAZUH_PASSWORD"] = os.environ.get("WAZUH_PASSWORD", "")
                     env["AD_EVAL_BLUE_PASSWORD"] = blue_credentials[team]

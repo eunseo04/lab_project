@@ -13,6 +13,7 @@ from pathlib import Path
 import shutil
 import sys
 import time
+from dataclasses import asdict
 
 from .agents import make_workers
 from .docker_lab import (ROOT, HOSTS, IPS, OPPONENT, COMPOSE, cmd, compose_up,
@@ -20,7 +21,9 @@ from .docker_lab import (ROOT, HOSTS, IPS, OPPONENT, COMPOSE, cmd, compose_up,
                          target_audit, root_ssh_credentials)
 from .evidence import flags_and_access, merge_manual_review
 from .models import select_model, verify_model
+from .inference import DEFAULT_INFERENCE, InferenceSettings
 from .scoring import score_match, summarize_matches
+from .adaptive import AdaptiveExperiment, enabled as adaptive_enabled, learning_preflight, validate_learning_args
 
 
 def dump(path: Path, obj: object) -> None:
@@ -74,6 +77,49 @@ def usage_totals(events_by_role: dict[str, list[dict]], input_price: float | Non
             "cost_basis": "configured_USD_per_million_tokens" if cost is not None else None}
 
 
+def inference_settings(args, rep: int = 1) -> InferenceSettings:
+    return InferenceSettings(temperature=args.temperature, top_p=args.top_p, max_tokens=args.max_tokens,
+                             top_k=args.top_k, min_p=args.min_p, repetition_penalty=args.repetition_penalty,
+                             frequency_penalty=args.frequency_penalty, presence_penalty=args.presence_penalty,
+                             enable_thinking=args.enable_thinking, seed=args.seed + 4 * (rep - 1))
+
+
+def campaign_plan(args) -> list[dict]:
+    plan = []
+    for rep in range(1, args.repeats + 1):
+        order = args.conditions if rep % 2 else list(reversed(args.conditions))
+        for condition in order:
+            plan.append({"rep": rep, "condition": condition,
+                         "inference": inference_settings(args, rep).to_dict()})
+    return plan
+
+
+def closed_loop_configuration(args) -> dict:
+    adaptive = "proposed" in args.conditions and adaptive_enabled(args)
+    return {"feedback_within_match": True,
+            "model_weights": {condition: "trajectory_grpo" if adaptive and condition == "proposed" else "fixed"
+                              for condition in args.conditions},
+            "mcts_reward_updates": adaptive, "reset_environment_between_matches": True,
+            "preserve_proposed_planner_and_weights": adaptive,
+            "grpo_updates_per_proposed_match": 4 if adaptive else 0,
+            "planned_grpo_updates": 4 * args.repeats if adaptive else 0}
+
+
+def inference_audit(events: list[dict], expected: InferenceSettings) -> dict:
+    declarations = [e.get("inference") for e in events if e.get("kind") == "inference_settings"]
+    requests = [e.get("inference") for e in events
+                if e.get("kind") in {"inference_request", "llm_request_started"} and "inference" in e]
+    mismatches = sum(value != expected.request_fields() for value in [*declarations, *requests])
+    usage = [e for e in events if e.get("kind") == "llm_usage"]
+    completed = usage[-1].get("requests", 0) if usage else 0
+    unlogged = max(0, completed - len(requests))
+    matched = bool(declarations) and mismatches == 0 and unlogged == 0
+    return {"expected": expected.request_fields(), "requests_observed": len(requests),
+            "mismatches": mismatches, "unlogged_requests": unlogged, "valid": matched,
+            "status": "mismatch_or_missing_configuration" if not matched else
+                      "verified_client_requests" if requests else "configured_no_requests"}
+
+
 def validate_args(args) -> None:
     args.conditions = [x.strip() for x in args.conditions.split(",") if x.strip()]
     if not args.conditions or len(set(args.conditions)) != len(args.conditions) or any(
@@ -87,6 +133,9 @@ def validate_args(args) -> None:
             raise ValueError("token prices must be finite and nonnegative")
     for condition in args.conditions:
         select_model(args, condition)
+    inference_settings(args)
+    inference_settings(args, args.repeats).for_role("2", "blue")
+    validate_learning_args(args)
 
 
 def preflight(args) -> dict:
@@ -105,11 +154,14 @@ def preflight(args) -> dict:
         if not get_wazuh_client().ping():
             raise RuntimeError("proposed requires a reachable real Wazuh Indexer")
     cmd(["docker", "version", "--format", "{{.Server.Version}}"], timeout=15)
+    learning = learning_preflight(args) if "proposed" in args.conditions and adaptive_enabled(args) else None
     return {"cai_package_version": version, "python": sys.executable, "models": models,
             "compose_sha256": hashlib.sha256(COMPOSE.read_bytes()).hexdigest(),
             "dataset_sha256": hashlib.sha256((ROOT / "attack_dataset.json").read_bytes()).hexdigest(),
             "baseline_execution": "native_CAI_parallel_two_isolated_agents_per_team",
-            "score_version": "local_cai_ad_v2"}
+            "score_version": "local_cai_ad_v2", "inference": inference_settings(args).to_dict(),
+            "repeats_per_condition": args.repeats, "schedule": campaign_plan(args),
+            "closed_loop": closed_loop_configuration(args), "learning": learning}
 
 
 def collect_records(args, condition: str, rep: int, out: Path, samples: dict,
@@ -121,6 +173,14 @@ def collect_records(args, condition: str, rep: int, out: Path, samples: dict,
         event_paths = {role: out / (f"team{team}_{role}.events.jsonl" if condition == "cai"
                                    else f"team{team}_{role}.log") for role in ("red", "blue")}
         events = {role: read_events(path) for role, path in event_paths.items()}
+        inference = inference_settings(args, rep)
+        audits = {role: inference_audit(events[role], inference.for_role(team, role))
+                  for role in ("red", "blue")}
+        if any(not audit["valid"] for audit in audits.values()):
+            invalid = True
+        cycles = {role: {"started": sum(e.get("kind") == "closed_loop_cycle_started" for e in seq),
+                         "completed": sum(e.get("kind") == "closed_loop_cycle_completed" for e in seq)}
+                  for role, seq in events.items()}
         if condition == "cai" and any(not any(e.get("kind") == "agent_started" for e in events[r])
                                       for r in ("red", "blue")):
             invalid = True
@@ -140,6 +200,7 @@ def collect_records(args, condition: str, rep: int, out: Path, samples: dict,
                         "root_flag": ev["root_flag"], "vulnerability_detected": None,
                         "vulnerability_patched": patch["vulnerability_patched"],
                         "availability_samples": samples[team], **usage,
+                        "inference_audit": audits, "closed_loop_cycles": cycles,
                         "evidence": {**ev["evidence"], **patch,
                                      "blue_wazuh_alert_telemetry": any(e.get("kind") == "wazuh_alert_observed"
                                                                        for e in events["blue"]),
@@ -150,16 +211,17 @@ def collect_records(args, condition: str, rep: int, out: Path, samples: dict,
             for key in ("initial_access", "user_flag", "root_flag", "vulnerability_detected", "vulnerability_patched"):
                 record[key] = None
             record["evidence"]["invalid_match"] = {"worker_exit_codes": worker_exit,
-                                                       "reason": "worker_exit_or_error_or_missing_native_agent"}
+                                                       "reason": "worker_error_missing_agent_or_inference_mismatch"}
     return records
 
 
-def run_one(args, condition: str, rep: int, labels: dict) -> dict:
+def run_one(args, condition: str, rep: int, labels: dict, *, adaptive=None) -> dict:
     slug = f"rep{rep:03d}_{condition}"
     out = Path(args.out_dir).resolve() / slug
     if out.exists():
         raise FileExistsError(f"refusing to overwrite experiment evidence: {out}")
     out.mkdir(parents=True)
+    role_models, planner_state = adaptive.prepare(rep) if adaptive else (None, None)
     print(f"[ad_eval] {slug}: recreating the shared range", flush=True)
     compose_up()
     if condition != "cai":
@@ -178,8 +240,10 @@ def run_one(args, condition: str, rep: int, labels: dict) -> dict:
 
     collect_flags()
     model = select_model(args, condition)
+    inference = inference_settings(args, rep)
     workers = make_workers(condition, out, model=model.model, endpoint=model.endpoint,
-                           seed=rep, blue_credentials=root_ssh_credentials())
+                           seed=inference.seed, blue_credentials=root_ssh_credentials(), inference=inference,
+                           role_models=role_models, planner_state=planner_state)
     samples = {team: [] for team in HOSTS}
     worker_exit = {}
     audit_prefix = {team: len(target_audit(team)) for team in HOSTS}
@@ -244,14 +308,26 @@ def run_one(args, condition: str, rep: int, labels: dict) -> dict:
     # Always retain raw observations before applying human labels.
     dump(out / "records.json", {"match_id": slug, "condition": condition, "rep": rep,
                                "duration_s": args.match_seconds, "interval_s": args.interval,
+                               "inference": inference.to_dict(),
+                               "role_models": {role: asdict(spec) for role, spec in role_models.items()} if role_models else None,
+                               "planner_input": str(planner_state) if planner_state else None,
                                "records": records})
     reviewed = [merge_manual_review(rec, labels.get(f"{rep}:{condition}:{rec['team']}", {}))
                 for rec in records]
     match = score_match(*reviewed, args.match_seconds, args.interval)
     match.update(match_id=slug, started_utc=start_utc, model=model.model,
                  model_kind=model.kind, source="local_mayhem_cyber_range_not_HTB",
-                 worker_exit_codes=worker_exit)
+                 worker_exit_codes=worker_exit, rep=rep, inference=inference.to_dict())
+    if role_models:
+        match["model"] = {role: spec.model for role, spec in role_models.items()}
+        match["role_models"] = {role: asdict(spec) for role, spec in role_models.items()}
+        match["planner_input"] = str(planner_state)
     dump(out / "score.json", match)
+    if adaptive:
+        events = {(team, role): read_events(out / f"team{team}_{role}.log")
+                  for team in HOSTS for role in ("red", "blue")}
+        match["learning_updates"] = adaptive.update(match, out, events)
+        dump(out / "score.json", match)
     print(f"[ad_eval] {slug}: winner={match['winner']}", flush=True)
     return match
 
@@ -259,7 +335,7 @@ def run_one(args, condition: str, rep: int, labels: dict) -> dict:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--conditions", default="cai,proposed")
-    parser.add_argument("--repeats", type=int, default=3)
+    parser.add_argument("--repeats", type=int, default=10, help="complete closed-loop matches per condition")
     parser.add_argument("--match-seconds", type=float, default=900.)
     parser.add_argument("--interval", type=float, default=15.)
     parser.add_argument("--base-model", required=True)
@@ -271,9 +347,62 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--labels", help="review labels keyed by rep:condition:team")
     parser.add_argument("--input-usd-per-million", type=float)
     parser.add_argument("--output-usd-per-million", type=float)
+    parser.add_argument("--temperature", type=float, default=DEFAULT_INFERENCE.temperature)
+    parser.add_argument("--top-p", type=float, default=DEFAULT_INFERENCE.top_p)
+    parser.add_argument("--max-tokens", type=int, default=DEFAULT_INFERENCE.max_tokens)
+    parser.add_argument("--top-k", type=int, default=DEFAULT_INFERENCE.top_k)
+    parser.add_argument("--min-p", type=float, default=DEFAULT_INFERENCE.min_p)
+    parser.add_argument("--repetition-penalty", type=float, default=DEFAULT_INFERENCE.repetition_penalty)
+    parser.add_argument("--frequency-penalty", type=float, default=DEFAULT_INFERENCE.frequency_penalty)
+    parser.add_argument("--presence-penalty", type=float, default=DEFAULT_INFERENCE.presence_penalty)
+    parser.add_argument("--enable-thinking", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument("--seed", type=int, default=DEFAULT_INFERENCE.seed)
+    parser.add_argument("--adaptive-proposed", action=argparse.BooleanOptionalAction, default=True,
+                        help="reward-update proposed MCTS and train/deploy GRPO after each role trajectory")
+    parser.add_argument("--training-python", default=sys.executable)
+    parser.add_argument("--training-base-model", help="HF model ID or local base weights for GRPO")
+    parser.add_argument("--training-cuda-devices", help="CUDA_VISIBLE_DEVICES for the isolated training process")
+    parser.add_argument("--red-grpo-checkpoint", help="optional separate initial Red LoRA")
+    parser.add_argument("--blue-grpo-checkpoint", help="optional separate initial Blue LoRA")
+    parser.add_argument("--grpo-num-generations", type=int, default=4)
+    parser.add_argument("--grpo-epochs", type=float, default=1.)
+    parser.add_argument("--grpo-max-steps", type=int, default=-1, help="-1 trains the whole trajectory dataset")
+    parser.add_argument("--grpo-learning-rate", type=float, default=1e-5)
+    parser.add_argument("--grpo-beta", type=float, default=0., help="GRPO KL coefficient; 0 uses no extra reference model")
     parser.add_argument("--dry-run", action="store_true", help="print model/execution plan, without network or Docker")
     parser.add_argument("--preflight-only", action="store_true", help="check dependencies, served models and Indexer, without resetting hosts")
     return parser
+
+
+def run_campaign(args, labels: dict) -> list[dict]:
+    matches = []
+    schedule = campaign_plan(args)
+    learner = AdaptiveExperiment(args) if "proposed" in args.conditions and adaptive_enabled(args) else None
+    if learner:
+        learner.initialize_policies()  # validate dynamic registration before spending a measured match
+    for index, item in enumerate(schedule, 1):
+        print(f"[ad_eval] workflow {index}/{len(schedule)}: "
+              f"rep={item['rep']} condition={item['condition']}", flush=True)
+        if learner is not None and item["condition"] == "proposed":
+            match = run_one(args, item["condition"], item["rep"], labels, adaptive=learner)
+        else:
+            match = run_one(args, item["condition"], item["rep"], labels)
+        matches.append(match)
+        dump(Path(args.out_dir) / "summary.json", {
+            "schema_version": "local_cai_ad_v2", "matches": matches,
+            "by_condition": summarize_matches(matches),
+            "inference": inference_settings(args).to_dict(),
+            "progress": {"requested_per_condition": args.repeats, "total_requested": len(schedule),
+                         "total_completed": len(matches), "complete": len(matches) == len(schedule),
+                         "completed_by_condition": {condition: sum(m["condition"] == condition for m in matches)
+                                                    for condition in args.conditions}},
+            "closed_loop": closed_loop_configuration(args),
+            "completed_grpo_updates": sum(len(match.get("learning_updates", [])) for match in matches),
+            "caveats": ["Local range, model and availability checker differ from the HTB paper",
+                        "Detection and uncorrelated initial access require independent human review",
+                        "Team observations in a match are paired; Wilson intervals are descriptive",
+                        "Equal sampling settings and seeds do not guarantee deterministic GPU outputs"]})
+    return matches
 
 
 def main() -> None:
@@ -288,6 +417,9 @@ def main() -> None:
     plan = {c: vars(select_model(args, c)) for c in args.conditions}
     if args.dry_run:
         print(json.dumps({"conditions": plan, "duration_s": args.match_seconds,
+                          "repeats_per_condition": args.repeats, "total_matches": len(campaign_plan(args)),
+                          "inference": inference_settings(args).to_dict(), "schedule": campaign_plan(args),
+                          "closed_loop": closed_loop_configuration(args),
                           "cai_workers": "2 native /parallel sessions, each with Red+Blue",
                           "proposed_workers": "4 isolated MCTS/SIEM workers"}, indent=2))
         return
@@ -300,16 +432,7 @@ def main() -> None:
         raise FileExistsError("choose a fresh --out-dir for each experiment campaign")
     dump(out_dir / "manifest.json", manifest)
     labels = json.loads(Path(args.labels).read_text(encoding="utf-8")) if args.labels else {}
-    matches = []
-    for rep in range(1, args.repeats + 1):
-        order = args.conditions if rep % 2 else list(reversed(args.conditions))
-        for condition in order:
-            matches.append(run_one(args, condition, rep, labels))
-            dump(out_dir / "summary.json", {"schema_version": "local_cai_ad_v2", "matches": matches,
-                                           "by_condition": summarize_matches(matches),
-                                           "caveats": ["Local range, model and availability checker differ from the HTB paper",
-                                                       "Detection and uncorrelated initial access require independent human review",
-                                                       "Team observations in a match are paired; Wilson intervals are descriptive"]})
+    run_campaign(args, labels)
     print(f"[ad_eval] completed: {out_dir / 'summary.json'}")
 
 

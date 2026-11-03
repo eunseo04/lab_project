@@ -22,6 +22,12 @@ def rescore_directory(out_dir: Path, labels: dict) -> dict:
         match = score_match(records[0], records[1], raw["duration_s"], raw["interval_s"])
         match["match_id"] = raw["match_id"]
         match["source"] = "local_mayhem_cyber_range_not_HTB"
+        if "inference" in raw:
+            match["inference"] = raw["inference"]
+        for key in ("role_models", "planner_input"):
+            if raw.get(key) is not None:
+                match[key] = raw[key]
+        match["rep"] = raw["rep"]
         (path.parent / "score_reviewed.json").write_text(
             json.dumps(match, ensure_ascii=False, indent=2), encoding="utf-8")
         matches.append(match)

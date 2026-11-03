@@ -26,6 +26,7 @@ def main() -> None:
     argv = [sys.executable, "-m", "vllm.entrypoints.openai.api_server",
             "--model", args.base_model, "--served-model-name", args.base_model,
             "--enable-lora", "--lora-modules", f"{args.trained_model}={info['path']}",
+            "--max-loras", "2", "--max-cpu-loras", "4",
             "--host", args.host, "--port", str(args.port),
             "--max-model-len", str(args.max_model_len), "--max-lora-rank", str(args.max_lora_rank),
             "--enable-auto-tool-choice", "--tool-call-parser", "hermes"]

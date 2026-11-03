@@ -8,7 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ENTRYPOINTS = ("ad_eval/run.py", "ad_eval/rescore.py", "ad_eval/models.py",
-               "ad_eval/cai_parallel.py", "ad_eval/proposed_worker.py", "train.py")
+               "ad_eval/cai_parallel.py", "ad_eval/proposed_worker.py", "ad_eval/grpo_train.py", "train.py")
 LEGACY = {"pipeline", "llm", "redtools", "wazuh_client", "environment", "eval", "evaluator",
           "strategy_improve", "playbook_gen"}
 

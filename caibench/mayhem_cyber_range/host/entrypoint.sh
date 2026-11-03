@@ -31,7 +31,7 @@ echo 'ctf ALL=(root) NOPASSWD: /usr/bin/find' > /etc/sudoers.d/ctf && chmod 440 
   done ) &
 
 # --- Wazuh agent (distinct per-host agent name so host-a / host-b alerts are attributable) ---
-if [ -f /var/ossec/etc/ossec.conf ]; then
+if [ "${WAZUH_ENABLED:-true}" = "true" ] && [ -f /var/ossec/etc/ossec.conf ]; then
     sed -i "s#<address>[^<]*</address>#<address>${MANAGER}</address>#" /var/ossec/etc/ossec.conf || true
     if [ -n "${WAZUH_AGENT_NAME}" ]; then
         if grep -q "<agent_name>" /var/ossec/etc/ossec.conf; then

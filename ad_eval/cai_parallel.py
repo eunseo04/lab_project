@@ -6,6 +6,8 @@ Agent creation, context isolation, scheduling and Runner calls remain CAI's own.
 from __future__ import annotations
 
 import argparse
+from contextvars import ContextVar
+from dataclasses import replace
 import inspect
 import json
 import os
@@ -13,6 +15,37 @@ from pathlib import Path
 import time
 
 from .docker_lab import IPS, OPPONENT
+from .inference import InferenceSettings
+
+
+def install_inference_controls(completions, inference: InferenceSettings, team: str,
+                               active_role: ContextVar, emit):
+    """Scope transport controls to this CAI worker, keeping its scheduler and tools intact."""
+    original_async, original_sync = completions.acompletion, completions.completion
+
+    def prepare(args, kwargs):
+        role = active_role.get()
+        if role not in {"red", "blue"} or args:
+            raise RuntimeError("cannot attribute a CAI completion to a configured team/role")
+        settings = inference.for_role(team, role)
+        controlled = settings.litellm_kwargs(kwargs)
+        emit(role, kind="inference_request", inference=settings.request_fields(),
+             model=controlled.get("model"), transport="litellm")
+        return controlled
+
+    async def async_completion(*args, **kwargs):
+        return await original_async(**prepare(args, kwargs))
+
+    def completion(*args, **kwargs):
+        return original_sync(**prepare(args, kwargs))
+
+    completions.acompletion = async_completion
+    completions.completion = completion
+
+    def restore():
+        completions.acompletion, completions.completion = original_async, original_sync
+
+    return restore
 
 
 class LocalTraceSink:
@@ -86,10 +119,11 @@ def main() -> None:
     parser.add_argument("--check-config", action="store_true")
     args = parser.parse_args()
     config = json.loads(args.config.read_text(encoding="utf-8"))
+    inference = InferenceSettings(**config["inference"])
     # Import AFTER the parent configures endpoint/model environment variables.
     import cai.cli as cli
     from cai.repl.commands.parallel import PARALLEL_CONFIGS, ParallelCommand
-    from cai.sdk.agents import Runner, set_trace_processors, set_tracing_disabled
+    from cai.sdk.agents import Runner, ModelSettings, RunConfig, set_trace_processors, set_tracing_disabled
 
     command = ParallelCommand()
     PARALLEL_CONFIGS.clear()
@@ -98,19 +132,51 @@ def main() -> None:
             raise RuntimeError("CAI /parallel add failed")
     if len(PARALLEL_CONFIGS) != 2 or any(c.unified_context for c in PARALLEL_CONFIGS):
         raise RuntimeError("expected native /parallel with two isolated contexts")
+    sink = LocalTraceSink(args.config.parent, os.environ["AD_EVAL_TEAM"])
+    for role in ("red", "blue"):
+        sink.write(role, kind="inference_settings",
+                   inference=inference.for_role(sink.team, role).request_fields())
     if args.check_config:
         print("AD_EVAL_NATIVE_PARALLEL_OK")
         return
 
-    sink = LocalTraceSink(args.config.parent, os.environ["AD_EVAL_TEAM"])
     set_trace_processors([sink])
     original_run = Runner.run
+    active_role = ContextVar("ad_eval_cai_role", default=None)
+    import litellm
+    install_inference_controls(litellm, inference, sink.team, active_role, sink.write)
+    cycles = {"red": 0, "blue": 0}
 
     async def traced_run(*run_args, **kwargs):
         # CLI versions disable tracing during startup. Enable only our local sink
         # immediately before a native Runner call; no network trace processor exists.
         set_tracing_disabled(False)
-        return await original_run(*run_args, **kwargs)
+        agent = run_args[0] if run_args else kwargs.get("starting_agent")
+        name = str(getattr(agent, "name", "")).lower()
+        role = "red" if "red team" in name else "blue" if "blue team" in name else active_role.get()
+        if role not in cycles:
+            raise RuntimeError("unexpected agent in the native CAI A&D session")
+        settings = inference.for_role(sink.team, role)
+        # Public SDK settings cover the standard parameters. The transport hook
+        # supplies seed, thinking and vLLM extras dropped by CAI 0.5.10's adapter.
+        model_settings = ModelSettings(temperature=settings.temperature, top_p=settings.top_p,
+                                       max_tokens=settings.max_tokens,
+                                       frequency_penalty=settings.frequency_penalty,
+                                       presence_penalty=settings.presence_penalty)
+        kwargs["run_config"] = replace(kwargs.get("run_config") or RunConfig(), model_settings=model_settings)
+        token = active_role.set(role)
+        cycles[role] += 1
+        cycle = cycles[role]
+        sink.write(role, kind="closed_loop_cycle_started", cycle=cycle)
+        try:
+            result = await original_run(*run_args, **kwargs)
+            sink.write(role, kind="closed_loop_cycle_completed", cycle=cycle)
+            return result
+        except Exception as exc:
+            sink.write(role, kind="worker_error", error=str(exc))
+            raise
+        finally:
+            active_role.reset(token)
 
     Runner.run = staticmethod(traced_run)
 
