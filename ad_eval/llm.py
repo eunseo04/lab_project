@@ -60,6 +60,7 @@ class LLMClient:
         self.headers = {"Authorization": "Bearer " + key}
         self.usage = {"input_tokens": 0, "output_tokens": 0, "requests": 0}
         self.usage_complete = True
+        self.event_callback = None
 
     def check(self) -> list[str]:
         response = requests.get(self.base + "/models", headers=self.headers,
@@ -77,6 +78,8 @@ class LLMClient:
 
     def chat(self, messages: list[dict], max_new_tokens: int | None = None,
              temperature: float | None = None) -> str:
+        if self.event_callback:
+            self.event_callback(kind="llm_request_started")
         response = requests.post(
             self.base + "/chat/completions", headers=self.headers,
             json={"model": self.config.model, "messages": messages,
@@ -95,6 +98,8 @@ class LLMClient:
             self.usage["output_tokens"] += usage["completion_tokens"]
         else:
             self.usage_complete = False
+        if self.event_callback:
+            self.event_callback(kind="llm_usage", complete=self.usage_complete, **self.usage)
         answer = data["choices"][0]["message"].get("content")
         if not isinstance(answer, str) or not answer.strip():
             raise RuntimeError("LLM returned no visible content")

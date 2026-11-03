@@ -16,6 +16,10 @@ access log. The app runs AS the unprivileged 'ctf' user (see entrypoint.sh).
 import os
 import logging
 import subprocess
+import json
+import uuid
+import socket
+import hashlib
 from datetime import datetime, timezone
 from flask import Flask, request
 
@@ -85,6 +89,7 @@ def health():
 
 
 _PATCH = "/var/lib/shell-target/patched"
+_EXECUTION_LOG = os.environ.get("EXECUTION_LOG", "/var/log/shell-target/executions.jsonl")
 
 
 @app.route("/ping")
@@ -102,7 +107,23 @@ def ping():
     # so `127.0.0.1; id` or `x$(cat /home/ctf/user.txt)` yields command execution.
     cmd = f"ping -c 1 -W 1 {host}"
     _audit_line("EXEC", host, inj, cmd)
-    return _run(cmd)
+    execution_id = uuid.uuid4().hex
+    started = datetime.now(timezone.utc).isoformat()
+    output = _run(cmd)
+    if inj:
+        event = {"execution_id": execution_id, "started_utc": started,
+                 "ended_utc": datetime.now(timezone.utc).isoformat(),
+                 "host": socket.gethostname(), "source_ip": request.remote_addr,
+                 "executor_uid": os.geteuid(),
+                 "command": cmd, "injection": True,
+                 "output_sha256": hashlib.sha256(output.encode()).hexdigest(),
+                 "uid_observed": bool(_re.search(r"\buid=\d+\(", output))}
+        with open(_EXECUTION_LOG, "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(event) + "\n")
+        # A server-generated identifier links the response observed by the tool
+        # to this exact request; narrative UID text cannot supply that link.
+        output += "\nAD_EXECUTION_ID=" + execution_id + "\n"
+    return output
 
 
 if __name__ == "__main__":

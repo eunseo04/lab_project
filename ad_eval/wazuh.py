@@ -104,3 +104,48 @@ def get_wazuh_client() -> WazuhClient:
     else:
         print("[wazuh] WAZUH_PASSWORD not set -> live Wazuh detection disabled.")
     return c
+
+
+def verify_lab_ingestion(client: WazuhClient, timeout: float = 60.) -> dict:
+    """Check agent attribution AND a fresh MITRE-tagged canary on both local hosts.
+
+    Run before the measurement window; this is a benign lab canary, not an
+    agent action. Manager rule installation/enrollment must already be complete.
+    """
+    import time
+    import uuid
+    from .docker_lab import HOSTS, IPS, KALI, OPPONENT, dexec
+
+    if not client.ping():
+        raise RuntimeError("Wazuh Indexer is unreachable")
+    began = datetime.now(timezone.utc)
+    tokens = {team: "AD_WAZUH_CANARY_" + uuid.uuid4().hex for team in HOSTS}
+    for team in HOSTS:
+        dexec(KALI[OPPONENT[team]], [
+            "curl", "--silent", "--show-error", "--max-time", "5", "-G",
+            f"http://{IPS[team]}:8080/ping", "--data-urlencode",
+            f"host=127.0.0.1;printf {tokens[team]}"], timeout=8)
+    pending = set(HOSTS)
+    evidence = {}
+    deadline = time.monotonic() + timeout
+    while pending and time.monotonic() < deadline:
+        for team in list(pending):
+            alerts = client.query_alerts(since=began, agent_name=HOSTS[team])
+            if client.last_error:
+                raise RuntimeError("Wazuh query failed during ingestion verification")
+            hit = next((alert for alert in alerts
+                        if (alert.get("agent") or {}).get("name") == HOSTS[team]
+                        and tokens[team] in str(alert.get("full_log", ""))
+                        and "T1190" in client.technique_ids([alert])), None)
+            if hit:
+                evidence[team] = {"agent_name": HOSTS[team],
+                                  "agent_id": hit["agent"].get("id"),
+                                  "technique_ids": sorted(client.technique_ids([hit])),
+                                  "rule_id": (hit.get("rule") or {}).get("id")}
+                pending.remove(team)
+        if pending:
+            time.sleep(min(1., max(0., deadline - time.monotonic())))
+    if pending:
+        raise RuntimeError("no fresh host-scoped MITRE T1190 canary for " +
+                           ", ".join(HOSTS[t] for t in sorted(pending)))
+    return evidence

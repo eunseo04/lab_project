@@ -15,6 +15,7 @@ import os
 import random
 import re
 import time
+import uuid
 from datetime import datetime, timezone
 
 from . import mcts as P
@@ -109,6 +110,7 @@ def run(team: str, role: str) -> None:
         raise RuntimeError("fallback policy is forbidden in evaluation")
     llm = get_llm()
     llm.check()
+    llm.event_callback = lambda **fields: log_event(team=team, role=role, **fields)
     own_ip, other_ip = IPS[team], IPS[OPPONENT[team]]
     # Repo's actual coverage profiles: 'linux', 'containers', 'financial_linux_web'.
     # 'shell_linux' is not defined and could cause unscoped fallbacks.
@@ -156,7 +158,12 @@ def run(team: str, role: str) -> None:
                     observed = "Command rejected by local-range policy"
                     time.sleep(1)
                     continue
+                tool_started = datetime.now(timezone.utc).isoformat()
                 result = executor.run_command(command, container=KALI[team])
+                log_event(kind="tool_result", team=team, role=role,
+                          tool_call_id=uuid.uuid4().hex, command=command,
+                          target_ip=other_ip, started_utc=tool_started,
+                          ended_utc=datetime.now(timezone.utc).isoformat(), output=result)
                 print("RED_TOOL_OUTPUT_BEGIN", flush=True)
                 print(result[:30000], flush=True)
                 print("RED_TOOL_OUTPUT_END", flush=True)
@@ -184,12 +191,13 @@ def run(team: str, role: str) -> None:
                     raise RuntimeError(f"Wazuh query error: {wazuh.last_error}")
                 tids = wazuh.technique_ids(alerts) - seen
                 if not tids:
+                    log_event(kind="llm_usage", team=team, role=role,
+                              complete=llm.usage_complete, **llm.usage)
                     time.sleep(3)
                     continue
                 tid = sorted(tids)[0]
                 related = next((a for a in alerts
                                 if tid in str((a.get("rule") or {}).get("mitre", {}))), {})
-                seen.add(tid)
                 log_event(kind="wazuh_alert_observed", team=team,
                           tech_id=tid, agent_name=HOSTS[team])
                 # Blue MCTS ranks candidate defenses; trained GRPO model then
@@ -207,6 +215,10 @@ def run(team: str, role: str) -> None:
                     result = blue_ssh_exec(team, password, command)
                     print("BLUE_TOOL_RESULT " + result[:3000], flush=True)
                     observed = result
+                    # Allow later events for a technique after a failed/NODEF remedy.
+                    # Deduplicate actual event documents rather than suppressing the
+                    # technique for the rest of the match.
+                    seen.clear()
                 time.sleep(1)
             log_event(kind="llm_usage", team=team, role=role,
                       complete=llm.usage_complete, **llm.usage)

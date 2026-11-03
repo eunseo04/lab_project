@@ -20,3 +20,4 @@ analysis
 Search/output
 # secrets
 .env
+/output/ad_eval*/

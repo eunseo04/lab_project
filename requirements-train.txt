@@ -1,0 +1,17 @@
+# Direct dependencies of the retained GRPO training code.
+# Resolve GPU/torch/trl compatibility in the existing training environment.
+-r requirements-eval.txt
+torch
+transformers
+trl
+datasets
+peft
+accelerate
+numpy
+PyYAML
+json-repair
+nltk
+fast-bleu
+torchmetrics
+sentence-transformers
+scikit-learn

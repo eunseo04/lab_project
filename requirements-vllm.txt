@@ -1,0 +1,2 @@
+# Serve inference separately from the CPU evaluation runner.
+vllm==0.10.0

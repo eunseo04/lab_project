@@ -90,7 +90,7 @@ class EvidenceTests(unittest.TestCase):
 
     def test_ia_requires_red_result_and_target_audit(self):
         self.assertFalse(flags_and_access("uid=1000(ctf)", "", set(), set())["initial_access"])
-        self.assertTrue(flags_and_access("uid=1000(ctf)", "Nov 3 shell: EXEC inj=1 host=x", set(), set())["initial_access"])
+        self.assertIsNone(flags_and_access("uid=1000(ctf)", "Nov 3 shell: EXEC inj=1 host=x", set(), set())["initial_access"])
 
     def test_manual_label_needs_reviewer(self):
         with self.assertRaises(ValueError):

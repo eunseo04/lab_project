@@ -1,0 +1,50 @@
+{
+  "removed": [
+    "benign_activity.py",
+    "coverage.py",
+    "deploy_vllm_server.py",
+    "eval.py",
+    "evaluator.py",
+    "gen_data.py",
+    "redtools.py",
+    "strategy_improve.py",
+    "wazuh_client.py",
+    "wazuh_log.py",
+    "legacy/",
+    "scripts_qwen3_8b/",
+    "caibench/financial_cyber_range/",
+    "caibench/shell_cyber_range/",
+    "run_shell_trainloop.sh",
+    "run_trainloop_grpo.sh",
+    "redeploy_lora.sh",
+    "caibench/ctf_configs.jsonl",
+    "caibench/__init__.py",
+    "dataset/dataset.py",
+    "dataset/dataset_loader.py",
+    "scripts_wazuh_unblock.sh"
+  ],
+  "reason": "not reachable from ad_eval or retained GRPO training entrypoints; user requested deletion",
+  "preserved": [
+    "cai/",
+    "caibench/mayhem_cyber_range/",
+    "wazuh-docker/",
+    "train.py",
+    "reward.py",
+    "my_utils.py",
+    "red_diversity.py",
+    "prompts/",
+    "attack_dataset.json",
+    "dataset/",
+    "output/"
+  ],
+  "already_absent_legacy_entries": [
+    "pipeline.py",
+    "llm.py",
+    "playbook_gen.py",
+    "environment/",
+    "Dockerfile.kali",
+    "cai_ad_local_patch/",
+    "dataset/attack_dataset_23.json",
+    "dataset/strategy_playbook.json"
+  ]
+}

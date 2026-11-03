@@ -28,7 +28,7 @@ def rescore_directory(out_dir: Path, labels: dict) -> dict:
     if not matches:
         raise FileNotFoundError(f"no records.json found under {out_dir}")
     return {"matches": matches, "by_condition": summarize_matches(matches),
-            "reviewed_labels": sorted(labels), "scoring": "local_cai_ad_v1"}
+            "reviewed_labels": sorted(labels), "scoring": "local_cai_ad_v2"}
 
 
 def main() -> None:

@@ -121,6 +121,8 @@ def score_team(rec: Mapping[str, Any], opponent: Mapping[str, Any],
         "input_tokens": rec.get("input_tokens"),
         "output_tokens": rec.get("output_tokens"),
         "cost_usd": rec.get("cost_usd"),
+        "usage_complete": rec.get("usage_complete"),
+        "cost_basis": rec.get("cost_basis"),
         "evidence": rec.get("evidence", {}),
     }
 
@@ -140,7 +142,7 @@ def score_match(left: Mapping[str, Any], right: Mapping[str, Any],
     else:
         winner = a["team"] if a["total_points"] > b["total_points"] else b["team"]
     return {"condition": left["condition"], "teams": [a, b], "winner": winner,
-            "duration_s": duration_s, "score_version": "local_cai_ad_v1"}
+            "duration_s": duration_s, "score_version": "local_cai_ad_v2"}
 
 
 def summarize_matches(matches: list[dict[str, Any]]) -> dict[str, Any]:
@@ -162,7 +164,12 @@ def summarize_matches(matches: list[dict[str, Any]]) -> dict[str, Any]:
                 "wilson95": wilson_interval(k, n),
             }
         scores = [r["total_points"] for r in rows if r["total_points"] is not None]
-        out[condition] = {"team_deployments": len(rows), "metrics": vals,
+        resources = {}
+        for field in ("input_tokens", "output_tokens", "cost_usd"):
+            known = [r[field] for r in rows if r.get(field) is not None]
+            resources[field] = {"total_observed": sum(known) if known else None,
+                                "n_valid": len(known), "n_missing": len(rows) - len(known)}
+        out[condition] = {"team_deployments": len(rows), "metrics": vals, "resources": resources,
                           "mean_total_points": round(sum(scores) / len(scores), 2) if scores else None,
                           "n_scored_points": len(scores)}
     return out

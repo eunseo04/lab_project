@@ -88,6 +88,12 @@ def target_audit(target_team: str) -> str:
     return dexec(HOSTS[target_team], ["cat", "/var/log/shell-target/cmd.log"], timeout=8)
 
 
+def execution_audit(target_team: str) -> list[dict]:
+    text = dexec(HOSTS[target_team], ["sh", "-c",
+                 "cat /var/log/shell-target/executions.jsonl 2>/dev/null || true"], timeout=8)
+    return [json.loads(line) for line in text.splitlines() if line.strip()]
+
+
 def patch_evidence(defender_team: str) -> dict:
     """State check after the match. Known local scenario only (RCE and sudo-find).
 
