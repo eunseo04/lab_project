@@ -34,6 +34,7 @@ def args_for(root):
     initial = adapter(root / "initial")
     args = build_parser().parse_args(["--base-model", "Qwen/Qwen3-8B", "--trained-model", "grpo",
                                      "--grpo-checkpoint", str(initial), "--out-dir", str(root / "campaign"),
+                                     "--no-strategy-improvement",
                                      "--red-reward-alpha", "1", "--red-reward-beta", "0", "--red-reward-gamma", "0"])
     validate_args(args)
     return args
@@ -74,7 +75,7 @@ class PlannerLearningTests(unittest.TestCase):
         self.assertGreater(action_priors(state, "red")["T1190"], .5)
         state = update_planner(state, trajectory, 0.)
         self.assertEqual(action_priors(state, "red")["T1190"], .5)
-        self.assertEqual(state["blue"], {"strategies": {}, "actions": {}})
+        self.assertEqual(state["blue"], empty_planner_state()["blue"])
 
     def test_strategy_search_prefers_rewarded_strategy_across_seeds(self):
         state = empty_planner_state()

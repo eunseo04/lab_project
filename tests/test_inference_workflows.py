@@ -180,6 +180,7 @@ class ClosedLoopTests(unittest.TestCase):
         llm = SimpleNamespace(check=Mock(), inference=InferenceSettings(), complete=complete,
                               usage_complete=True, usage={"input_tokens": 0, "output_tokens": 0, "requests": 0})
         planner = Mock()
+        planner.last_search = {}
         planner.search.return_value = ({"tech_id": "T1595", "name": "Scan"}, .5)
         with patch.dict(os.environ, {}, clear=True), patch.object(worker, "get_llm", return_value=llm), \
                 patch.object(worker.P, "load_shared_memory", return_value={"T1595": {"name": "Scan"}}), \
@@ -202,6 +203,7 @@ class ClosedLoopTests(unittest.TestCase):
         llm = SimpleNamespace(check=Mock(), inference=InferenceSettings(), complete=complete,
                               usage_complete=True, usage={"input_tokens": 0, "output_tokens": 0, "requests": 0})
         planner = Mock()
+        planner.last_search = {}
         planner.search.return_value = ({"tech_id": "T1190", "name": "Contain"}, .5)
         wazuh = Mock(available=True, last_error=None)
         wazuh.query_alerts.return_value = [{"rule": {"description": "Observed injection", "mitre": {"id": ["T1190"]}}}]

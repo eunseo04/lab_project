@@ -105,6 +105,11 @@ def closed_loop_configuration(args) -> dict:
             "preserve_proposed_planner_and_weights": adaptive,
             "grpo_updates_per_proposed_match": 4 if adaptive else 0,
             "planned_grpo_updates": 4 * args.repeats if adaptive else 0,
+            "strategy_improvement": {"enabled": adaptive and args.strategy_improvement,
+                                     "paired_self_play_per_role": args.strategy_self_play_pairs,
+                                     "seconds_per_arm": args.strategy_self_play_seconds or args.match_seconds,
+                                     "minimum_gain": args.strategy_min_gain,
+                                     "excluded_from_campaign_scores_and_GRPO": True},
             "red_grpo_reward": red_reward.to_dict() if red_reward else None}
 
 
@@ -218,13 +223,17 @@ def collect_records(args, condition: str, rep: int, out: Path, samples: dict,
     return records
 
 
-def run_one(args, condition: str, rep: int, labels: dict, *, adaptive=None) -> dict:
+def run_one(args, condition: str, rep: int, labels: dict, *, adaptive=None,
+            role_models=None, planner_state=None) -> dict:
     slug = f"rep{rep:03d}_{condition}"
     out = Path(args.out_dir).resolve() / slug
     if out.exists():
         raise FileExistsError(f"refusing to overwrite experiment evidence: {out}")
     out.mkdir(parents=True)
-    role_models, planner_state = adaptive.prepare(rep) if adaptive else (None, None)
+    if adaptive:
+        if role_models is not None or planner_state is not None:
+            raise ValueError("adaptive preparation and frozen self-play inputs are mutually exclusive")
+        role_models, planner_state = adaptive.prepare(rep)
     print(f"[ad_eval] {slug}: recreating the shared range", flush=True)
     compose_up()
     if condition != "cai":
@@ -233,6 +242,14 @@ def run_one(args, condition: str, rep: int, labels: dict, *, adaptive=None) -> d
     initial_patches = {team: patch_evidence(team) for team in HOSTS}
     if any(p["vulnerability_patched"] is not False for p in initial_patches.values()):
         raise RuntimeError("fresh range does not expose both expected weaknesses")
+    initial_conditions = None
+    if planner_state and not adaptive:
+        initial_probes = {team: service_probe(team) for team in HOSTS}
+        if any(probe.get("up") is not True for probe in initial_probes.values()):
+            raise RuntimeError("self-play range must begin with both services available")
+        initial_conditions = {"reset": "compose_down_volumes_then_recreate",
+                              "patches": initial_patches, "services": initial_probes}
+        dump(out / "initial_conditions.json", initial_conditions)
     flags = {team: {"user": set(), "root": set()} for team in HOSTS}
 
     def collect_flags():
@@ -325,6 +342,22 @@ def run_one(args, condition: str, rep: int, labels: dict, *, adaptive=None) -> d
         match["model"] = {role: spec.model for role, spec in role_models.items()}
         match["role_models"] = {role: asdict(spec) for role, spec in role_models.items()}
         match["planner_input"] = str(planner_state)
+    if planner_state and not adaptive:
+        # The Strategist must prove that the requested single-role intervention
+        # actually reached all worker decisions, beyond a configuration manifest.
+        pinned = json.loads(Path(planner_state).read_text(encoding="utf-8"))
+        strategy_audit = {}
+        for team in HOSTS:
+            for role in ("red", "blue"):
+                expected = pinned[role].get("selection_overrides", {}).get(team)
+                decisions = [event for event in read_events(out / f"team{team}_{role}.log")
+                             if event.get("kind") == "policy_decision"]
+                strategy_audit[f"{team}:{role}"] = {
+                    "expected": expected, "decisions": len(decisions),
+                    "valid": bool(expected and decisions) and
+                             all(event.get("strategy_id") == expected for event in decisions)}
+        match["strategy_selection_audit"] = strategy_audit
+        match["initial_conditions"] = initial_conditions
     dump(out / "score.json", match)
     if adaptive:
         events = {(team, role): read_events(out / f"team{team}_{role}.log")
@@ -362,6 +395,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--seed", type=int, default=DEFAULT_INFERENCE.seed)
     parser.add_argument("--adaptive-proposed", action=argparse.BooleanOptionalAction, default=True,
                         help="reward-update proposed MCTS and train/deploy GRPO after each role trajectory")
+    parser.add_argument("--strategy-improvement", action=argparse.BooleanOptionalAction, default=True,
+                        help="reflect and compare one strategy mutation per role after each Proposed game")
+    parser.add_argument("--strategy-self-play-pairs", type=int, default=2,
+                        help="paired old/new games per role; even number >=2 covers both network positions")
+    parser.add_argument("--strategy-self-play-seconds", type=float,
+                        help="development-game duration; defaults to the measured match duration")
+    parser.add_argument("--strategy-min-gain", type=float, default=0.,
+                        help="required mean paired return improvement; no pair may regress")
     parser.add_argument("--training-python", default=sys.executable)
     parser.add_argument("--training-base-model", help="HF model ID or local base weights for GRPO")
     parser.add_argument("--training-cuda-devices", help="CUDA_VISIBLE_DEVICES for the isolated training process")

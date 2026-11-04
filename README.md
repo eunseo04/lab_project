@@ -31,7 +31,7 @@ CLI와 기본값으로 만든 공통 설정이 기존 `QWEN_*`·`CAI_*` 환경�
 
 CAI는 네이티브 `/parallel` 도구 실행과 대화 이력을 사용하는 기존 워크플로우로 10경기를 반복하고 기본 모델을 고정한다. 제안 방식은 경기 안에서 실제 명령 결과·호스트별 Wazuh 경보·현재 계획 상태를 다음 판단에 반영하며, 경기 종료 후 얻은 reward와 trajectory로 **다음 회차의 전략·action 선택 및 Red/Blue 모델을 갱신한다.**
 
-매 경기 취약 환경과 대화 문맥은 초기화한다. 제안 방식의 전략·action reward 통계 및 학습된 LoRA는 회차 사이에 보존한다. 두 조건의 실행 순서는 회차마다 교대로 바뀐다. 기본 관측 시간은 총 20경기 × 15분 = 5시간이며, GRPO 학습과 훈련 환경 재생·사전 검사 시간은 별도로 추가된다.
+매 경기 취약 환경과 대화 문맥은 초기화한다. 제안 방식의 전략 Tree·action reward 통계 및 학습된 LoRA는 회차 사이에 보존한다. 두 조건의 실행 순서는 회차마다 교대로 바뀐다. 기본 관측 시간은 총 20경기 × 15분 = 5시간이며, 전략 비교 Self-Play·GRPO 학습·훈련 환경 재생·사전 검사 시간은 별도로 추가된다.
 
 ## 제안 방식의 회차별 학습
 
@@ -41,6 +41,7 @@ CAI는 네이티브 `/parallel` 도구 실행과 대화 이력을 사용하는 �
 4. trajectory마다 `ad_eval/grpo_train.py`를 별도 프로세스로 실행한다. trajectory의 의사결정 prompt에서 현재 정책으로 후보를 새로 샘플링한다. 기본값은 prompt당 4개 후보, trajectory 전체 데이터 1 epoch, 학습률 `1e-5`, `loss_type=grpo`, 그룹별 상대 reward, KL 계수 0이다. Red는 아래 연구용 합성 보상, Blue는 기존 환경 보상으로 실제 GRPO optimizer step을 수행한다. [TRL GRPO](https://huggingface.co/docs/trl/grpo_trainer)의 온라인 샘플링 경로를 사용한다.
 5. 훈련 reward는 평가용 컨테이너와 다른 `adtrain-*` 컨테이너 및 `172.29.80.0/24` 내부 네트워크에서 계산한다. 평가 때 빌드한 같은 이미지를 사용하고, 후보마다 초기화 후 해당 의사결정 이전에 완료된 도구 명령을 재생한다. Red는 실제 flag·실행 증거, Blue는 실제 재공격 차단·정상 서비스 검사로 채점한다. 기록된 terminal reward를 새 GRPO 후보 전체에 복사하지 않는다. 훈련 twin은 Wazuh에 등록하지 않아 실제 경기의 경보와 섞이지 않는다.
 6. Red는 직전 Red 어댑터를, Blue는 직전 Blue 어댑터를 이어 학습한다. 새 가중치 해시와 optimizer step을 확인하고 새 버전 ID로 vLLM에 등록한 후, 등록 경로까지 검증한 정책만 다음 경기에서 사용한다. CAI 기본 모델과 초기 체크포인트 파일은 수정하지 않는다.
+7. 갱신한 역할 모델을 고정한 상태에서 `Reflection → 아이디어 우선순위화 → 전략 후보 생성 → 동일 조건 Self-Play → Tree 업데이트`를 수행한다. 이전 경기의 승패만으로 신규 전략을 채택하지 않는다.
 
 따라서 기본 10회 제안 경기에서는 **GRPO 학습 작업 40회**를 실행한다. 마지막 10회차의 trajectory도 학습하여 최종 모델을 저장한다. 같은 경기에서 나온 두 팀의 trajectory는 역할별 정책 체인에 순차 반영한다. 두 번째 trajectory의 GRPO 후보는 그때의 최신 정책으로 다시 생성한다.
 
@@ -49,6 +50,22 @@ CAI는 네이티브 `/parallel` 도구 실행과 대화 이력을 사용하는 �
 `manifest.json`에 공통 설정과 전체 20경기 일정, 초기 체크포인트, 학습 환경을 기록한다. `records.json`과 `score.json`에는 회차 설정, 역할별 실제 모델 버전, 요청 파라미터 감사, closed-loop 실행 횟수가 남는다. 제안 방식은 HTTP 요청 본문의 설정을, CAI는 파라미터 필터 이후 LiteLLM에 전달하는 설정을 요청별로 기록한다. 설정 불일치나 완료 요청의 설정 로그 누락은 두 팀 모두 해당 경기의 성능 지표를 무효 처리한다. `summary.json`의 `progress`는 조건별 완료 경기 수와 캠페인 완료 여부, `completed_grpo_updates`는 완료한 학습 작업 수다. CAI와 제안 방식의 내부 cycle 단위는 다르므로 cycle 수 자체를 성능 지표로 비교하지 않는다.
 
 `learning/state.json`에는 누적 reward 통계와 현재 역할별 정책이 있다. 회차별 `*_planner_input.json`은 경기 시작 시 사용한 통계의 불변 snapshot이다. `team*_*.trajectory.json`, `learning_updates.json`, 학습 작업의 `training_result.json`과 `rollout_rewards.jsonl`은 trajectory→reward→optimizer→체크포인트→vLLM 등록의 연결을 제공한다. 학습 시간·rollout 자원은 경기 안의 토큰·시간 지표와 분리하여 보고해야 한다. 적응하는 제안 방식과 고정 CAI 비교는 학습 효과까지 포함한다.
+
+## 전략 Tree와 다단계 탐색
+
+`ad_eval/learning.py`의 기존 여섯 전략은 초기 root 노드로 사용한다. 신규 전략은 parent·children·아이디어 ID·근거 reflection·검증 결과를 가진 자식 노드로 추가한다. 기존 통계 파일은 읽을 때 Tree 구조로 이전한다. 후보·거절·판정 불가 노드는 일반 경기에서 선택하지 않으며, 비교를 통과한 노드만 해당 역할의 incumbent가 된다. 실제 trajectory reward는 사용 전략과 조상 및 action에 trajectory당 한 번 반영한다.
+
+`ad_eval/mcts.py`는 매 탐색에서 UCT 선택, 확률적 상태 전이, 다음 상태의 후보 확장, 할인 보상 역전파를 여러 단계 수행한다. 동일 행동의 성공·실패 결과를 별도 상태로 보존한다. 기본 깊이는 4이며 후보 전략은 깊이 2~8, 할인율, 선호 tactic·technique와 관측에 따른 행동 지침을 변경할 수 있다. 이 지침은 행동 후보를 순위화하는 LLM과 실제 명령 생성 LLM 양쪽에 전달한다. `mcts_search` 로그의 값은 가상 탐색 추정치이며 실제 접근·패치·flag 성공 증거로 사용하지 않는다.
+
+`reflection.py`는 완료 trajectory에서 정책 거절·반복 명령·실행 오류·미달성 목표·가용성 저하를 해당 step ID와 연결한다. 실제 학습 경로에서는 고정한 역할 LLM이 목표·전략·행동 불일치, 충족하지 않은 전제조건, 무시한 피드백을 분석하고 신규 개선 아이디어와 우선순위 가설을 생성한다. 근거 step ID 또는 관측된 terminal 필드가 없는 설명은 거부한다. 원인 설명은 검증 전 가설이다. `idea_queue.py`는 중복 아이디어를 합치고 관측된 reward gap·근거 수·거절/가용성 문제·모델의 우선순위 힌트로 테스트 순서를 정한다. 이 휴리스틱 우선순위는 측정된 성능 향상값이 아니다. `strategy_improve.py`는 같은 역할 LLM에 부모 전략과 선택한 아이디어·근거를 전달해 JSON 전략 후보를 생성한다. 기법 ID는 고정 ATT&CK memory 범위로 검증하며, 잘못된 응답을 임의 전략으로 대체하지 않는다.
+
+`self_play.py`는 후보당 기본 2쌍(총 4경기)을 실행한다. 각 쌍은 한 팀의 한 역할만 기존/후보 전략으로 바꾸고 나머지 세 역할의 전략을 고정한다. 두 쌍은 팀 위치와 실행 순서를 교대한다. 매 arm에서 실제 공통 레인지를 초기화하고 기존 Proposed의 전체 closed-loop 실행기와 실시간 Wazuh 관측을 사용한다. 초기 취약점 노출·정상 서비스 증거도 별도 저장한다. 기록된 명령 재생이나 MCTS 가상 rollout으로 비교를 대신하지 않는다. Red·Blue 각각의 비교에서 모델 별칭·체크포인트 해시, 공통 샘플링, 쌍별 seed, 시간 예산, Compose·dataset·실제 Docker image·워커 소스 해시가 같아야 한다. 워커 로그의 실제 전략 ID도 감사한다.
+
+비교 지표는 기존의 관측 기반 역할 terminal return이다. Red GRPO의 의미·다양성 보상은 사용하지 않는다. 모든 쌍이 유효하고 평균 `candidate - baseline`이 `--strategy-min-gain`(기본 0)을 초과하며 퇴보한 쌍이 없을 때 채택한다. 동률·퇴보는 거절하고, 모델/환경 변경·전략 로그 누락·무효 경기·가용성 증거 누락은 `inconclusive`로 남겨 incumbent를 보존한다. 소수 쌍에서의 관측된 개선을 통계적 유의성으로 주장하지 않는다. 역할별 변경 효과를 검증하므로 동시에 채택한 두 역할의 결합 효과까지 입증하는 것은 아니다. 새 flag·자격 증명 값과 비동기 스케줄은 달라질 수 있으며 동일 seed가 GPU 결정성을 보장하지 않는다.
+
+기본 10회 Proposed 실험에 전략 개발용 경기 **최대 80회**(역할 2 × 2쌍 × 2 arm × 10회)가 추가된다. 기본 arm 시간은 본 경기와 같은 900초이므로 최대 20시간의 개발용 실행 시간과 초기화 시간이 별도로 필요하다. `--strategy-self-play-pairs`는 양쪽 위치를 포함하도록 2 이상의 짝수로 설정한다. `--strategy-self-play-seconds`로 개발용 시간만 줄일 수 있으며 해당 비교 결과는 그 예산의 근거로 기록된다. `--no-strategy-improvement`는 Reflection·전략 변형·Self-Play를 생략하는 ablation이며 기존 전략/action 통계·GRPO 갱신은 유지한다. `--no-adaptive-proposed`는 모델·전략 학습을 모두 중지한다.
+
+`learning/strategist/repNNN/`의 `reflections.json`, 역할별 `candidate.json`, `protocol.json`, `pairs.json`, `comparison.json`과 각 arm의 실제 로그·`score.json`을 보존한다. 아이디어는 `learning/idea_queue.json`, 채택·거절 이력은 Tree와 `strategy_updates`에 남는다. 이 개발용 경기와 전략 생성 토큰은 최종 20경기의 점수·토큰 집계 및 GRPO trajectory 데이터에 포함하지 않으며 개발 비용으로 별도 보고해야 한다. CAI 실행 경로와 공통 최종 채점식 `ad_eval/scoring.py`는 동일하게 유지한다.
 
 ## Red GRPO 전용 연구 보상
 
@@ -169,4 +186,4 @@ AD_EVAL_LIVE_WAZUH=1 python3 -m unittest discover -s tests -p test_refactored_ad
 
 구형 금융 파이프라인, 중복 평가기, 옛 도구 래퍼, 구형 환경·실행 스크립트는 의존성 감사 후 삭제했다. 목록은 `scripts/removed_legacy_files.json`에 남긴다. `cai/`, 공통 Mayhem, Wazuh 스택, 학습 코드 네 파일, 학습 프롬프트, 기존 데이터·결과는 보존한다.
 
-자동 검사로 양쪽 생성 파라미터 일치, seed 분리, CAI 고정 10경기와 제안 방식 40개 학습 작업의 연결, 역할별 체크포인트 체인, 전략·action reward 통계 반영, 실패 시 갱신 중단을 검증한다. 작은 CPU LoRA 모델의 실제 GRPO optimizer step·어댑터 저장과 실제 Docker 훈련 twin의 flag·서비스 유지 패치 reward도 별도로 통과했다. CPU 검사는 사용하지 않는 DeepSpeed 경로를 비활성화하여 수행했다. 테스트용 모의 학습·배포 호출은 실제 Qwen 학습 성과로 간주하지 않는다. 현재 검증 환경에는 CUDA 장치가 노출되지 않아 Qwen3-8B 학습 및 20경기는 실행하지 않았다. 실제 실행 결과로 성능을 평가해야 한다. vLLM의 동적 LoRA 등록은 [공식 문서](https://docs.vllm.ai/en/v0.10.0/features/lora.html)를 따른다.
+자동 검사로 양쪽 생성 파라미터 일치, seed 분리, CAI 고정 10경기와 제안 방식 40개 학습 작업의 연결, 역할별 체크포인트 체인, 전략·action reward 통계 반영, 실패 시 갱신 중단을 검증한다. `tests/test_strategy_learning.py`는 전략 Tree 확장·근거 없는 Reflection 거부·아이디어 저장·다단계 전이와 역전파·단일 역할 개입·조건 변경 시 판정 보류·동률/퇴보 거절을 검사한다. 모의 캠페인에서는 20개 본 경기·40개 GRPO 작업·80개 개발 경기의 분리와 10세대 전략 lineage를 검증한다. 작은 CPU LoRA 모델의 실제 GRPO optimizer step·어댑터 저장과 실제 Docker 훈련 twin의 flag·서비스 유지 패치 reward도 별도로 통과했다. CPU 검사는 사용하지 않는 DeepSpeed 경로를 비활성화하여 수행했다. 테스트용 모의 학습·배포·비교 호출은 실제 Qwen 학습 성과나 전략 향상 증거로 간주하지 않는다. 현재 검증 환경에는 CUDA 장치가 노출되지 않아 Qwen3-8B 학습·20경기·실제 전략 비교 캠페인은 실행하지 않았다. 실제 실행 결과로 성능을 평가해야 한다. vLLM의 동적 LoRA 등록은 [공식 문서](https://docs.vllm.ai/en/v0.10.0/features/lora.html)를 따른다.

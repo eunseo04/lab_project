@@ -108,21 +108,23 @@ class RefactorTests(unittest.TestCase):
         self.assertTrue(memory)
         self.assertTrue(all("command" not in info for info in memory.values()))
 
-    def test_extracted_uct_retains_legacy_seeded_results(self):
+    def test_multistep_search_keeps_stage_prerequisites_and_is_reproducible(self):
         memory = {
             "T1595": {"name": "Active Scanning", "tactics": ["reconnaissance"]},
             "T1190": {"name": "Exploit Public-Facing Application", "tactics": ["initial-access"]},
             "T1548": {"name": "Abuse Elevation Control Mechanism", "tactics": ["privilege-escalation"]},
         }
-        # Captured from the original pipeline before its authorized deletion.
-        for stage, caps, tid, expected in [(0, (), "T1595", .5953125),
-                  (2, ("recon", "infra"), "T1190", .5953125),
-                  (5, ("recon", "infra", "access", "exec", "persistence"), "T1548", .68125)]:
-            action, value = MCTS(memory, n_sims=32, rng=random.Random(7),
-                                 objective=Objective(capture_tactic="privilege-escalation")).search(
-                                     CyberState(foothold=stage, capabilities=caps))
+        for stage, caps, tid in [(0, (), "T1595"),
+                  (2, ("recon", "infra"), "T1190"),
+                  (5, ("recon", "infra", "access", "exec", "persistence"), "T1548")]:
+            def search():
+                return MCTS(memory, n_sims=32, rng=random.Random(7),
+                            objective=Objective(capture_tactic="privilege-escalation")).search(
+                                CyberState(foothold=stage, capabilities=caps))
+            action, value = search()
             self.assertEqual(action["tech_id"], tid)
-            self.assertAlmostEqual(value, expected)
+            self.assertTrue(0 <= value <= 1)
+            self.assertEqual((action, value), search())
 
 
 class EvidenceCorrelationTests(unittest.TestCase):

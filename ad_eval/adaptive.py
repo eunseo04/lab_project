@@ -10,7 +10,8 @@ from pathlib import Path
 import subprocess
 
 from .docker_lab import ROOT
-from .learning import empty_planner_state, trajectory_reward, update_planner
+from .learning import (empty_planner_state, trajectory_reward, update_planner,
+                       normalize_planner, add_strategy, commit_comparison, strategy_node)
 from .models import ModelSpec, checkpoint_info, load_adapter, select_model, verify_model
 from .llm import served_model
 from .trajectory import export_trajectories
@@ -64,6 +65,13 @@ def validate_learning_args(args):
     if args.frequency_penalty or args.presence_penalty:
         raise ValueError("the adaptive Transformers sampler currently requires zero frequency/presence penalties")
     config_from_args(args, required=not args.dry_run)
+    if args.strategy_improvement:
+        if args.strategy_self_play_pairs < 2 or args.strategy_self_play_pairs % 2:
+            raise ValueError("strategy self-play needs an even number of pairs >=2 for both network positions")
+        if (not math.isfinite(args.strategy_min_gain) or not 0 <= args.strategy_min_gain < 1 or
+                (args.strategy_self_play_seconds is not None and
+                 (not math.isfinite(args.strategy_self_play_seconds) or args.strategy_self_play_seconds < 10))):
+            raise ValueError("strategy comparison requires finite margin in [0,1) and duration>=10")
 
 
 def learning_preflight(args) -> dict:
@@ -105,9 +113,12 @@ class AdaptiveExperiment:
         self.state_path = self.directory / "state.json"
         self.initial = initial_checkpoints(args)
         self.red_reward = config_from_args(args)
-        self.state = {"schema_version": 1, "planners": empty_planner_state(), "policies": {}, "updates": []}
+        self.state = {"schema_version": 2, "planners": empty_planner_state(), "policies": {}, "updates": []}
         if self.state_path.exists():
             self.state = json.loads(self.state_path.read_text(encoding="utf-8"))
+        self.state["planners"] = normalize_planner(self.state["planners"])
+        self.state["schema_version"] = 2
+        self.state.setdefault("strategy_updates", [])
 
     def initialize_policies(self):
         if not self.state["policies"]:
@@ -195,5 +206,71 @@ class AdaptiveExperiment:
             self.state["updates"].append(update)
             save(self.state_path, self.state)
             updates.append(update)
-        save(directory / "learning_updates.json", {"updates": updates, "planner_after": self.state["planners"]})
+        strategy_updates = self.improve_strategies(trajectories, match) if self.args.strategy_improvement else []
+        save(directory / "learning_updates.json", {"updates": updates, "strategy_updates": strategy_updates,
+                                                   "planner_after": self.state["planners"]})
         return updates
+
+    def improve_strategies(self, paths: list[Path], match: dict) -> list[dict]:
+        """Freeze the newly trained role weights, then test strategic changes only."""
+        from .reflection import reflect
+        from .idea_queue import IdeaQueue
+        from .strategy_improve import improve_strategy
+        from .self_play import PairedSelfPlay, incumbent_for
+        from .llm import LLMClient, LLMConfig
+        from .mcts import load_shared_memory
+
+        directory = self.directory / "strategist" / f"rep{match['rep']:03d}"
+        if (directory / "complete.json").exists():
+            raise RuntimeError("strategy improvement for this match was already committed")
+        trajectories = [json.loads(path.read_text(encoding="utf-8")) for path in paths]
+        models = {role: ModelSpec(**data) for role, data in self.state["policies"].items()}
+        settings = dict(match["inference"])
+        settings["max_new_tokens"] = settings.pop("max_tokens")
+        clients = {role: LLMClient(LLMConfig(endpoint=spec.endpoint, model=spec.model, **settings))
+                   for role, spec in models.items()}
+        reflections = [reflect(trajectory, clients[trajectory["role"]]) for trajectory in trajectories]
+        save(directory / "reflections.json", {"reflections": reflections,
+             "analyst_models": {role: asdict(spec) for role, spec in models.items()},
+             "usage": {role: dict(client.usage) for role, client in clients.items()},
+             "usage_complete": {role: client.usage_complete for role, client in clients.items()}})
+        base = normalize_planner(self.state["planners"])
+        incumbents = {role: incumbent_for(base, role, trajectories) for role in ("red", "blue")}
+        queue = IdeaQueue(self.directory / "idea_queue.json")
+        for reflection in reflections:
+            queue.generate(reflection, incumbents[reflection["role"]])
+        evaluator, memory, reports = PairedSelfPlay(self.args), load_shared_memory(), []
+        for role in ("red", "blue"):
+            parent_id = incumbents[role]
+            idea = queue.next(role, parent_id)
+            if idea is None:
+                continue
+            spec = models[role]
+            llm = clients[role]
+            related = [r for r in reflections if r["role"] == role]
+            usage_before = dict(llm.usage)
+            candidate = improve_strategy(strategy_node(base, role, parent_id), idea, related, llm, memory)
+            save(directory / role / "candidate.json", {"strategy": candidate, "idea": idea,
+                                                       "generator_model": asdict(spec),
+                                                       "inference": llm.inference.to_dict(),
+                                                       "usage": {key: value - usage_before[key] for key, value in llm.usage.items()},
+                                                       "usage_complete": llm.usage_complete})
+            trial_state = add_strategy(base, role, candidate)
+            print(f"[ad_eval] Strategist {role}: paired self-play {parent_id} -> {candidate['id']}", flush=True)
+            report = evaluator.evaluate(state=trial_state, role=role, parent_id=parent_id,
+                                        candidate_id=candidate["id"], models=models, rep=match["rep"],
+                                        directory=directory / role, incumbents=incumbents)
+            # Development games never enter export_trajectories, GRPO datasets,
+            # action posteriors or the campaign's CAI/Proposed score summary.
+            planner = add_strategy(self.state["planners"], role, candidate)
+            self.state["planners"] = commit_comparison(planner, role, candidate["id"], report)
+            update = {"rep": match["rep"], "role": role, "idea_id": idea["id"],
+                      "parent_id": parent_id, "candidate_id": candidate["id"],
+                      "status": report["status"], "mean_paired_gain": report["mean_paired_gain"],
+                      "comparison": str(directory / role / "comparison.json")}
+            self.state["strategy_updates"].append(update)
+            save(self.state_path, self.state)
+            queue.finish(idea["id"], update)
+            reports.append(update)
+        save(directory / "complete.json", {"updates": reports})
+        return reports

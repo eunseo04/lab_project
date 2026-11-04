@@ -1,14 +1,13 @@
-"""UCT action ranking extracted from pipeline.py; rollouts are NOT evaluation results.
+"""Multi-step stochastic UCT over abstract states; simulations are not evidence.
 
-Evaluation uses a frozen ATT&CK dataset. Financial targets, generated overlays,
-GRPO training, synthetic SIEM events and legacy campaign orchestration stay outside
-this module. The UCT selection and rollout reward formulas retain their source behavior.
+Only the executor can establish real access, capabilities, flags or mitigations.
+Search transitions remain local to each call and never enter the final scorer.
 """
 from __future__ import annotations
 import json
 import math
 import random
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field, replace
 from pathlib import Path
 from typing import Optional
 
@@ -79,10 +78,9 @@ def prerequisite_capability(stage: str) -> Optional[str]:
 class CyberState:
     """Abstract state of one engagement, shared by the MCTS and the executor.
 
-    `capabilities` and `flag` are the VERIFIED facts the executor threads from turn to
-    turn: capabilities are the stage powers red has actually earned (preconditions for
-    later stages) and `flag` is True only once the environment confirmed the objective
-    was captured. The MCTS reads these so it plans from real state, not assumptions."""
+    At the root, the executor supplies its observed planning state. Descendants
+    are hypothetical transition-model states, never verified environment facts.
+    Simulated capabilities and flags are never returned to the executor as evidence."""
     executed: tuple = ()        # techniques red has run
     detected: tuple = ()        # techniques Wazuh flagged
     defended: tuple = ()        # techniques blue has mitigated
@@ -289,6 +287,7 @@ def _llm_reorder_candidates(role: str, state: CyberState, pool: list[dict], llm,
             f"capabilities={list(state.capabilities)}, executed={list(state.executed)}, "
             f"detected={list(state.detected)}, defended={list(state.defended)}, "
             f"flag_captured={state.flag}.\n"
+            f"Selected strategy: {objective.description if objective else ''}\n"
             f"Candidates:\n{menu}")
     text = llm.complete(user, system=system)
     if not text:
@@ -308,21 +307,10 @@ def step_reward(role: str, *, success: bool, detected: bool,
                 mitigated: bool = False, rule_deployed: bool = False,
                 evasive: bool = False, captured: bool = False,
                 on_stage: bool = True) -> float:
-    """One source of truth for the per-action / per-step reward.
+    """Local search shaping, independent of GRPO and final evaluation scores.
 
-    This is the MCTS-side reward: it drives action-level search (rollouts),
-    episode returns, action priors and llm_improve (strategy reward). It used to
-    be duplicated by a divergent inline formula inside run_episode; that copy has
-    been removed and both the MCTS rollout and the realized self-play step now
-    call this function, so there is a single reward definition.
-
-    It is GOAL-AWARE: capturing the objective flag dominates (`captured`), and an
-    off-stage action that cannot advance the campaign is penalized (`on_stage`) so
-    the agent pursues the goal instead of spraying unrelated techniques.
-
-    IMPORTANT: GRPO does NOT use this. GRPO scores whole trajectories with the
-    TriPlay reward (reward.py). Keep the two separate: MCTS = action/strategy
-    reward here; GRPO = trajectory-level TriPlay judging.
+    MCTS applies the Red shaping here to hypothetical transitions. Actual
+    strategy comparisons use observed trajectory_reward, not this utility.
     """
     if role == "red":
         # follows the MCTS rollout shaping: success vs -0.2, detection penalty
@@ -341,120 +329,163 @@ def step_reward(role: str, *, success: bool, detected: bool,
     return r
 
 
+@dataclass
+class SearchEdge:
+    action: dict
+    prior: float
+    visits: int = 0
+    value_sum: float = 0.
+    outcomes: dict = field(default_factory=dict)
+
+
+@dataclass
+class SearchNode:
+    state: CyberState
+    visits: int = 0
+    value_sum: float = 0.
+    edges: list = field(default_factory=list)
+
+
 class MCTS:
-    """Minimal UCT search that ranks candidate actions by simulated win-rate.
+    """Finite-horizon stochastic UCT: select, transition, expand and back up.
 
-    The rollout model stands in for 'execute in target + SIEM reaction' so search
-    can run before touching the real environment. Priors come from `action_priors`
-    (updated by llm_improve), realizing the MCTS-graph-update feedback edge.
+    An edge can lead to several outcome states, rather than freezing its first
+    random outcome. Descendant candidates are regenerated from their own state.
+    LLM ranking is used at the real root only, never as simulated observation.
     """
-
     def __init__(self, memory: dict, action_priors: Optional[dict] = None,
                  n_sims: int = 64, c_uct: float = 1.4, rng: Optional[random.Random] = None,
                  llm=None, learned_covered=None, evasive: bool = False,
                  objective: Optional["Objective"] = None,
-                 allow_novel: bool = False, generated_path=None, infeasible=None):
-        self.memory = memory
-        self.priors = action_priors or {}
-        self.infeasible = infeasible if infeasible is not None else set()
-        self.n_sims = n_sims
-        self.c_uct = c_uct
-        self.rng = rng or random.Random(0)
-        self.llm = llm  # LLM proposes/reorders candidate actions (strategy generation)
-        self.learned_covered = learned_covered  # blue-deployed detection coverage
-        self.evasive = evasive  # red plans a stealth campaign that blends into benign noise
-        self.objective = objective or Objective()  # the goal MCTS plans toward
-        self.allow_novel = allow_novel  # red may INVENT new actions (grows the attack dataset)
-        self.generated_path = generated_path  # where invented techniques are persisted
-        self._proposed_stages: set = set()  # ideate at most once per stage per episode
+                 allow_novel: bool = False, generated_path=None, infeasible=None,
+                 max_depth: int = 4, discount: float = .95):
+        if n_sims < 1 or not 1 <= max_depth <= 16 or not 0 < discount <= 1:
+            raise ValueError("invalid MCTS budget, horizon or discount")
+        if allow_novel:
+            raise ValueError("search uses frozen techniques; improve strategies separately")
+        self.memory, self.priors = memory, action_priors or {}
+        self.n_sims, self.c_uct = n_sims, c_uct
+        self.rng, self.llm = rng or random.Random(0), llm
+        self.learned_covered, self.evasive = learned_covered, evasive
+        self.objective = objective or Objective()
+        self.infeasible = infeasible or set()
+        self.max_depth, self.discount = max_depth, discount
+        self.last_search = {}
 
-    def search(self, state: CyberState, role: str = "red",
-               focus_tid: Optional[str] = None) -> tuple[dict, float]:
-        self._focus_tid = focus_tid  # blue: the live attack technique to contain
-        # Throttle ideation to the FIRST time red reaches a given stage this episode, so
-        # the LLM invents fresh actions per stage without a proposal call every single step.
-        allow_novel = False
-        if role == "red" and self.allow_novel:
-            stg = state.tactic_reached()
-            if stg not in self._proposed_stages:
-                self._proposed_stages.add(stg)
-                allow_novel = True
-        candidates = generate_candidates(role, state, self.memory, llm=self.llm,
-                                         learned_covered=self.learned_covered,
-                                         evasive=self.evasive and role == "red",
-                                         objective=self.objective, focus_tid=focus_tid,
-                                         allow_novel=allow_novel,
-                                         persist_path=self.generated_path,
-                                         infeasible=self.infeasible)
-        if not candidates:
-            return {}, 0.0
-        N = {i: 0 for i in range(len(candidates))}
-        W = {i: 0.0 for i in range(len(candidates))}
-        total = 0
-        for _ in range(self.n_sims):
-            total += 1
-            i = self._select(candidates, N, W, total)
-            reward = self._rollout(state, candidates[i], role)
-            N[i] += 1
-            W[i] += reward
-        best = max(range(len(candidates)), key=lambda i: (W[i] / N[i]) if N[i] else 0.0)
-        winrate = (W[best] / N[best]) if N[best] else 0.0
-        chosen = dict(candidates[best])
-        chosen["winrate"] = round(winrate, 3)
-        return chosen, winrate
+    def _prior(self, action, strategy):
+        value = self.priors.get(action.get("tech_id"), .5)
+        if action.get("tech_id") in strategy.get("preferred_techniques", []):
+            value *= 2.
+        tactics = action.get("tactics", self.memory.get(action.get("tech_id"), {}).get("tactics", []))
+        if set(tactics) & set(strategy.get("preferred_tactics", [])):
+            value *= 1.5
+        return max(.01, value)
 
-    def _select(self, candidates, N, W, total) -> int:
-        best_i, best_u = 0, -1e9
-        for i, c in enumerate(candidates):
-            prior = self.priors.get(c.get("tech_id") or c["name"], 0.5)
-            if N[i] == 0:
-                u = prior + self.c_uct  # encourage unexplored
-            else:
-                q = W[i] / N[i]
-                u = q + self.c_uct * prior * math.sqrt(math.log(total + 1) / N[i])
-            if u > best_u:
-                best_i, best_u = i, u
-        return best_i
+    def _expand(self, node, role, focus_tid, strategy, root=False):
+        objective = replace(self.objective, description=(self.objective.description +
+                            "\n" + strategy.get("instruction", "")).strip())
+        candidates = generate_candidates(role, node.state, self.memory, k=12,
+                        llm=self.llm if root else None, learned_covered=self.learned_covered,
+                        evasive=self.evasive, objective=objective, focus_tid=focus_tid,
+                        infeasible=self.infeasible)
+        candidates.sort(key=lambda action: self._prior(action, strategy), reverse=True)
+        candidates = candidates[:4]
+        total = sum(self._prior(action, strategy) for action in candidates) or 1.
+        node.edges = [SearchEdge(action, self._prior(action, strategy) / total) for action in candidates]
 
-    def _rollout(self, state: CyberState, action: dict, role: str) -> float:
-        """Stochastic, GOAL-AWARE self-play rollout: it weighs both the chance of
-        advancing toward the objective and the detection risk, so MCTS prefers actions
-        that make verifiable progress to the flag over merely trying many techniques."""
-        prior = self.priors.get(action.get("tech_id") or action["name"], 0.5)
+    def transition(self, state: CyberState, action: dict, role: str,
+                   focus_tid: Optional[str] = None) -> tuple[CyberState, float]:
+        """Sample a *hypothetical* next state; never mutate an executor state."""
+        tid = action.get("tech_id")
+        prior = max(0., min(1., self.priors.get(tid, .5)))
+        executed, detected, defended = set(state.executed), set(state.detected), set(state.defended)
+        caps, foothold, captured = set(state.capabilities), state.foothold, state.flag
         if role == "red":
             stage = state.tactic_reached()
-            on_stage = bool(action.get("tactics") and stage in action["tactics"])
-            # precondition: this technique can only progress if red holds the stage's
-            # prerequisite capability; otherwise it is wasted effort this turn.
-            can_progress = on_stage and state.has(prerequisite_capability(stage))
-            p_success = 0.4 + 0.4 * prior + (0.1 if can_progress else 0.0)
-            success = self.rng.random() < p_success
-            # evasive red plans against detection: uncovered techniques are quieter,
-            # and getting caught is weighted much more heavily (stealth is the objective).
-            covered = is_covered(action.get("tech_id"), self.memory, self.learned_covered)
-            p_detect = (0.75 if covered else 0.15) if self.evasive else 0.5
-            detected = self.rng.random() < p_detect
-            # objective: if this is the capture stage and the step would succeed+evade,
-            # simulate capturing the flag (dominant reward) so search drives to the goal.
-            is_capture = can_progress and stage == self.objective.capture_tactic
-            captured = bool(is_capture and success and not detected)
-            # single reward definition (shared with run_episode); normalize the
-            # raw step reward to a [0,1] win-rate for UCT backups.
-            reward = step_reward("red", success=success, detected=detected,
-                                 evasive=self.evasive, captured=captured,
-                                 on_stage=can_progress)
-            # keep the win-rate in [0,1]; the capture bonus widens the top end.
-            return max(0.0, min(1.0, 0.5 + 0.25 * reward))
-        else:  # blue win-rate: catching/defending the active technique
-            p_defend = 0.3 + 0.6 * prior
-            # prefer defending the LIVE incoming attack (focus) -- that is what can be
-            # contained this turn; and deploying a rule for an evaded technique raises
-            # future detection, so reward it slightly.
-            if getattr(self, "_focus_tid", None) and action.get("tech_id") == self._focus_tid:
-                p_defend = min(1.0, p_defend + 0.4)
-            if action.get("deploy_rule"):
-                p_defend = min(1.0, p_defend + 0.1)
-            return 1.0 if self.rng.random() < p_defend else 0.2
+            on_stage = stage in action.get("tactics", []) and state.has(prerequisite_capability(stage))
+            success = self.rng.random() < (.4 + .4 * prior + (.1 if on_stage else 0.))
+            covered = is_covered(tid, self.memory, self.learned_covered) or tid in defended
+            detection = self.rng.random() < ((.75 if covered else .15) if self.evasive else .5)
+            if tid:
+                executed.add(tid)
+                if detection:
+                    detected.add(tid)
+            mitigated = tid in defended
+            if success and on_stage and not mitigated:
+                cap = stage_capability(stage)
+                if cap:
+                    caps.add(cap)
+                foothold = min(foothold + 1, len(_TACTIC_ORDER) - 1)
+                captured = captured or (stage == self.objective.capture_tactic and not detection)
+            shaped = step_reward(role, success=success, detected=detection, mitigated=mitigated,
+                                 captured=captured, on_stage=on_stage, evasive=self.evasive)
+            reward = max(0., min(1., .5 + .25 * shaped))
+        else:
+            probability = .3 + .6 * prior + (.4 if tid and tid == focus_tid else 0.)
+            probability += .1 if action.get("deploy_rule") else 0.
+            success = self.rng.random() < min(1., probability)
+            if success and tid:
+                defended.add(tid)
+                detected.add(tid)
+            reward = 1. if success else .2
+        result = CyberState(tuple(sorted(executed)), tuple(sorted(detected)), tuple(sorted(defended)),
+                            tuple(sorted(caps)), foothold, bool(captured), state.step + 1)
+        return result, reward
+
+    def search(self, state: CyberState, role: str = "red", focus_tid: Optional[str] = None,
+               strategy: Optional[dict] = None) -> tuple[dict, float]:
+        if role not in {"red", "blue"}:
+            raise ValueError("expected red/blue")
+        strategy = strategy or {}
+        horizon = int(strategy.get("max_depth", self.max_depth))
+        discount = float(strategy.get("discount", self.discount))
+        if not 1 <= horizon <= 16 or not 0 < discount <= 1:
+            raise ValueError("invalid strategy search horizon/discount")
+        root = SearchNode(state)
+        self._expand(root, role, focus_tid, strategy, root=True)
+        deepest = 0
+        for _ in range(self.n_sims):
+            node, path = root, []
+            for depth in range(horizon):
+                if node.state.flag:
+                    break
+                if not node.edges:
+                    self._expand(node, role, focus_tid, strategy)
+                if not node.edges:
+                    break
+                unvisited = [edge for edge in node.edges if not edge.visits]
+                edge = max(unvisited, key=lambda edge: edge.prior) if unvisited else max(
+                    node.edges, key=lambda edge: edge.value_sum / edge.visits + self.c_uct *
+                    edge.prior * math.sqrt(math.log(node.visits + 1) / edge.visits))
+                next_state, reward = self.transition(node.state, edge.action, role, focus_tid)
+                child = edge.outcomes.setdefault(next_state.key(), SearchNode(next_state))
+                path.append((node, edge, reward))
+                node = child
+                deepest = max(deepest, depth + 1)
+            # Back up normalized discounted returns at every ancestor. They are
+            # search estimates only; persistent stats use real trajectory_reward.
+            value, mass = 0., 0.
+            node.visits += 1
+            for parent, edge, reward in reversed(path):
+                value, mass = reward + discount * value, 1. + discount * mass
+                estimate = value / mass
+                edge.visits += 1
+                edge.value_sum += estimate
+                parent.visits += 1
+                parent.value_sum += estimate
+        self.last_tree = root
+        self.last_search = {"simulations": self.n_sims, "max_depth_reached": deepest,
+                            "horizon": horizon, "discount": discount, "root_visits": root.visits,
+                            "edges": [{"tech_id": edge.action.get("tech_id"), "visits": edge.visits,
+                                       "value": edge.value_sum / edge.visits if edge.visits else None,
+                                       "outcome_states": len(edge.outcomes)} for edge in root.edges],
+                            "value_source": "hypothetical_model_not_environment_evidence"}
+        if not root.edges or not deepest:
+            return {}, 0.
+        best = max(root.edges, key=lambda edge: (edge.visits, edge.value_sum / edge.visits if edge.visits else -1.))
+        value = best.value_sum / best.visits
+        chosen = dict(best.action, search_value=round(value, 4))
+        return chosen, value
 
 
 @dataclass

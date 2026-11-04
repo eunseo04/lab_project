@@ -23,7 +23,7 @@ from . import executor
 from .llm import get_llm
 from .docker_lab import HOSTS, KALI, IPS, OPPONENT, blue_ssh_exec
 from .policy import command_allowed
-from .learning import StrategyMCTS, action_priors, load_planner_state
+from .learning import StrategyMCTS, action_priors, load_planner_state, strategy_node
 from .trajectory import sanitize, utc_now
 
 
@@ -142,7 +142,7 @@ def run(team: str, role: str) -> None:
     )
     learned = load_planner_state(os.environ.get("AD_EVAL_PLANNER_STATE"))
     strategy_search = StrategyMCTS(learned, role,
-                                  rng=random.Random(int(os.environ.get("AD_EVAL_SEED", "0")) + int(team)))
+                                  rng=random.Random(int(os.environ.get("AD_EVAL_SEED", "0")) + int(team)), team=team)
     mcts = P.MCTS(memory, action_priors=action_priors(learned, role),
                   n_sims=int(os.environ.get("MAYHEM_SIMS", "32")),
                   rng=random.Random(int(os.environ.get("AD_EVAL_SEED", "0")) + int(team)),
@@ -168,12 +168,15 @@ def run(team: str, role: str) -> None:
             iteration += 1
             log_event(kind="closed_loop_cycle_started", team=team, role=role, cycle=iteration)
             strategy_id, instruction = strategy_search.search()
+            strategy = strategy_node(learned, role, strategy_id)
             decision = {"decision_id": uuid.uuid4().hex, "team": team, "role": role,
                         "started_utc": utc_now(), "strategy_id": strategy_id,
                         "strategy_instruction": instruction}
             if role == "red":
                 state = planner_state(phase, executed, iteration)
-                action, _ = mcts.search(state, role="red")
+                action, _ = mcts.search(state, role="red", strategy=strategy)
+                log_event(kind="mcts_search", team=team, role=role, strategy_id=strategy_id,
+                          search=mcts.last_search)
                 if not action:
                     log_event(kind="closed_loop_cycle_completed", team=team, role=role,
                               cycle=iteration, status="no_action")
@@ -243,7 +246,9 @@ def run(team: str, role: str) -> None:
                 # Blue MCTS ranks candidate defenses; trained GRPO model then
                 # generates the actual command. NO canonical patch substitution.
                 action, _ = mcts.search(P.CyberState(step=iteration),
-                                        role="blue", focus_tid=tid)
+                                        role="blue", focus_tid=tid, strategy=strategy)
+                log_event(kind="mcts_search", team=team, role=role, strategy_id=strategy_id,
+                          search=mcts.last_search)
                 decision["tech_id"] = tid
                 command = shell_blue_command(llm, action or {}, own_ip, tid, related, observed, decision=decision)
                 allowed = command_allowed(command, role, team)
