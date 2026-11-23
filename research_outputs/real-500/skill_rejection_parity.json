@@ -1,0 +1,7 @@
+{
+  "passed": true,
+  "compared_blue_records": 4990,
+  "joint_steps": 998,
+  "reason": "Rejected E2 candidates leave the static skill policy unchanged",
+  "differences": []
+}

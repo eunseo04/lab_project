@@ -1,0 +1,22 @@
+| Red | Comparison | Paired N | Left Mean | Right Mean | Mean difference | Sample Std of differences |
+|---|---|---|---|---|---|---|
+| finite | E1 - E0 | 0 | N/A | N/A | N/A | N/A |
+| finite | E2 - E1 | 0 | N/A | N/A | N/A | N/A |
+| finite | E3 - E2 | 0 | N/A | N/A | N/A | N/A |
+| finite | E3 - E0 | 0 | N/A | N/A | N/A | N/A |
+| aggressive | E1 - E0 | 0 | N/A | N/A | N/A | N/A |
+| aggressive | E2 - E1 | 0 | N/A | N/A | N/A | N/A |
+| aggressive | E3 - E2 | 0 | N/A | N/A | N/A | N/A |
+| aggressive | E3 - E0 | 0 | N/A | N/A | N/A | N/A |
+| stealthy | E1 - E0 | 0 | N/A | N/A | N/A | N/A |
+| stealthy | E2 - E1 | 0 | N/A | N/A | N/A | N/A |
+| stealthy | E3 - E2 | 0 | N/A | N/A | N/A | N/A |
+| stealthy | E3 - E0 | 0 | N/A | N/A | N/A | N/A |
+| impact | E1 - E0 | 0 | N/A | N/A | N/A | N/A |
+| impact | E2 - E1 | 0 | N/A | N/A | N/A | N/A |
+| impact | E3 - E2 | 0 | N/A | N/A | N/A | N/A |
+| impact | E3 - E0 | 0 | N/A | N/A | N/A | N/A |
+| degrade | E1 - E0 | 0 | N/A | N/A | N/A | N/A |
+| degrade | E2 - E1 | 0 | N/A | N/A | N/A | N/A |
+| degrade | E3 - E2 | 0 | N/A | N/A | N/A | N/A |
+| degrade | E3 - E0 | 0 | N/A | N/A | N/A | N/A |

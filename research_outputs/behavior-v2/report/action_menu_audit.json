@@ -1,0 +1,33 @@
+{
+  "llm_controlled_explicit_actions": [
+    "Analyse",
+    "Remove",
+    "Restore",
+    "DeployDecoy",
+    "BlockTrafficZone",
+    "AllowTrafficZone",
+    "Sleep"
+  ],
+  "keep_explicit_actions": [
+    "Analyse",
+    "Remove",
+    "Restore",
+    "DeployDecoy",
+    "AllowTrafficZone",
+    "BlockTrafficZone",
+    "Monitor"
+  ],
+  "automatic_monitor_for_both": true,
+  "llm_and_proposed_action_sets_identical": true,
+  "same_action_set_for_keep_and_llm": false,
+  "passive_analysis_category": [
+    "Sleep",
+    "Monitor"
+  ],
+  "passive_category_is_descriptive_not_a_claim_of_identical_MDP": true,
+  "sources": {
+    "runtime/CybORG/Agents/Wrappers/CybermonicWrappers/globals.py": "2e10b2d2d67a9df54b15e45efba29be324ecd8541b2ba84921ff4b450273085c",
+    "runtime/CybORG/Agents/Wrappers/CybermonicWrappers/graph_wrapper.py": "c50aec01486f6d2f7a543e0855c84f469a8aac5eeeb18d10a35031f7a9a14499",
+    "acd/llm_agent.py": "8cc161f8a0ea51f7f0f7b68e6bf77d220a3b35ee2ea1a777e7167ccf1a021d1c"
+  }
+}

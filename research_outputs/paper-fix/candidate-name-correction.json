@@ -1,0 +1,20 @@
+{
+  "change": "Finalize a unique candidate name before exact Gate scoring; preserve identical verified text on admission",
+  "long_run_source": "revisions/paper-fix-long-run-20261120/manifest.json",
+  "final_source": "revisions/paper-fix-final-20261120/manifest.json",
+  "changed_files": [
+    "research/evolution.py"
+  ],
+  "before_sha256": {
+    "research/evolution.py": "aa4e0f04926546dd2a58728f507820e634bbdf79efd9fb48af6bb7f86bac734b"
+  },
+  "after_sha256": {
+    "research/evolution.py": "9ed2dd05400cbc71f15094ecc7308339422a33d2010ebe91e8085b37cbb4fdb4"
+  },
+  "real_identity_gate_audit": "research_outputs/paper-fix/candidate-identity-audit.json",
+  "candidate_selection_unchanged": true,
+  "evaluated_pool_content_unchanged": true,
+  "heldout_rewards_used_for_candidate_selection": false,
+  "validation_tests": "research_outputs/paper-fix-final-tests.xml",
+  "no_gate_ablation": "Reserve sibling names when all proposals are admitted; gated experiment behavior unchanged"
+}

@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="15" time="5.996" timestamp="2026-11-20T17:00:14.909184" hostname="devbox"><testcase classname="research_tests.test_research" name="test_official_gate_matches_manual_clipped_formula" time="0.002" /><testcase classname="research_tests.test_research" name="test_paper_rtg_is_distinct_and_exact" time="0.001" /><testcase classname="research_tests.test_research" name="test_official_dispatcher_parity" time="0.001"><failure message="KeyError: 'action'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7f39e748eaa0&gt;
+
+    def test_official_dispatcher_parity(monkeypatch):
+        pool=SecuritySkillPool(); parent=pool.skills[3]
+        evolver=OriginalEvolution(None,threshold=1)
+        candidate=Skill(name="next",initiation="valid",policy=["one"],termination="done")
+        monkeypatch.setattr(evolver,"evolve",lambda *a:(candidate,"REFINE"))
+        monkeypatch.setattr(evolver,"_compute_skill_logprobs",lambda s,*a:np.zeros(2) if s is parent else np.log([1.5,1.5]))
+        exp=experience(); exp.skill=parent.name
+&gt;       log=evolver.run_skill_evolution_with_verification(pool,[exp],None,{"test":2},best_of_n=1,acceptance_margin=0)
+
+research_tests/test_research.py:78: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;Skills.skill_evolution.SkillEvolution object at 0x7f39e73200d0&gt;
+skill_pool = &lt;research.skills.SecuritySkillPool object at 0x7f39e748ffa0&gt;
+new_experiences = [Experience(reward=4, skill='DeceptionDeployment', trajectory='full step history', env_name='test', transitions=[{'ste...ids': [1], 'policy_invoked': True, 'request_applied': True, 'parse_error': None}], step_count=0, total_added_tokens=0)]
+build_prompt_fn = None, baselines = {'test': 2}, acceptance_margin = 0
+max_evolutions_per_step = 2, best_of_n = 1, current_iteration = 0
+ablation_type = 'none'
+
+    def run_skill_evolution_with_verification(
+            self,
+            skill_pool: Any,
+            new_experiences: List[Any],
+            build_prompt_fn: Callable,
+            baselines: Dict[str, float],
+            acceptance_margin: float = 0.001,
+            max_evolutions_per_step: int = 2,
+            # max_evolutions_per_step: int = 1,
+            best_of_n: int = 3,  # 引入 Best-of-N 采样
+            current_iteration: int = 0,
+            ablation_type: str = "none"
+    ) -&gt; List[Dict]:
+        """
+        支持 Best-of-N 采样与 J-Score 验证的 Skill 演化调度函数
+        """
+        evolution_logs = []
+    
+        # 1. 经验分发
+        for exp in new_experiences:
+            if exp.skill and exp.skill != "None":
+                skill_names = exp.skill.split(";")
+                for sk_name in skill_names:
+                    self.experience_buffer[sk_name].append(exp)
+    
+        all_skills = list(skill_pool.get_all())
+        ready_candidates = []
+    
+        for sk in all_skills:
+            buffered_exps = self.experience_buffer.get(sk.name, [])
+            if len(buffered_exps) &gt;= self.threshold:
+                ready_candidates.append(sk)
+    
+        if not ready_candidates:
+            return []
+    
+        ready_candidates.sort(key=lambda o: get_priority(o, pool_skills=all_skills, t=current_iteration), reverse=True)
+        selected_parents = ready_candidates[:max_evolutions_per_step]
+    
+        # 3. 对选中的 Parent 执行 Best-of-N 演化
+        for old_sk in selected_parents:
+            print(f"#x1F9EC [Best-of-{best_of_n} Evolution] Selecting '{old_sk.name}' "
+                  f"(Freq: {old_sk.frequency}, Gain: {old_sk.avg_gain:.3f})")
+    
+            # 获取用于评估的数据集
+            # eval_exps = self.experience_buffer[old_sk.name][-self.threshold:]
+            buffer = self.experience_buffer.get(old_sk.name, [])
+            eval_exps = build_success_failure_eval_batch(buffer, self.threshold)
+    
+            # 预处理数据：展平 transitions 以进行批量 logprob 计算
+            all_states = []
+            all_actions = []
+            all_envs = []
+            traj_boundaries = [0]
+            for exp in eval_exps:
+                for trans in exp.transitions:
+                    all_states.append(trans['state'])
+&gt;                   all_actions.append(trans['action'])
+E                   KeyError: 'action'
+
+third_party/Skill-Pro/Skills/skill_evolution.py:425: KeyError</failure></testcase><testcase classname="research_tests.test_research" name="test_bad_probability_fails_closed" time="0.002" /><testcase classname="research_tests.test_research" name="test_no_gate_ablation_never_computes_logprob" time="0.001" /><testcase classname="research_tests.test_research" name="test_no_gradient_ablation_uses_summary_path" time="0.001" /><testcase classname="research_tests.test_research" name="test_fifo_ablation_is_a_real_maintenance_switch" time="0.001" /><testcase classname="research_tests.test_research" name="test_semantic_gradient_receives_all_step_history" time="0.001" /><testcase classname="research_tests.test_research" name="test_reward_ledger_matches_official_loop_without_fivefold_sum" time="0.001" /><testcase classname="research_tests.test_research" name="test_skills_off_has_same_prompt_and_action_as_acd" time="0.688" /><testcase classname="research_tests.test_research" name="test_controllers_are_independent_and_persist_multiple_steps" time="0.002" /><testcase classname="research_tests.test_research" name="test_proposed_checks_do_not_use_hidden_state" time="0.001" /><testcase classname="research_tests.test_research" name="test_training_eval_seed_overlap_rejected" time="0.001" /><testcase classname="research_tests.test_research" name="test_resume_and_frozen_evaluation" time="2.025" /><testcase classname="research_tests.test_research" name="test_connection_failure_produces_no_success_score" time="0.003" /></testsuite></testsuites>

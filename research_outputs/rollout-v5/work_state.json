@@ -1,0 +1,109 @@
+{
+  "started_at_utc": "2026-11-20T19:20:37.355733+00:00",
+  "status": "B1 explicit seven-skill pool loading repaired before final evaluation; B4 exact-candidate validation continues unchanged; B2 original one-loop learning completed.",
+  "git_status": "proposed and all parents are not a Git repository; no pre-change project commit exists; exact source hashes recorded instead",
+  "upstream_commits": {
+    "Skill-Pro": "3be7a9be2d4c024d132efe394d537404eba7e4c8",
+    "cage-4-submission": "2afd652d80ce9d4051a07c23c2538f3dec6bb6c6",
+    "llms-are-acd": "81ff29a0d8f7a7184cafecc62c39945d03acdda6",
+    "cage-challenge-4": "8c3c50ca54b176c2de199847944e8dcc035497e3",
+    "runtime": "not_git"
+  },
+  "prechange_source_sha256": {
+    "revisions/behavior-v4-observation-20261121/research/client.py": "68c43e791d11e0e7d0e7f15ea713c5bb76511b42c69c95acb63a58895c4cd1c3",
+    "revisions/behavior-v4-observation-20261121/research/__init__.py": "a6a3fe43b4b652e3cbe49fff17029ca23a08c26b36905e9d4131d16e44d375fb",
+    "revisions/behavior-v4-observation-20261121/research/config.py": "8daf759d776a4b42df06fe115fb4ee578aa176fac573d78242d837fcd79380f9",
+    "revisions/behavior-v4-observation-20261121/research/skills.py": "5872a14f4140faf98c520f4a392668c1dd2a4c73ab58f26397d5d8462316f976",
+    "revisions/behavior-v4-observation-20261121/research/adapter.py": "ad39ac101b8f93cea887605f83be331e226afb85dfb20140226b37e74c988b92",
+    "revisions/behavior-v4-observation-20261121/research/paper_algorithm.py": "656bd2e674b69f8dfe2fa4974d7c21dd01ba8a189cc57bd83501e1bab448eff6",
+    "revisions/behavior-v4-observation-20261121/research/official.py": "54192c231e878c97e8d47a3d1a4eaf7ce85c0e72c1ff71c945dad1c5528e4e60",
+    "revisions/behavior-v4-observation-20261121/research/__main__.py": "8c82846a331c1cb1e9f397c56a30fd984c609d56784fba01ffacf9c3b268b515",
+    "revisions/behavior-v4-observation-20261121/research/behavior_skills.py": "091e0319d8430a203a96b72db4da1799250531b792f9675aeff691cd7aaf83cb",
+    "revisions/behavior-v4-observation-20261121/research/experiment.py": "df629ca8306fba361649bcaa8c4a8043ad07aaeadada43abe115e150ddb6c9b9",
+    "revisions/behavior-v4-observation-20261121/research/gate.py": "9fae1dba41d0f18ffb571d675516011d4509d5b736bfb20c0d8acbfa77b02231",
+    "revisions/behavior-v4-observation-20261121/research/evolution.py": "8adbf008bca416475887a64e7dabe655741e11625f33b97c999bedb02b3cdb77",
+    "revisions/behavior-v4-observation-20261121/research/behavior.py": "098f38d3ad7ba6a4dfc3155096672905281aec9f30d49f0d04c1f93b3f3d06e0",
+    "revisions/behavior-v4-observation-20261121/research/reporting.py": "e4484ed10cb3978b9c4b6d82bf60ebd20483387c2dda32921330003b083bdd5a",
+    "revisions/behavior-v4-observation-20261121/research/upstream.py": "0d226601790d2cb61868a0a9a5024d24c6e86c30c5601c9b614daeeb7e3a2962",
+    "revisions/behavior-v4-observation-20261121/research/metrics.py": "fa5acc93526659ae96497d0ddcefefe9c720de75e5521467ce1bad9cfa97c918",
+    "revisions/behavior-v4-observation-20261121/research/model_server.py": "7acc0c79caa693479615bf4b362ef5b90055047df0606a7077b5898c0cdb4ea0",
+    "revisions/behavior-v4-observation-20261121/tests/test_experiments.py": "f6fa66111bed19b0a45b53bb3247c0a13e8df5dde110bced782e901d82b8cd85",
+    "revisions/behavior-v4-observation-20261121/research.sh": "de4038462f6190d24c29051449439bde10b908414c177febd475c943741b3306"
+  },
+  "user_budget": {
+    "model_execution_wall_time_limit_hours": 8,
+    "parallel_gpu_slots": 4,
+    "interpretation": "Overall model-campaign elapsed time, including replicas; deadline recorded before first model launch. Never start work beyond deadline."
+  },
+  "main_final_seed_count_planned": 100,
+  "validation_seed_count_planned": 20,
+  "actual_counts": "not_started",
+  "primary_server_to_preserve": 8018,
+  "original_results_preserved": true,
+  "remaining": [
+    "All three registered measured source revisions and drivers are frozen. Final manager attaches existing B4 validation; B3 retries within original deadline. Final E1 now loads the common initial pool.",
+    "Finish report_rollout_v5.py audits, eight plots and final RQ narrative while models run.",
+    "Check actual20-seed validations and transaction outcomes; never claim incomplete candidates accepted.",
+    "At budget end audit actual held-out N, CI, source/previous hashes and source parity; inspect plots; finalize all docs.",
+    "Manager stops only its8219/8220/8221 replicas and preserves8018. Verify cleanup and report final within8-hour model budget.",
+    "Reusable multi-loop metadata hardening has140 passed tests; do not attribute measured outcomes to that distinct unmeasured metadata revision."
+  ],
+  "current_source_root": "revisions/rollout-v5-static-pool-fix",
+  "current_tests": 139,
+  "root_cause_report": "reports/reward_root_cause.md",
+  "algorithm_audit": "reports/skillpro_algorithm_audit.md",
+  "budget": "research_outputs/rollout-v5/budget.json",
+  "replica_ports": [
+    8219,
+    8220,
+    8221
+  ],
+  "replica_pids": [
+    4022202,
+    4022203,
+    4022204
+  ],
+  "new_features": [
+    "Evidence catalog links every SG component to real step/agent/field without hidden state",
+    "Reject unsupported candidate component changes and training host/IP memorization",
+    "Original clipped PPO gate unchanged; Proposed-only transactional20-seed paired CAGE4 validation after J>0",
+    "Rollback or retain previous pool on loss, uncertainty, incomplete validation or budget expiry",
+    "B4-only initiation priority: current admin recovery and fresh PID response before redundant diagnosis",
+    "Original official reward event audit, never fed into policy context"
+  ],
+  "baseline_parity": "Four v4 E0 recorded500-step episodes29000-29003 exactly replayed through new v5 reward instrumentation; no new model samples",
+  "counterfactual": "Cloudpickle identical five-step branch audit passed; interventions at first divergence passed for seeds22000/22001. Later-state22002/22003 snapshot observation checks failed; no causal reward claims for those cases.",
+  "manager_pid": 4029060,
+  "protocol": "/home/jeonges/proposed/research_outputs/rollout-v5/protocol.json",
+  "main_document": "reports/rollout_methodology.md",
+  "final_report_command": ".venv/bin/python scripts/report_rollout_v5.py --require-terminal",
+  "registered_regression_tests": 135,
+  "supplementary_capacity_tests": 2,
+  "extra_known_debug": "research_outputs/rollout-v5/debugging/protocol.json",
+  "main_reporter": "scripts/report_rollout_v5.py",
+  "read_only_new_findings": [
+    "All official reward/topology/Green/Restore/Degrade/control-traffic sources match pinned original bytes.",
+    "Static seed22001 ASF32 directly follows KEEP agent3 block; static22000 ASF2 follows Qwen block.",
+    "Some skill gates have nonpositive mathematical upper bound under current shared RTG; diagnostic only.",
+    "Active Skill generation/uncached exact scorer parity: eight real actions across six Skill families; max difference9.5367431640625e-7. No extra performance episode."
+  ],
+  "important": "Never edit registered research Python or campaign driver; scripts/docs may be fixed. Keep primary8018; temporary8219/8220/8221 only. Final only after campaign terminal and audit.",
+  "first_validation_case": "B4/train/rollout-verification/iteration-0001-001-EscalationDiagnosis_v2",
+  "status_command": ".venv/bin/python scripts/rollout_v5_status.py",
+  "main_report_command": ".venv/bin/python scripts/report_rollout_v5.py --require-terminal",
+  "known_debug_audit": "research_outputs/rollout-v5/debugging/audit.json",
+  "reporter_notes": [
+    "Report uses explicit connection_leads=True ledger factory.",
+    "episode_metrics returns agent mapping directly.",
+    "Recognize new children by (name,version) absent from initial pool, including NEW version1.",
+    "Count completed validations even if enclosing evolution is uncommitted.",
+    "Registered code and driver stay frozen."
+  ],
+  "metadata_repair_protocol": "research_outputs/rollout-v5/metadata-repair-protocol.json",
+  "repaired_manager_pid": 4046317,
+  "reusable_source_root": "revisions/rollout-v5-reusable",
+  "reusable_tests": 141,
+  "reusable_scope": "Validation snapshot counts current completed loop and inherited episodes/seeds/history. No new model performance runs; measured source and original deadlines remain unchanged.",
+  "static_pool_repair_protocol": "research_outputs/rollout-v5/static-pool-repair-protocol.json",
+  "final_manager_pid": 4055499
+}

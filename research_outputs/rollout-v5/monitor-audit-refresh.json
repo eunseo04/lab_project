@@ -1,0 +1,25 @@
+{
+  "updated_unix": 1795214529.8571856,
+  "results": [
+    {
+      "script": "audit_rtg_alignment.py",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "script": "audit_semantic_catalog.py",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "script": "report_rollout_v5.py",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "script": "report_closed_loop_findings.py",
+      "exit_code": 0,
+      "error": null
+    }
+  ]
+}

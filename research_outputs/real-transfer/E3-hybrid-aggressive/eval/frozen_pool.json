@@ -1,0 +1,226 @@
+{
+  "pool": {
+    "max_size": 10,
+    "skills": [
+      {
+        "name": "HostInvestigation",
+        "initiation": "When an assigned host has suspicious process/connection events that need investigation.",
+        "policy": [
+          "Identify an assigned host with observable suspicious events.",
+          "Analyse that host.",
+          "Wait for completion and inspect the actual result before escalation."
+        ],
+        "termination": "Analysis has completed and its observable findings have been inspected, or no relevant host remains.",
+        "frequency": 84,
+        "avg_gain": -2.4138627035823297,
+        "total_gain": -202.76446710091568,
+        "maturity": 1,
+        "success_count": 0,
+        "last_evolved_iter": 0,
+        "parent_id": "",
+        "version": 1,
+        "allowed_actions": [
+          "Analyse"
+        ],
+        "family": "HostInvestigation"
+      },
+      {
+        "name": "ThreatRemoval",
+        "initiation": "When observable events support a user-level compromise or a malicious process on an assigned host.",
+        "policy": [
+          "Check the affected host and previous analysis/monitor evidence.",
+          "Remove malicious processes on that host.",
+          "Verify the returned status; re-analyse if evidence is inconclusive."
+        ],
+        "termination": "Removal completed and subsequent observations no longer support the same malicious process, or removal failed and further analysis is needed.",
+        "frequency": 34,
+        "avg_gain": -2.870663756864966,
+        "total_gain": -97.60256773340885,
+        "maturity": 1,
+        "success_count": 0,
+        "last_evolved_iter": 0,
+        "parent_id": "",
+        "version": 1,
+        "allowed_actions": [
+          "Remove",
+          "Analyse"
+        ],
+        "family": "ThreatRemoval"
+      },
+      {
+        "name": "HostRecovery",
+        "initiation": "When an assigned host has observable admin-level compromise and removal is insufficient.",
+        "policy": [
+          "Confirm observable admin-compromise evidence on the specific host.",
+          "Restore the host, considering its availability cost.",
+          "Wait for the restore action and check the observed result."
+        ],
+        "termination": "Restore has completed with observable confirmation, or the action has failed.",
+        "frequency": 4,
+        "avg_gain": -2.380817521004437,
+        "total_gain": -9.523270084017748,
+        "maturity": 1,
+        "success_count": 0,
+        "last_evolved_iter": 1,
+        "parent_id": "",
+        "version": 1,
+        "allowed_actions": [
+          "Restore",
+          "Analyse"
+        ],
+        "family": "HostRecovery"
+      },
+      {
+        "name": "DeceptionDeployment",
+        "initiation": "When the defender is available and a legitimate assigned host can host a useful decoy.",
+        "policy": [
+          "Choose a valid assigned host without repeating a failed deployment blindly.",
+          "DeployDecoy on the host.",
+          "Wait for completion and examine status and subsequent monitor events."
+        ],
+        "termination": "Deployment has completed or failed and its result has been checked.",
+        "frequency": 11,
+        "avg_gain": -2.4439037786531412,
+        "total_gain": -26.882941565184552,
+        "maturity": 1,
+        "success_count": 0,
+        "last_evolved_iter": 0,
+        "parent_id": "",
+        "version": 1,
+        "allowed_actions": [
+          "DeployDecoy",
+          "Analyse"
+        ],
+        "family": "DeceptionDeployment"
+      },
+      {
+        "name": "NetworkContainment",
+        "initiation": "When observable repeated malicious connections or communicated threat justify limiting a zone.",
+        "policy": [
+          "Check the visible mission phase and relevant communication vectors.",
+          "Choose a valid subnet for BlockTrafficZone without gratuitous availability loss.",
+          "Observe success/failure and reassess the containment need."
+        ],
+        "termination": "The block action result is known and the immediate containment decision has been reassessed.",
+        "frequency": 16,
+        "avg_gain": -2.120586708203531,
+        "total_gain": -33.92938733125649,
+        "maturity": 1,
+        "success_count": 0,
+        "last_evolved_iter": 0,
+        "parent_id": "",
+        "version": 1,
+        "allowed_actions": [
+          "BlockTrafficZone"
+        ],
+        "family": "NetworkContainment"
+      },
+      {
+        "name": "TrafficRecovery",
+        "initiation": "When the defender has observable evidence of its previous traffic block and can reassess its need.",
+        "policy": [
+          "Identify the previously blocked subnet from observed action history.",
+          "Check current phase and available threat evidence.",
+          "AllowTrafficZone when recovery is justified and check the actual status."
+        ],
+        "termination": "Traffic restoration has completed or failed and its result has been inspected.",
+        "frequency": 6,
+        "avg_gain": -1.9181849649139366,
+        "total_gain": -11.50910978948362,
+        "maturity": 1,
+        "success_count": 0,
+        "last_evolved_iter": 0,
+        "parent_id": "",
+        "version": 1,
+        "allowed_actions": [
+          "AllowTrafficZone"
+        ],
+        "family": "TrafficRecovery"
+      },
+      {
+        "name": "WaitVerification",
+        "initiation": "When an action is still in progress or an already initiated response must be checked before another intervention.",
+        "policy": [
+          "Inspect Last Action Status and the busy bit.",
+          "Sleep while the previous action remains in progress.",
+          "Read the completed action status and automatic Monitor observations before continuing."
+        ],
+        "termination": "The outstanding action has completed and its observable outcome is available.",
+        "frequency": 51,
+        "avg_gain": -2.2311422822692752,
+        "total_gain": -113.78825639573304,
+        "maturity": 1,
+        "success_count": 0,
+        "last_evolved_iter": 0,
+        "parent_id": "",
+        "version": 1,
+        "allowed_actions": [
+          "Sleep"
+        ],
+        "family": "WaitVerification"
+      },
+      {
+        "name": "HostRecovery_v2",
+        "initiation": "IF observable admin-level compromise evidence is confirmed on the host AND the host is the correct target of the restore action AND removal of the compromised state is insufficient",
+        "policy": [
+          "Verify the exact compromised host through evidence analysis and cross-check with incident data",
+          "Confirm the restoration target matches the compromised host before initiating the restore action",
+          "Execute the restore action and wait for confirmation of successful restoration",
+          "Validate the host's restored state through observable metrics and functional tests"
+        ],
+        "termination": "Stop IF the correct host has been successfully restored with observable confirmation AND the host is functioning as expected",
+        "frequency": 0,
+        "avg_gain": 0.0,
+        "total_gain": 0.0,
+        "maturity": 0,
+        "success_count": 0,
+        "last_evolved_iter": 0,
+        "parent_id": "HostRecovery",
+        "version": 2,
+        "allowed_actions": [
+          "Restore",
+          "Analyse"
+        ],
+        "family": "HostRecovery"
+      }
+    ]
+  },
+  "model_identity": {
+    "model": "Qwen/Qwen3-8B",
+    "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+    "backend": "transformers",
+    "transformers": "4.51.3",
+    "torch": "2.6.0+cu124",
+    "dtype": "bfloat16",
+    "weights_frozen": true,
+    "temperature_scoring": true,
+    "scoring_mode": "incremental_teacher_forcing",
+    "chat_template_sha256": "a55ee1b1660128b7098723e0abcd92caa0788061051c62d51cbe87d9cf1974d8"
+  },
+  "training_provenance": {
+    "path": "/home/jeonges/proposed/research_outputs/real-500/E3-hybrid-finite/train/checkpoint.json",
+    "sha256": "f5d2b154ab6bea1bc4b4b917267c2b541b038e6b9a3ebb085f8a655d52df9000",
+    "episodes_completed": 2,
+    "total_training_episodes": 2,
+    "training_seeds": [
+      100,
+      101
+    ],
+    "algorithm": {
+      "enabled": true,
+      "gate_mode": "official_code",
+      "ppo_gate": true,
+      "semantic_gradient": true,
+      "score_maintenance": true,
+      "threshold": 2,
+      "best_of_n": 2,
+      "max_evolutions": 1,
+      "semantic_chunk_steps": 8,
+      "clip": 0.2,
+      "gamma": 0.99,
+      "ema_alpha": 0.1,
+      "acceptance_margin": 0.0,
+      "maintenance_mode": "official_code"
+    }
+  }
+}

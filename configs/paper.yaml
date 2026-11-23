@@ -1,0 +1,25 @@
+# Paper evaluation dimensions: 2 episodes x 500 steps; matrix selects 4 teams x 5 reds.
+# This requires paper-protocol policies trained with train_paper.yaml.
+# LLM slots remain mock until you replace the backend. Their results are labeled mock.
+name: paper
+team: mixed
+red: finite
+communication: paper
+episodes: 2
+steps: 500
+seed: 42
+threads: 1
+weights: checkpoints/paper-trained
+output: runs
+model:
+  backend: mock
+  enabled: false
+  model: replace-with-your-model
+  temperature: 1.0
+  # backend: api
+  # enabled: true
+  # base_url: https://your-provider.example/v1
+  # api_key_env: ACD_MODEL_API_KEY
+  # timeout_seconds: 60
+  # The request code in acd/backends.py is commented out too.
+  # Alternative: backend: custom; factory: my_model:create_backend

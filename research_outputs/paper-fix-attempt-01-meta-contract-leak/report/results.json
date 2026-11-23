@@ -1,0 +1,306 @@
+{
+  "status": "partial",
+  "metric": "official joint reward; higher is better",
+  "metrics": [
+    {
+      "stage": "baseline",
+      "n": 3,
+      "planned_n": 4,
+      "mean": -286.0,
+      "sample_std": 148.98657657654934,
+      "returns_by_seed": {
+        "12001": -203.0,
+        "12002": -197.0,
+        "12003": -458.0
+      },
+      "policy_decisions": 1236,
+      "policy_errors": 0,
+      "evolved_policy_decisions": 0
+    },
+    {
+      "stage": "static_verified",
+      "n": 0,
+      "planned_n": 4,
+      "mean": null,
+      "sample_std": null,
+      "returns_by_seed": {},
+      "policy_decisions": 0,
+      "policy_errors": 0,
+      "evolved_policy_decisions": 0
+    },
+    {
+      "stage": "loop1",
+      "n": 0,
+      "planned_n": 4,
+      "mean": null,
+      "sample_std": null,
+      "returns_by_seed": {},
+      "policy_decisions": 0,
+      "policy_errors": 0,
+      "evolved_policy_decisions": 0
+    },
+    {
+      "stage": "loop2",
+      "n": 0,
+      "planned_n": 4,
+      "mean": null,
+      "sample_std": null,
+      "returns_by_seed": {},
+      "policy_decisions": 0,
+      "policy_errors": 0,
+      "evolved_policy_decisions": 0
+    },
+    {
+      "stage": "transfer_baseline",
+      "n": 0,
+      "planned_n": 4,
+      "mean": null,
+      "sample_std": null,
+      "returns_by_seed": {},
+      "policy_decisions": 0,
+      "policy_errors": 0,
+      "evolved_policy_decisions": 0
+    },
+    {
+      "stage": "transfer_loop2",
+      "n": 0,
+      "planned_n": 4,
+      "mean": null,
+      "sample_std": null,
+      "returns_by_seed": {},
+      "policy_decisions": 0,
+      "policy_errors": 0,
+      "evolved_policy_decisions": 0
+    }
+  ],
+  "paired_differences": [
+    {
+      "comparison": "loop1 - baseline",
+      "n": 0,
+      "seeds": [],
+      "differences": [],
+      "mean_difference": null,
+      "wins": 0
+    },
+    {
+      "comparison": "loop2 - baseline",
+      "n": 0,
+      "seeds": [],
+      "differences": [],
+      "mean_difference": null,
+      "wins": 0
+    },
+    {
+      "comparison": "loop1 - static_verified",
+      "n": 0,
+      "seeds": [],
+      "differences": [],
+      "mean_difference": null,
+      "wins": 0
+    },
+    {
+      "comparison": "loop2 - static_verified",
+      "n": 0,
+      "seeds": [],
+      "differences": [],
+      "mean_difference": null,
+      "wins": 0
+    },
+    {
+      "comparison": "loop2 - loop1",
+      "n": 0,
+      "seeds": [],
+      "differences": [],
+      "mean_difference": null,
+      "wins": 0
+    },
+    {
+      "comparison": "transfer_loop2 - transfer_baseline",
+      "n": 0,
+      "seeds": [],
+      "differences": [],
+      "mean_difference": null,
+      "wins": 0
+    }
+  ],
+  "closed_loops": [],
+  "evolution": [],
+  "episodes": [
+    {
+      "stage": "baseline",
+      "red": "finite",
+      "arm": "E0",
+      "seed": 12001,
+      "joint_return": -203.0,
+      "wall_s": 636.0930881609675,
+      "policy_decisions": 423,
+      "policy_errors": 0,
+      "evolved_policy_decisions": 0,
+      "evolved_policy_fraction": 0.0,
+      "action_counts": {
+        "Analyse": 56,
+        "Sleep": 427,
+        "Remove": 6,
+        "Restore": 2,
+        "BlockTrafficZone": 6,
+        "AllowTrafficZone": 2
+      },
+      "skill_usage": {
+        "NONE": 423
+      },
+      "terminations": {},
+      "model_calls": 423,
+      "source": "research_outputs/paper-fix/paired/baseline-seed-12001/summary.json",
+      "pool_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+    },
+    {
+      "stage": "baseline",
+      "red": "finite",
+      "arm": "E0",
+      "seed": 12002,
+      "joint_return": -197.0,
+      "wall_s": 639.4217703398317,
+      "policy_decisions": 431,
+      "policy_errors": 0,
+      "evolved_policy_decisions": 0,
+      "evolved_policy_fraction": 0.0,
+      "action_counts": {
+        "Analyse": 42,
+        "Sleep": 440,
+        "Remove": 7,
+        "Restore": 3,
+        "BlockTrafficZone": 5,
+        "AllowTrafficZone": 2
+      },
+      "skill_usage": {
+        "NONE": 431
+      },
+      "terminations": {},
+      "model_calls": 431,
+      "source": "research_outputs/paper-fix/paired/baseline-seed-12002/summary.json",
+      "pool_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+    },
+    {
+      "stage": "baseline",
+      "red": "finite",
+      "arm": "E0",
+      "seed": 12003,
+      "joint_return": -458.0,
+      "wall_s": 581.8379303251859,
+      "policy_decisions": 382,
+      "policy_errors": 0,
+      "evolved_policy_decisions": 0,
+      "evolved_policy_fraction": 0.0,
+      "action_counts": {
+        "Analyse": 66,
+        "Sleep": 409,
+        "Remove": 17,
+        "Restore": 4,
+        "DeployDecoy": 1,
+        "BlockTrafficZone": 2
+      },
+      "skill_usage": {
+        "NONE": 382
+      },
+      "terminations": {},
+      "model_calls": 382,
+      "source": "research_outputs/paper-fix/paired/baseline-seed-12003/summary.json",
+      "pool_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+    }
+  ],
+  "missing": [
+    {
+      "stage": "baseline",
+      "seed": 12000
+    },
+    {
+      "stage": "static_verified",
+      "seed": 12000
+    },
+    {
+      "stage": "static_verified",
+      "seed": 12001
+    },
+    {
+      "stage": "static_verified",
+      "seed": 12002
+    },
+    {
+      "stage": "static_verified",
+      "seed": 12003
+    },
+    {
+      "stage": "loop1",
+      "seed": 12000
+    },
+    {
+      "stage": "loop1",
+      "seed": 12001
+    },
+    {
+      "stage": "loop1",
+      "seed": 12002
+    },
+    {
+      "stage": "loop1",
+      "seed": 12003
+    },
+    {
+      "stage": "loop2",
+      "seed": 12000
+    },
+    {
+      "stage": "loop2",
+      "seed": 12001
+    },
+    {
+      "stage": "loop2",
+      "seed": 12002
+    },
+    {
+      "stage": "loop2",
+      "seed": 12003
+    },
+    {
+      "stage": "transfer_baseline",
+      "seed": 12000
+    },
+    {
+      "stage": "transfer_baseline",
+      "seed": 12001
+    },
+    {
+      "stage": "transfer_baseline",
+      "seed": 12002
+    },
+    {
+      "stage": "transfer_baseline",
+      "seed": 12003
+    },
+    {
+      "stage": "transfer_loop2",
+      "seed": 12000
+    },
+    {
+      "stage": "transfer_loop2",
+      "seed": 12001
+    },
+    {
+      "stage": "transfer_loop2",
+      "seed": 12002
+    },
+    {
+      "stage": "transfer_loop2",
+      "seed": 12003
+    }
+  ],
+  "audit": {
+    "passed": true,
+    "real_eval_episodes": 3,
+    "old_raw_files_preserved": 135,
+    "common_first_prompt_equal": true,
+    "test_count": 55,
+    "test_failures": 0,
+    "scoring_parity": true
+  }
+}

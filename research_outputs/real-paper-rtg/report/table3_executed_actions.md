@@ -1,0 +1,10 @@
+| Action | E0 | E1 | E2 | E3 |
+|---|---|---|---|---|
+| Analyse | N/A | N/A | N/A | N/A |
+| DeployDecoy | N/A | N/A | N/A | N/A |
+| Remove | N/A | N/A | N/A | N/A |
+| Restore | N/A | N/A | N/A | N/A |
+| Monitor | N/A | N/A | N/A | N/A |
+| Sleep | N/A | N/A | N/A | N/A |
+| BlockTrafficZone | N/A | N/A | N/A | N/A |
+| AllowTrafficZone | N/A | N/A | N/A | N/A |

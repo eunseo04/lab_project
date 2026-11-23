@@ -1,0 +1,7 @@
+{
+  "passed": true,
+  "checked_prior_real_episodes": 153,
+  "intersections": [],
+  "registered_unix": 1795211707.18306,
+  "scope": "Seed-presence check only; no prior final-test rewards inspected for selection. Validation/train/current debugging remain separate."
+}

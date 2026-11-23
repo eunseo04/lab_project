@@ -1,0 +1,3 @@
+iteration,train_seeds,train_returns,train_mean,baseline,parents,accepted,pool_size,maintenance,evolution_seconds,evolution_errors,validation_return
+1,"[21000, 21001]","[-323.0, -304.0]",-313.5,-49.747347952964496,6,"[""SelectiveDeception_v2"", ""TrafficRecovery_v2""]",8,[],1735.937412309926,0,-175.0
+2,"[21002, 21003]","[-198.0, -207.0]",-202.5,-47.65342240700458,6,"[""RapidProcessResponse_v2"", ""EscalationDiagnosis_v2"", ""PrivilegedRecovery_v2"", ""SelectiveDeception_v2_c1"", ""NetworkContainment_v2"", ""SelectiveDeception_v3""]",14,[],2865.6107950359583,0,-80.0

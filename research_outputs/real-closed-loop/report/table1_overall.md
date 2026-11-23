@@ -1,0 +1,5 @@
+| Metric | KEEP (Paper Reference) | GPT-4o-mini (Paper Reference) | E0 | E1 | E2 | E3 |
+|---|---|---|---|---|---|---|
+| Mean Joint Reward | -493.000 | -2547.200 | N/A | N/A | N/A | N/A |
+| Reward Std. | 95.900 | 498.800 | N/A | N/A | N/A | N/A |
+| Execution Time (s) | 45.200 | 4704.600 | N/A | N/A | N/A | N/A |

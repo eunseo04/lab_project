@@ -1,0 +1,45 @@
+{
+  "model": {
+    "model": "Qwen/Qwen3-8B",
+    "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+    "backend": "transformers",
+    "transformers": "4.51.3",
+    "torch": "2.6.0+cu124",
+    "dtype": "bfloat16",
+    "weights_frozen": true,
+    "trainable_parameters": 0,
+    "temperature_scoring": true,
+    "scoring_mode": "incremental_teacher_forcing",
+    "chat_template_sha256": "a55ee1b1660128b7098723e0abcd92caa0788061051c62d51cbe87d9cf1974d8"
+  },
+  "sampling": {
+    "temperature": 1.0,
+    "top_p": 1.0,
+    "top_k": 0,
+    "enable_thinking": false
+  },
+  "rows": [
+    {
+      "seed": 42,
+      "response": "{\n  \"action\": \"Sleep\",\n  \"reason\": \"To conserve energy and remain alert for the next defensive action.\"\n}",
+      "tokens": 27,
+      "generation_logprob": -4.014633655548096,
+      "teacher_forced_logprob": -4.014633655548096,
+      "absolute_difference": 0.0,
+      "pass": true,
+      "generation_seconds": 1.2692210010718554
+    },
+    {
+      "seed": 43,
+      "response": "{\n  \"action\": \"Sleep\",\n  \"reason\": \"To conserve energy and prepare for the next defensive action.\"\n}",
+      "tokens": 26,
+      "generation_logprob": -0.6825374364852905,
+      "teacher_forced_logprob": -0.6825377941131592,
+      "absolute_difference": 3.5762786865234375e-07,
+      "pass": true,
+      "generation_seconds": 0.902032736921683
+    }
+  ],
+  "passed": true,
+  "tolerance_note": "Same incremental cache path, exact observed token IDs; absolute sequence logprob tolerance 1e-4."
+}

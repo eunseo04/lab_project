@@ -1,0 +1,81 @@
+{
+  "source_summary_sha256": "c71454ae724357f62ddf840d0467155686bd2ad2ab20ae37303a0ebcb5c4ea61",
+  "results": [
+    {
+      "skill": "RapidProcessResponse",
+      "gradient": {
+        "initiation": "The initiation conditions were met, as a newly flagged PID was observed. However, the agent should have immediately proceeded with the Remove action without delay, as per the strategy step to avoid redundant analysis.",
+        "execution": "The policy executed the Remove action, but it did not wait for completion. The agent should have continued monitoring the status and only proceeded to termination once the action was confirmed completed (TRUE) or when it became clear that the action was not successful and required further investigation.",
+        "termination": "The termination condition was not met, as the flagged evidence did not receive a verified response. The agent should have continued to monitor the status of the Remove action and only stopped after a complete response and review was confirmed."
+      },
+      "related": true,
+      "audit": [
+        {
+          "skill": "RapidProcessResponse",
+          "steps": [
+            12
+          ],
+          "gradient": {
+            "initiation": "The initiation conditions were met, as a newly flagged PID was observed. However, the agent should have immediately proceeded with the Remove action without delay, as per the strategy step to avoid redundant analysis.",
+            "execution": "The policy executed the Remove action, but it did not wait for completion. The agent should have continued monitoring the status and only proceeded to termination once the action was confirmed completed (TRUE) or when it became clear that the action was not successful and required further investigation.",
+            "termination": "The termination condition was not met, as the flagged evidence did not receive a verified response. The agent should have continued to monitor the status of the Remove action and only stopped after a complete response and review was confirmed."
+          },
+          "related": true
+        }
+      ],
+      "source_trace_step": 12,
+      "new_performance_sample": false
+    },
+    {
+      "skill": "EscalationDiagnosis",
+      "gradient": {
+        "initiation": "The skill should have initiated the 'Analyse' action earlier, as there were observed suspicious connections and flagged PIDs that required investigation before the 'Remove' action was executed.",
+        "execution": "The policy might have missed the critical step of verifying whether the 'Remove' action was sufficient or whether a 'Restore' was necessary based on the presence of escalated commands (e.g., 'escalate.sh/escalate.exe'). Additionally, the policy did not account for the potential persistence of old cmd files as evidence of a long-running threat.",
+        "termination": "The termination was premature. The analysis did not fully conclude, and no clear response was indicated, leading to an incomplete investigation and no actionable resolution."
+      },
+      "related": true,
+      "audit": [
+        {
+          "skill": "EscalationDiagnosis",
+          "steps": [
+            15
+          ],
+          "gradient": {
+            "initiation": "The skill should have initiated the 'Analyse' action earlier, as there were observed suspicious connections and flagged PIDs that required investigation before the 'Remove' action was executed.",
+            "execution": "The policy might have missed the critical step of verifying whether the 'Remove' action was sufficient or whether a 'Restore' was necessary based on the presence of escalated commands (e.g., 'escalate.sh/escalate.exe'). Additionally, the policy did not account for the potential persistence of old cmd files as evidence of a long-running threat.",
+            "termination": "The termination was premature. The analysis did not fully conclude, and no clear response was indicated, leading to an incomplete investigation and no actionable resolution."
+          },
+          "related": true
+        }
+      ],
+      "source_trace_step": 15,
+      "new_performance_sample": false
+    },
+    {
+      "skill": "RiskBasedInvestigation",
+      "gradient": {
+        "initiation": "The initiation condition was met (investigation_due=true), but the agent did not verify the exact host or ensure that the investigation_lead was properly analyzed before proceeding.",
+        "execution": "The policy step of analyzing the host was not executed. The agent skipped analyzing the host and chose to sleep, which may have bypassed necessary investigative steps, such as inspecting connection data or file artifacts.",
+        "termination": "The termination was premature. The lead was still valid and warranted further investigation, but the agent did not follow up, leading to an incomplete review and possible missed indicators of compromise."
+      },
+      "related": true,
+      "audit": [
+        {
+          "skill": "RiskBasedInvestigation",
+          "steps": [
+            2
+          ],
+          "gradient": {
+            "initiation": "The initiation condition was met (investigation_due=true), but the agent did not verify the exact host or ensure that the investigation_lead was properly analyzed before proceeding.",
+            "execution": "The policy step of analyzing the host was not executed. The agent skipped analyzing the host and chose to sleep, which may have bypassed necessary investigative steps, such as inspecting connection data or file artifacts.",
+            "termination": "The termination was premature. The lead was still valid and warranted further investigation, but the agent did not follow up, leading to an incomplete review and possible missed indicators of compromise."
+          },
+          "related": true
+        }
+      ],
+      "source_trace_step": 2,
+      "new_performance_sample": false
+    }
+  ],
+  "new_model_episode_samples": 0
+}

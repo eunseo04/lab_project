@@ -1,0 +1,720 @@
+{
+  "status": "completed",
+  "stage": "eval",
+  "config": {
+    "arm": "E0",
+    "composition": "all_llm",
+    "red": "finite",
+    "steps": 12,
+    "episodes": 2,
+    "train_episodes": 2,
+    "iterations": 1,
+    "train_seed": 100,
+    "eval_seed": 10000,
+    "threads": 1,
+    "validation_seed": 5000,
+    "validation_episodes": 1,
+    "profile": "controlled-comparison",
+    "scoring": "official",
+    "communication": "paper_projected_keep",
+    "skip_busy_policy": true,
+    "pool_size": 10,
+    "weights": "/home/jeonges/proposed/third_party/cage-4-submission/weights",
+    "output": "/home/jeonges/proposed/research_outputs/real-pilot",
+    "model": {
+      "endpoint": "http://127.0.0.1:8018",
+      "model": "Qwen/Qwen3-8B",
+      "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+      "temperature": 1.0,
+      "max_tokens": 192,
+      "timeout_seconds": 240
+    },
+    "selector": {
+      "epsilon": 0.1,
+      "max_skill_age": 8
+    },
+    "evolution": {
+      "enabled": true,
+      "gate_mode": "official_code",
+      "ppo_gate": true,
+      "semantic_gradient": true,
+      "score_maintenance": true,
+      "threshold": 1,
+      "best_of_n": 2,
+      "max_evolutions": 1,
+      "semantic_chunk_steps": 4,
+      "clip": 0.2,
+      "gamma": 0.99,
+      "ema_alpha": 0.1,
+      "acceptance_margin": 0.0,
+      "maintenance_mode": "official_code"
+    }
+  },
+  "episodes": [
+    {
+      "status": "completed",
+      "episode_id": 0,
+      "seed": 10000,
+      "steps_requested": 12,
+      "joint_transitions": 11,
+      "scored_transitions": 10,
+      "joint_return": -5.0,
+      "raw_joint_return": -5.0,
+      "execution_time_s": 60.958008450921625,
+      "raw_joint_rewards": [
+        0.0,
+        0.0,
+        0.0,
+        -5.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scored_step_rewards": [
+        0.0,
+        0.0,
+        0.0,
+        -5.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "requested_action_counts": {
+        "Analyse": 10,
+        "DeployDecoy": 2,
+        "Sleep": 43
+      },
+      "executed_action_counts": {
+        "Sleep": 43,
+        "Analyse": 10,
+        "DeployDecoy": 2
+      },
+      "automatic_action_counts": {
+        "Monitor": 55
+      },
+      "invalid_json": 0,
+      "model_identity": {
+        "model": "Qwen/Qwen3-8B",
+        "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+        "backend": "transformers",
+        "transformers": "4.51.3",
+        "torch": "2.6.0+cu124",
+        "dtype": "bfloat16",
+        "weights_frozen": true,
+        "temperature_scoring": true,
+        "scoring_mode": "incremental_teacher_forcing",
+        "chat_template_sha256": "a55ee1b1660128b7098723e0abcd92caa0788061051c62d51cbe87d9cf1974d8"
+      },
+      "kind": "real_cage4",
+      "weights": {},
+      "trace": "research_outputs/real-all-llm/E0/eval/episode-0000.jsonl",
+      "calls": [
+        {
+          "purpose": "policy",
+          "input_tokens": 2512,
+          "output_tokens": 33,
+          "seconds": 1.7285067359916866
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2555,
+          "output_tokens": 37,
+          "seconds": 1.8630472889635712
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2498,
+          "output_tokens": 31,
+          "seconds": 1.6377096930518746
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2380,
+          "output_tokens": 38,
+          "seconds": 1.869847547961399
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 3167,
+          "output_tokens": 32,
+          "seconds": 1.8980754108633846
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2193,
+          "output_tokens": 30,
+          "seconds": 1.5366894518956542
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2167,
+          "output_tokens": 21,
+          "seconds": 1.1920745191164315
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2194,
+          "output_tokens": 30,
+          "seconds": 1.5385178450960666
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2167,
+          "output_tokens": 32,
+          "seconds": 1.5869942218996584
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2168,
+          "output_tokens": 36,
+          "seconds": 1.729881257051602
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 19,
+          "seconds": 1.120543034048751
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2167,
+          "output_tokens": 23,
+          "seconds": 1.2631010399200022
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 26,
+          "seconds": 1.371802831068635
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2167,
+          "output_tokens": 21,
+          "seconds": 1.2004811379592866
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2167,
+          "output_tokens": 23,
+          "seconds": 1.2660527280531824
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2167,
+          "output_tokens": 32,
+          "seconds": 1.5916518368758261
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 19,
+          "seconds": 1.1225983700715005
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 26,
+          "seconds": 1.3715211730450392
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 26,
+          "seconds": 1.3755438418593258
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 26,
+          "seconds": 1.376397879095748
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 23,
+          "seconds": 1.2681664030533284
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 26,
+          "seconds": 1.370163079118356
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 26,
+          "seconds": 1.3736182390712202
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 23,
+          "seconds": 1.2621581919956952
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2168,
+          "output_tokens": 31,
+          "seconds": 1.5540468951221555
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 26,
+          "seconds": 1.3746517719700933
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 26,
+          "seconds": 1.3743663800414652
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 26,
+          "seconds": 1.3705510671716183
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 19,
+          "seconds": 1.122921922011301
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 26,
+          "seconds": 1.3706261049956083
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 26,
+          "seconds": 1.3725926671177149
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 23,
+          "seconds": 1.2678319558035582
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 26,
+          "seconds": 1.3738662819378078
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2167,
+          "output_tokens": 26,
+          "seconds": 1.3730030918959528
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 21,
+          "seconds": 1.1905503789894283
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 22,
+          "seconds": 1.2303941959980875
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2185,
+          "output_tokens": 35,
+          "seconds": 1.7201915890909731
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 21,
+          "seconds": 1.193678576964885
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 21,
+          "seconds": 1.1945390228647739
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 22,
+          "seconds": 1.2260820700321347
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 16,
+          "seconds": 1.0132882678881288
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 16,
+          "seconds": 1.0142993337940425
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 22,
+          "seconds": 1.2272169429343194
+        }
+      ]
+    },
+    {
+      "status": "completed",
+      "episode_id": 1,
+      "seed": 10001,
+      "steps_requested": 12,
+      "joint_transitions": 11,
+      "scored_transitions": 10,
+      "joint_return": 0.0,
+      "raw_joint_return": 0.0,
+      "execution_time_s": 66.4423022128176,
+      "raw_joint_rewards": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scored_step_rewards": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "requested_action_counts": {
+        "Analyse": 11,
+        "Sleep": 39,
+        "DeployDecoy": 5
+      },
+      "executed_action_counts": {
+        "Sleep": 41,
+        "Analyse": 9,
+        "DeployDecoy": 5
+      },
+      "automatic_action_counts": {
+        "Monitor": 55
+      },
+      "invalid_json": 3,
+      "model_identity": {
+        "model": "Qwen/Qwen3-8B",
+        "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+        "backend": "transformers",
+        "transformers": "4.51.3",
+        "torch": "2.6.0+cu124",
+        "dtype": "bfloat16",
+        "weights_frozen": true,
+        "temperature_scoring": true,
+        "scoring_mode": "incremental_teacher_forcing",
+        "chat_template_sha256": "a55ee1b1660128b7098723e0abcd92caa0788061051c62d51cbe87d9cf1974d8"
+      },
+      "kind": "real_cage4",
+      "weights": {},
+      "trace": "research_outputs/real-all-llm/E0/eval/episode-0001.jsonl",
+      "calls": [
+        {
+          "purpose": "policy",
+          "input_tokens": 2499,
+          "output_tokens": 31,
+          "seconds": 1.646615644916892
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2582,
+          "output_tokens": 33,
+          "seconds": 1.767427152954042
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2543,
+          "output_tokens": 33,
+          "seconds": 1.7258716160431504
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2441,
+          "output_tokens": 33,
+          "seconds": 1.711582147050649
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2904,
+          "output_tokens": 33,
+          "seconds": 1.8577961360570043
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2167,
+          "output_tokens": 32,
+          "seconds": 1.5991980810649693
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2167,
+          "output_tokens": 32,
+          "seconds": 1.5961803260724992
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2167,
+          "output_tokens": 42,
+          "seconds": 1.9482619180344045
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2167,
+          "output_tokens": 33,
+          "seconds": 1.628785375971347
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2220,
+          "output_tokens": 29,
+          "seconds": 1.5107550071552396
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 23,
+          "seconds": 1.2679591078776866
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2168,
+          "output_tokens": 39,
+          "seconds": 1.8402326479554176
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2167,
+          "output_tokens": 33,
+          "seconds": 1.6252644250635058
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 23,
+          "seconds": 1.268920311005786
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2168,
+          "output_tokens": 30,
+          "seconds": 1.5195574169047177
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2167,
+          "output_tokens": 21,
+          "seconds": 1.2001025080680847
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 26,
+          "seconds": 1.3758812078740448
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 26,
+          "seconds": 1.3745527791325003
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 26,
+          "seconds": 1.3767824519891292
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2167,
+          "output_tokens": 32,
+          "seconds": 1.59372365497984
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2168,
+          "output_tokens": 30,
+          "seconds": 1.5198453050106764
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 26,
+          "seconds": 1.3763177681248635
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 26,
+          "seconds": 1.3748849600087851
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 26,
+          "seconds": 1.37778185098432
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 26,
+          "seconds": 1.375763185089454
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 19,
+          "seconds": 1.1280067928601056
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 19,
+          "seconds": 1.1240237900055945
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 26,
+          "seconds": 1.3749006630387157
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2168,
+          "output_tokens": 32,
+          "seconds": 1.5971491001546383
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2185,
+          "output_tokens": 31,
+          "seconds": 1.5796760888770223
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 26,
+          "seconds": 1.3813687129877508
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 26,
+          "seconds": 1.5761433839797974
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 26,
+          "seconds": 1.3898894290905446
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 22,
+          "seconds": 1.2341138529591262
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 22,
+          "seconds": 1.2544421630445868
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 22,
+          "seconds": 1.2558724691625684
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2168,
+          "output_tokens": 38,
+          "seconds": 2.3468044130131602
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2167,
+          "output_tokens": 37,
+          "seconds": 3.6665609797928482
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 21,
+          "seconds": 1.5628692188765854
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 21,
+          "seconds": 2.496369865955785
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 21,
+          "seconds": 1.5558009198866785
+        }
+      ]
+    }
+  ],
+  "metrics": {
+    "n": 2,
+    "mean_joint_reward": -2.5,
+    "reward_std": 3.5355339059327378,
+    "execution_time_s": 127.40031066373922,
+    "mean_episode_time_s": 63.70015533186961
+  },
+  "result_kind": "real_cage4",
+  "history": [],
+  "planned_episodes": 2,
+  "pool_frozen": true,
+  "model_identity": {
+    "model": "Qwen/Qwen3-8B",
+    "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+    "backend": "transformers",
+    "transformers": "4.51.3",
+    "torch": "2.6.0+cu124",
+    "dtype": "bfloat16",
+    "weights_frozen": true,
+    "temperature_scoring": true,
+    "scoring_mode": "incremental_teacher_forcing",
+    "chat_template_sha256": "a55ee1b1660128b7098723e0abcd92caa0788061051c62d51cbe87d9cf1974d8"
+  },
+  "training_provenance": null,
+  "pool_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+}

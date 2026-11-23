@@ -1,0 +1,45 @@
+{
+  "snapshot_date": "2026-11-24",
+  "repository": "https://github.com/eunseo04/lab_project.git",
+  "isolated_checkout": "/home/jeonges/lab_project",
+  "research_regression_tests": {
+    "passed": 141,
+    "failed": 0,
+    "junit": "publication-research-tests.xml",
+    "model_api_calls": 0
+  },
+  "publication_tests": {
+    "passed": 8,
+    "failed": 0,
+    "command": "python3 -m unittest discover -s tests -p test_publication.py -v"
+  },
+  "registered_source_hashes": {
+    "verified": 88,
+    "unchanged": true,
+    "details": "publication_source_check.json"
+  },
+  "dependency_reuse_for_tests": "Existing local CPU environment and downloaded dependencies temporarily linked; ignored links removed after testing.",
+  "model_experiments_started_during_packaging": 0,
+  "original_research_files_modified": false,
+  "git_commit_created": false,
+  "git_push_performed": false,
+  "staged_blob_scope_audit": {
+    "passed": true,
+    "checks": [
+      "research-only top-level scope",
+      "no private files or detected API credentials",
+      "no model weights or raw trajectories",
+      "no external symlinks",
+      "no file larger than10MiB"
+    ],
+    "command": "python3 scripts/check_publication.py"
+  },
+  "staged_registered_source_hashes": {
+    "verified": 88,
+    "unchanged": true
+  },
+  "git_diff_cached_check": {
+    "passed": true,
+    "archived_data_whitespace": "Original CSV/XML bytes are retained; archive-only whitespace attributes declared."
+  }
+}

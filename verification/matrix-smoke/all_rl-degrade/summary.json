@@ -1,0 +1,517 @@
+{
+  "config": {
+    "name": "all_rl-degrade",
+    "team": "all_rl",
+    "red": "degrade",
+    "communication": "paper",
+    "episodes": 1,
+    "steps": 12,
+    "seed": 42,
+    "threads": 1,
+    "weights": "/home/jeonges/acd-experiments/checkpoints/paper-smoke",
+    "output": "/home/jeonges/acd-experiments/runs",
+    "model": {
+      "backend": "mock",
+      "enabled": false,
+      "mock_action": "Sleep"
+    },
+    "horizon": "fixed",
+    "deterministic_rl": false
+  },
+  "started_at_kst": "20261116-193323-468633",
+  "roles": {
+    "blue_agent_0": "rl",
+    "blue_agent_1": "rl",
+    "blue_agent_2": "rl",
+    "blue_agent_3": "rl",
+    "blue_agent_4": "rl"
+  },
+  "result_kind": "simulation_evaluation",
+  "paper_scores_reproduced": false,
+  "notes": [
+    "Public weights are not the paper's retrained 8-bit-communication policies.",
+    "Short training checkpoints validate execution only; they do not establish convergence."
+  ],
+  "episodes": [
+    {
+      "episode": 0,
+      "seed": 42,
+      "steps": 12,
+      "simulator_steps": 12,
+      "mission_phases": [
+        0,
+        1,
+        2
+      ],
+      "reward": -17.0
+    }
+  ],
+  "weights": {
+    "blue_agent_0": {
+      "file": "/home/jeonges/acd-experiments/checkpoints/paper-smoke/gnn_ppo-0.pt",
+      "sha256": "70de079263141c2a0f3c076243352dbd49230e5295a8683f273674d4c549f359",
+      "input_features": 197,
+      "training": {
+        "config": {
+          "name": "paper-training-smoke",
+          "communication": "paper",
+          "red": "finite",
+          "steps": 12,
+          "seed": 1337,
+          "threads": 1,
+          "weights": "/home/jeonges/acd-experiments/checkpoints/paper-smoke",
+          "training": {
+            "episodes": 2,
+            "rollout_episodes": 2,
+            "batch_size": 16,
+            "epochs": 1,
+            "hidden": 32,
+            "embedding": 16,
+            "actor_lr": 0.0003,
+            "critic_lr": 0.001,
+            "clip": 0.2
+          },
+          "team": "mixed",
+          "horizon": "fixed",
+          "episodes": 2,
+          "deterministic_rl": false,
+          "model": {
+            "backend": "mock",
+            "enabled": false
+          },
+          "output": "/home/jeonges/acd-experiments/runs"
+        },
+        "communication": "paper",
+        "input_features": 197,
+        "episodes_trained": 2,
+        "validation_only": true,
+        "policy_quality_evaluated": false,
+        "elapsed_seconds": 2.7279764470877126,
+        "parameters_changed": [
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        "save_reload_matches": [
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        "history": [
+          {
+            "episodes_completed": 2,
+            "reward_mean": -9.5,
+            "losses": [
+              -0.35222354531288147,
+              -0.25728607177734375,
+              -0.3057498335838318,
+              -0.42490389943122864,
+              -0.47188055515289307
+            ],
+            "transitions_per_agent": [
+              11,
+              12,
+              10,
+              14,
+              13
+            ]
+          }
+        ],
+        "collector_fixes": [
+          "Single environment step for all five agents",
+          "Rewards attributed through multistep action completion",
+          "Terminal transitions sealed per episode",
+          "All rollout episode buffers included in each PPO update"
+        ]
+      }
+    },
+    "blue_agent_1": {
+      "file": "/home/jeonges/acd-experiments/checkpoints/paper-smoke/gnn_ppo-1.pt",
+      "sha256": "016b2ce4e5a1ca3ff88c6381cf4bf15d2971797af6dfe9dd6ee9956591d25dcc",
+      "input_features": 197,
+      "training": {
+        "config": {
+          "name": "paper-training-smoke",
+          "communication": "paper",
+          "red": "finite",
+          "steps": 12,
+          "seed": 1337,
+          "threads": 1,
+          "weights": "/home/jeonges/acd-experiments/checkpoints/paper-smoke",
+          "training": {
+            "episodes": 2,
+            "rollout_episodes": 2,
+            "batch_size": 16,
+            "epochs": 1,
+            "hidden": 32,
+            "embedding": 16,
+            "actor_lr": 0.0003,
+            "critic_lr": 0.001,
+            "clip": 0.2
+          },
+          "team": "mixed",
+          "horizon": "fixed",
+          "episodes": 2,
+          "deterministic_rl": false,
+          "model": {
+            "backend": "mock",
+            "enabled": false
+          },
+          "output": "/home/jeonges/acd-experiments/runs"
+        },
+        "communication": "paper",
+        "input_features": 197,
+        "episodes_trained": 2,
+        "validation_only": true,
+        "policy_quality_evaluated": false,
+        "elapsed_seconds": 2.7279764470877126,
+        "parameters_changed": [
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        "save_reload_matches": [
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        "history": [
+          {
+            "episodes_completed": 2,
+            "reward_mean": -9.5,
+            "losses": [
+              -0.35222354531288147,
+              -0.25728607177734375,
+              -0.3057498335838318,
+              -0.42490389943122864,
+              -0.47188055515289307
+            ],
+            "transitions_per_agent": [
+              11,
+              12,
+              10,
+              14,
+              13
+            ]
+          }
+        ],
+        "collector_fixes": [
+          "Single environment step for all five agents",
+          "Rewards attributed through multistep action completion",
+          "Terminal transitions sealed per episode",
+          "All rollout episode buffers included in each PPO update"
+        ]
+      }
+    },
+    "blue_agent_2": {
+      "file": "/home/jeonges/acd-experiments/checkpoints/paper-smoke/gnn_ppo-2.pt",
+      "sha256": "44f70b933748417456333a13d7f985217a5c9ced0be48089103f14ab5bfa5955",
+      "input_features": 197,
+      "training": {
+        "config": {
+          "name": "paper-training-smoke",
+          "communication": "paper",
+          "red": "finite",
+          "steps": 12,
+          "seed": 1337,
+          "threads": 1,
+          "weights": "/home/jeonges/acd-experiments/checkpoints/paper-smoke",
+          "training": {
+            "episodes": 2,
+            "rollout_episodes": 2,
+            "batch_size": 16,
+            "epochs": 1,
+            "hidden": 32,
+            "embedding": 16,
+            "actor_lr": 0.0003,
+            "critic_lr": 0.001,
+            "clip": 0.2
+          },
+          "team": "mixed",
+          "horizon": "fixed",
+          "episodes": 2,
+          "deterministic_rl": false,
+          "model": {
+            "backend": "mock",
+            "enabled": false
+          },
+          "output": "/home/jeonges/acd-experiments/runs"
+        },
+        "communication": "paper",
+        "input_features": 197,
+        "episodes_trained": 2,
+        "validation_only": true,
+        "policy_quality_evaluated": false,
+        "elapsed_seconds": 2.7279764470877126,
+        "parameters_changed": [
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        "save_reload_matches": [
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        "history": [
+          {
+            "episodes_completed": 2,
+            "reward_mean": -9.5,
+            "losses": [
+              -0.35222354531288147,
+              -0.25728607177734375,
+              -0.3057498335838318,
+              -0.42490389943122864,
+              -0.47188055515289307
+            ],
+            "transitions_per_agent": [
+              11,
+              12,
+              10,
+              14,
+              13
+            ]
+          }
+        ],
+        "collector_fixes": [
+          "Single environment step for all five agents",
+          "Rewards attributed through multistep action completion",
+          "Terminal transitions sealed per episode",
+          "All rollout episode buffers included in each PPO update"
+        ]
+      }
+    },
+    "blue_agent_3": {
+      "file": "/home/jeonges/acd-experiments/checkpoints/paper-smoke/gnn_ppo-3.pt",
+      "sha256": "1041649fe76e9de3c93bc1b432159cb3522bfe88944eae80742a5398371777ee",
+      "input_features": 197,
+      "training": {
+        "config": {
+          "name": "paper-training-smoke",
+          "communication": "paper",
+          "red": "finite",
+          "steps": 12,
+          "seed": 1337,
+          "threads": 1,
+          "weights": "/home/jeonges/acd-experiments/checkpoints/paper-smoke",
+          "training": {
+            "episodes": 2,
+            "rollout_episodes": 2,
+            "batch_size": 16,
+            "epochs": 1,
+            "hidden": 32,
+            "embedding": 16,
+            "actor_lr": 0.0003,
+            "critic_lr": 0.001,
+            "clip": 0.2
+          },
+          "team": "mixed",
+          "horizon": "fixed",
+          "episodes": 2,
+          "deterministic_rl": false,
+          "model": {
+            "backend": "mock",
+            "enabled": false
+          },
+          "output": "/home/jeonges/acd-experiments/runs"
+        },
+        "communication": "paper",
+        "input_features": 197,
+        "episodes_trained": 2,
+        "validation_only": true,
+        "policy_quality_evaluated": false,
+        "elapsed_seconds": 2.7279764470877126,
+        "parameters_changed": [
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        "save_reload_matches": [
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        "history": [
+          {
+            "episodes_completed": 2,
+            "reward_mean": -9.5,
+            "losses": [
+              -0.35222354531288147,
+              -0.25728607177734375,
+              -0.3057498335838318,
+              -0.42490389943122864,
+              -0.47188055515289307
+            ],
+            "transitions_per_agent": [
+              11,
+              12,
+              10,
+              14,
+              13
+            ]
+          }
+        ],
+        "collector_fixes": [
+          "Single environment step for all five agents",
+          "Rewards attributed through multistep action completion",
+          "Terminal transitions sealed per episode",
+          "All rollout episode buffers included in each PPO update"
+        ]
+      }
+    },
+    "blue_agent_4": {
+      "file": "/home/jeonges/acd-experiments/checkpoints/paper-smoke/gnn_ppo-4.pt",
+      "sha256": "ddca4729b4d392e4c9714fcbd58818d90eb40b190a53c19f829058d37d77e69b",
+      "input_features": 197,
+      "training": {
+        "config": {
+          "name": "paper-training-smoke",
+          "communication": "paper",
+          "red": "finite",
+          "steps": 12,
+          "seed": 1337,
+          "threads": 1,
+          "weights": "/home/jeonges/acd-experiments/checkpoints/paper-smoke",
+          "training": {
+            "episodes": 2,
+            "rollout_episodes": 2,
+            "batch_size": 16,
+            "epochs": 1,
+            "hidden": 32,
+            "embedding": 16,
+            "actor_lr": 0.0003,
+            "critic_lr": 0.001,
+            "clip": 0.2
+          },
+          "team": "mixed",
+          "horizon": "fixed",
+          "episodes": 2,
+          "deterministic_rl": false,
+          "model": {
+            "backend": "mock",
+            "enabled": false
+          },
+          "output": "/home/jeonges/acd-experiments/runs"
+        },
+        "communication": "paper",
+        "input_features": 197,
+        "episodes_trained": 2,
+        "validation_only": true,
+        "policy_quality_evaluated": false,
+        "elapsed_seconds": 2.7279764470877126,
+        "parameters_changed": [
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        "save_reload_matches": [
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        "history": [
+          {
+            "episodes_completed": 2,
+            "reward_mean": -9.5,
+            "losses": [
+              -0.35222354531288147,
+              -0.25728607177734375,
+              -0.3057498335838318,
+              -0.42490389943122864,
+              -0.47188055515289307
+            ],
+            "transitions_per_agent": [
+              11,
+              12,
+              10,
+              14,
+              13
+            ]
+          }
+        ],
+        "collector_fixes": [
+          "Single environment step for all five agents",
+          "Rewards attributed through multistep action completion",
+          "Terminal transitions sealed per episode",
+          "All rollout episode buffers included in each PPO update"
+        ]
+      }
+    }
+  },
+  "reward": {
+    "mean": -17.0,
+    "stdev": null
+  },
+  "elapsed_seconds": 1.1750689840409905,
+  "action_counts": {
+    "blue_agent_0:Analyse": 1,
+    "blue_agent_1:DeployDecoy": 2,
+    "blue_agent_2:Remove": 2,
+    "blue_agent_3:Remove": 2,
+    "blue_agent_4:Analyse": 2,
+    "blue_agent_0:Monitor": 8,
+    "blue_agent_1:Monitor": 6,
+    "blue_agent_2:Monitor": 6,
+    "blue_agent_3:Monitor": 6,
+    "blue_agent_4:Monitor": 6,
+    "blue_agent_0:Restore": 1,
+    "blue_agent_1:BlockTrafficZone": 1,
+    "blue_agent_4:DeployDecoy": 1,
+    "blue_agent_1:Remove": 2,
+    "blue_agent_2:DeployDecoy": 2,
+    "blue_agent_3:Analyse": 2,
+    "blue_agent_4:Remove": 2,
+    "blue_agent_3:BlockTrafficZone": 2,
+    "blue_agent_1:AllowTrafficZone": 1,
+    "blue_agent_0:DeployDecoy": 1,
+    "blue_agent_2:Analyse": 1,
+    "blue_agent_0:Remove": 1,
+    "blue_agent_2:BlockTrafficZone": 1,
+    "blue_agent_4:BlockTrafficZone": 1
+  },
+  "invalid_responses": {},
+  "sources": {
+    "sources": {
+      "cage-challenge-4": {
+        "url": "https://github.com/cage-challenge/cage-challenge-4",
+        "commit": "8c3c50ca54b176c2de199847944e8dcc035497e3"
+      },
+      "llms-are-acd": {
+        "url": "https://github.com/r4wd3r/llms-are-acd",
+        "commit": "81ff29a0d8f7a7184cafecc62c39945d03acdda6"
+      },
+      "cage-4-submission": {
+        "url": "https://github.com/cybermonic/cage-4-submission",
+        "commit": "2afd652d80ce9d4051a07c23c2538f3dec6bb6c6"
+      }
+    },
+    "published_weights_sha256": {
+      "gnn_ppo-0.pt": "991d96cb5132eec36595f6d407e67b93b2e5045c960dc4d25586e0c0bf124e60",
+      "gnn_ppo-1.pt": "27072ef12bab1e1b2ec9b9143845d07af7545c615c92ef44c59b67268cb98502",
+      "gnn_ppo-2.pt": "a76ea99d830976aa4c7f370c1fc575746de7c8a1618dd239ff34f0525da11478",
+      "gnn_ppo-3.pt": "acca6460545401e47c1dfe30d9f761f4955437b9c13f8098d5856e7995163fe4",
+      "gnn_ppo-4.pt": "ea9c664085987f4c191b74f2d4ffa44453461990d0c8cc1c1525ec4d8f7372d2"
+    },
+    "paper": "https://arxiv.org/abs/2505.04843v2"
+  }
+}

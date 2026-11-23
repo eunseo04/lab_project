@@ -1,0 +1,44 @@
+{
+  "accepted": false,
+  "reason": "validation_error",
+  "error": "RuntimeError: Validation worker failed: /home/jeonges/proposed/research_outputs/rollout-v5/B4/train/rollout-verification/iteration-0001-001-EscalationDiagnosis_v2/previous-seed-62000",
+  "previous_pool_sha256": "354c2e68740ff3ffc2aeb0c6cef0339c936551d230d8ef50d6b9a1070ee761bc",
+  "candidate_pool_sha256": "a3839c0481794fa4b186824ed562a2e96f4c310f2cfece784c279be2be268bff",
+  "live_pool_unchanged_during_validation": true,
+  "maintenance_before_validation": [],
+  "support": {
+    "parent": "EscalationDiagnosis",
+    "iteration": 1,
+    "valid_behavior_decisions": 200,
+    "evidence_trajectories": 2
+  },
+  "support_threshold_sensitivity": [
+    {
+      "minimum_decisions": 0,
+      "candidate_eligible": true,
+      "would_accept_this_candidate": false
+    },
+    {
+      "minimum_decisions": 4,
+      "candidate_eligible": true,
+      "would_accept_this_candidate": false
+    },
+    {
+      "minimum_decisions": 8,
+      "candidate_eligible": true,
+      "would_accept_this_candidate": false
+    },
+    {
+      "minimum_decisions": 16,
+      "candidate_eligible": true,
+      "would_accept_this_candidate": false
+    },
+    {
+      "minimum_decisions": 32,
+      "candidate_eligible": true,
+      "would_accept_this_candidate": false
+    }
+  ],
+  "support_threshold_identified": false,
+  "support_note": "This one-candidate comparison cannot identify the best rare-skill threshold. Other parents remain deferred under the registered rollout budget."
+}

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites><testsuite name="pytest" errors="0" failures="5" skipped="0" tests="8" time="2.758" timestamp="2026-11-21T02:46:37.113451" hostname="devbox"><testcase classname="revisions.behavior-v4-observation-20261121.research_tests.test_restore_epoch" name="test_same_admin_indicator_after_restore_is_a_new_unresolved_case" time="0.001"><failure message="IndexError: list index out of range">def test_same_admin_indicator_after_restore_is_a_new_unresolved_case():
+        ledger=admin_ledger();ledger.transition(row(0,"Restore h1",{"success":"TRUE"}))
+        assert not ledger.context(state(),1)["open_cases"]
+        context=ledger.context(state({"h1":{"Files":[{"File Name":"escalate.sh"}]}}),20)
+&gt;       assert context["open_cases"][0]["observed_level"]==3
+E       IndexError: list index out of range
+
+research_tests/test_restore_epoch.py:16: IndexError</failure></testcase><testcase classname="revisions.behavior-v4-observation-20261121.research_tests.test_restore_epoch" name="test_reused_pid_after_restore_is_not_suppressed_by_previous_epoch" time="0.001"><failure message="IndexError: list index out of range">def test_reused_pid_after_restore_is_not_suppressed_by_previous_epoch():
+        ledger=admin_ledger();ledger.transition(row(0,"Restore h1",{"success":"TRUE"}))
+        context=ledger.context(state({"h1":{"Processes":[{"PID":41}]}}),20)
+&gt;       case=context["open_cases"][0]
+E       IndexError: list index out of range
+
+research_tests/test_restore_epoch.py:23: IndexError</failure></testcase><testcase classname="revisions.behavior-v4-observation-20261121.research_tests.test_restore_epoch" name="test_fresh_user_indicator_does_not_inherit_old_admin_classification" time="0.001"><failure message="AssertionError: assert (2 == 2 and ['cmd.sh', 'escalate.sh'] == ['cmd.sh']&#10;  &#10;  Left contains one more item: 'escalate.sh'&#10;  Use -v to get more diff)">def test_fresh_user_indicator_does_not_inherit_old_admin_classification():
+        ledger=admin_ledger();ledger.transition(row(0,"Restore h1",{"success":"TRUE"}))
+        case=ledger.context(state({"h1":{"Files":[{"File Name":"cmd.sh"}]}}),20)["open_cases"][0]
+&gt;       assert case["observed_level"]==2 and case["file_indicators"]==["cmd.sh"]
+E       AssertionError: assert (2 == 2 and ['cmd.sh', 'escalate.sh'] == ['cmd.sh']
+E         
+E         Left contains one more item: 'escalate.sh'
+E         Use -v to get more diff)
+
+research_tests/test_restore_epoch.py:31: AssertionError</failure></testcase><testcase classname="revisions.behavior-v4-observation-20261121.research_tests.test_restore_epoch" name="test_observed_pid_on_restore_completion_is_retained_in_the_new_epoch" time="0.001"><failure message="assert (3 == 1)">def test_observed_pid_on_restore_completion_is_retained_in_the_new_epoch():
+        ledger=admin_ledger()
+        ledger.transition(row(0,"Restore h1",{"success":"TRUE","h1":{"Processes":[{"PID":42}]}}))
+        case=ledger.context(state(),1)["open_cases"][0]
+&gt;       assert case["observed_level"]==1 and case["flagged_pids"]==["42"]
+E       assert (3 == 1)
+
+research_tests/test_restore_epoch.py:38: AssertionError</failure></testcase><testcase classname="revisions.behavior-v4-observation-20261121.research_tests.test_restore_epoch" name="test_failed_restore_keeps_the_prior_admin_case" time="0.001" /><testcase classname="revisions.behavior-v4-observation-20261121.research_tests.test_restore_epoch" name="test_remove_from_before_restore_cannot_close_new_file_only_compromise" time="0.001"><failure message="IndexError: list index out of range">def test_remove_from_before_restore_cannot_close_new_file_only_compromise():
+        ledger=admin_ledger();ledger.transition(row(0,"Remove h1",{"success":"TRUE"}))
+        ledger.context(state(),1);ledger.transition(row(1,"Restore h1",{"success":"TRUE"}))
+        ledger.context(state({"h1":{"Files":[{"File Name":"cmd.sh"}]}}),3)
+        ledger.transition(row(3,"Analyse h1",{"success":"TRUE","h1":{"Files":[{"File Name":"cmd.sh"}]}}))
+&gt;       assert ledger.context(state(),4)["open_cases"][0]["response_due"]
+E       IndexError: list index out of range
+
+research_tests/test_restore_epoch.py:52: IndexError</failure></testcase><testcase classname="revisions.behavior-v4-observation-20261121.research_tests.test_restore_epoch" name="test_new_remove_after_restore_can_review_its_persistent_cmd_artifact" time="0.001" /><testcase classname="revisions.behavior-v4-observation-20261121.research_tests.test_restore_epoch" name="test_failed_restore_does_not_replace_the_last_successful_epoch_boundary" time="0.001" /></testsuite></testsuites>

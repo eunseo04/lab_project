@@ -1,0 +1,120 @@
+{
+  "passed": true,
+  "n": 8,
+  "active_skill_families": 6,
+  "max_absolute_logprob_difference": 9.5367431640625e-07,
+  "samples": [
+    {
+      "trace": "/home/jeonges/proposed/research_outputs/rollout-v5/B4/train/episode-0000.jsonl",
+      "trace_sha256": "77ee5d735bfab2253d77bcd563b223f654fe53202b65ac7b1939f3ccb5cbc71f",
+      "seed": 61000,
+      "step": 46,
+      "agent": "blue_agent_4",
+      "skill": "RapidProcessResponse",
+      "generation_logprob": -0.1605239063501358,
+      "independent_uncached_logprob": -0.16052402555942535,
+      "absolute_difference": 1.1920928955078125e-07,
+      "reconstructed_sample_sha256": "8f52fc857b4c76f11d9bcec5187c17fd5a52de2861296a90387166132b2c1c87"
+    },
+    {
+      "trace": "/home/jeonges/proposed/research_outputs/rollout-v5/B4/train/episode-0000.jsonl",
+      "trace_sha256": "77ee5d735bfab2253d77bcd563b223f654fe53202b65ac7b1939f3ccb5cbc71f",
+      "seed": 61000,
+      "step": 49,
+      "agent": "blue_agent_4",
+      "skill": "EscalationDiagnosis",
+      "generation_logprob": -5.086523532867432,
+      "independent_uncached_logprob": -5.086522579193115,
+      "absolute_difference": 9.5367431640625e-07,
+      "reconstructed_sample_sha256": "8a4c08116339de2f6d7398b0c83310da216dee41ff2df1b55463a0d847aeeb55"
+    },
+    {
+      "trace": "/home/jeonges/proposed/research_outputs/rollout-v5/B4/train/episode-0000.jsonl",
+      "trace_sha256": "77ee5d735bfab2253d77bcd563b223f654fe53202b65ac7b1939f3ccb5cbc71f",
+      "seed": 61000,
+      "step": 109,
+      "agent": "blue_agent_4",
+      "skill": "PrivilegedRecovery",
+      "generation_logprob": -1.1989331245422363,
+      "independent_uncached_logprob": -1.1989333629608154,
+      "absolute_difference": 2.384185791015625e-07,
+      "reconstructed_sample_sha256": "977448642ccf098809dc63ec1eda2f208666e160522968df271d324e74bbea15"
+    },
+    {
+      "trace": "/home/jeonges/proposed/research_outputs/rollout-v5/B4/train/episode-0000.jsonl",
+      "trace_sha256": "77ee5d735bfab2253d77bcd563b223f654fe53202b65ac7b1939f3ccb5cbc71f",
+      "seed": 61000,
+      "step": 8,
+      "agent": "blue_agent_4",
+      "skill": "SelectiveDeception",
+      "generation_logprob": -3.1060690879821777,
+      "independent_uncached_logprob": -3.1060690879821777,
+      "absolute_difference": 0.0,
+      "reconstructed_sample_sha256": "c418769d2c8c760110613b60fe726232435017c8d9a8f94c2d97a8a23a43cd4b"
+    },
+    {
+      "trace": "/home/jeonges/proposed/research_outputs/rollout-v5/B4/train/episode-0000.jsonl",
+      "trace_sha256": "77ee5d735bfab2253d77bcd563b223f654fe53202b65ac7b1939f3ccb5cbc71f",
+      "seed": 61000,
+      "step": 198,
+      "agent": "blue_agent_4",
+      "skill": "NetworkContainment",
+      "generation_logprob": -3.1460623741149902,
+      "independent_uncached_logprob": -3.1460623741149902,
+      "absolute_difference": 0.0,
+      "reconstructed_sample_sha256": "668a04c9ffbea6ac7112c3677ca72e8bdbb14f6e18ce1839caf268eda081fd63"
+    },
+    {
+      "trace": "/home/jeonges/proposed/research_outputs/rollout-v5/B4/train/episode-0000.jsonl",
+      "trace_sha256": "77ee5d735bfab2253d77bcd563b223f654fe53202b65ac7b1939f3ccb5cbc71f",
+      "seed": 61000,
+      "step": 5,
+      "agent": "blue_agent_4",
+      "skill": "RiskBasedInvestigation",
+      "generation_logprob": -1.468117117881775,
+      "independent_uncached_logprob": -1.4681168794631958,
+      "absolute_difference": 2.384185791015625e-07,
+      "reconstructed_sample_sha256": "2ae11da23a6b59b43dc56b451e8cc78a613dd02cd935da01d74d8c36f81a5bdb"
+    },
+    {
+      "trace": "/home/jeonges/proposed/research_outputs/rollout-v5/B4/train/episode-0000.jsonl",
+      "trace_sha256": "77ee5d735bfab2253d77bcd563b223f654fe53202b65ac7b1939f3ccb5cbc71f",
+      "seed": 61000,
+      "step": 11,
+      "agent": "blue_agent_4",
+      "skill": "SelectiveDeception",
+      "generation_logprob": -0.7690973281860352,
+      "independent_uncached_logprob": -0.7690972089767456,
+      "absolute_difference": 1.1920928955078125e-07,
+      "reconstructed_sample_sha256": "f2f9263f04ae38917296dc576aa8d30c4240cb9cc5d72362a651c08fe6c994f8"
+    },
+    {
+      "trace": "/home/jeonges/proposed/research_outputs/rollout-v5/B4/train/episode-0000.jsonl",
+      "trace_sha256": "77ee5d735bfab2253d77bcd563b223f654fe53202b65ac7b1939f3ccb5cbc71f",
+      "seed": 61000,
+      "step": 12,
+      "agent": "blue_agent_4",
+      "skill": "RiskBasedInvestigation",
+      "generation_logprob": -1.8663123846054077,
+      "independent_uncached_logprob": -1.8663125038146973,
+      "absolute_difference": 1.1920928955078125e-07,
+      "reconstructed_sample_sha256": "0da1156337760a154d5f87d9acc012172ae3c1bafbc49608749c7ca6deb9da89"
+    }
+  ],
+  "model_identity": {
+    "model": "Qwen/Qwen3-8B",
+    "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+    "backend": "transformers",
+    "transformers": "4.51.3",
+    "torch": "2.6.0+cu124",
+    "dtype": "bfloat16",
+    "weights_frozen": true,
+    "trainable_parameters": 0,
+    "temperature_scoring": true,
+    "scoring_mode": "incremental_teacher_forcing",
+    "chat_template_sha256": "a55ee1b1660128b7098723e0abcd92caa0788061051c62d51cbe87d9cf1974d8"
+  },
+  "completed_unix": 1795209522.2066567,
+  "new_performance_episodes": 0,
+  "scope": "Original generated tokens are independently teacher-forced with the reconstructed active Skill prompt. No policy/candidate/reward changes."
+}

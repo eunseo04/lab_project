@@ -1,0 +1,99 @@
+{
+  "passed": true,
+  "real_episodes": 3,
+  "model_identity": {
+    "model": "Qwen/Qwen3-8B",
+    "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+    "backend": "transformers",
+    "transformers": "4.51.3",
+    "torch": "2.6.0+cu124",
+    "dtype": "bfloat16",
+    "weights_frozen": true,
+    "trainable_parameters": 0,
+    "temperature_scoring": true,
+    "scoring_mode": "incremental_teacher_forcing",
+    "chat_template_sha256": "a55ee1b1660128b7098723e0abcd92caa0788061051c62d51cbe87d9cf1974d8"
+  },
+  "role_counts": {
+    "selector": 48,
+    "termination": 24,
+    "policy_errors": 0
+  },
+  "cache_bypassed": true,
+  "probability_checks": [
+    {
+      "seed": 31000,
+      "step": 13,
+      "action": "Remove public_access_zone_subnet_user_host_2",
+      "skill": "RapidProcessResponse",
+      "generation_logprob": -1.1493030786514282,
+      "uncached_logprob": -1.1493029594421387,
+      "absolute_difference": 1.1920928955078125e-07
+    },
+    {
+      "seed": 31000,
+      "step": 16,
+      "action": "Analyse public_access_zone_subnet_user_host_3",
+      "skill": "EscalationDiagnosis",
+      "generation_logprob": -2.8043770790100098,
+      "uncached_logprob": -2.804377555847168,
+      "absolute_difference": 4.76837158203125e-07
+    },
+    {
+      "seed": 31000,
+      "step": 18,
+      "action": "Sleep",
+      "skill": "EscalationDiagnosis",
+      "generation_logprob": -2.839322566986084,
+      "uncached_logprob": -2.839322566986084,
+      "absolute_difference": 0.0
+    },
+    {
+      "seed": 31000,
+      "step": 21,
+      "action": "Restore public_access_zone_subnet_user_host_2",
+      "skill": "EscalationDiagnosis",
+      "generation_logprob": -0.04598601162433624,
+      "uncached_logprob": -0.04598589241504669,
+      "absolute_difference": 1.1920928955078125e-07
+    },
+    {
+      "seed": 33000,
+      "step": 26,
+      "action": "Remove public_access_zone_subnet_user_host_2",
+      "skill": "RapidProcessResponse_v2",
+      "generation_logprob": -0.8391498923301697,
+      "uncached_logprob": -0.8391501903533936,
+      "absolute_difference": 2.980232238769531e-07
+    },
+    {
+      "seed": 31000,
+      "step": 28,
+      "action": "Restore public_access_zone_subnet_user_host_4",
+      "skill": "PrivilegedRecovery",
+      "generation_logprob": -0.24523280560970306,
+      "uncached_logprob": -0.24523304402828217,
+      "absolute_difference": 2.384185791015625e-07
+    },
+    {
+      "seed": 31001,
+      "step": 28,
+      "action": "Sleep",
+      "skill": null,
+      "generation_logprob": -4.824586868286133,
+      "uncached_logprob": -4.824586868286133,
+      "absolute_difference": 0.0
+    },
+    {
+      "seed": 31001,
+      "step": 32,
+      "action": "Analyse admin_network_subnet_server_host_3",
+      "skill": "RapidProcessResponse",
+      "generation_logprob": -2.2938947677612305,
+      "uncached_logprob": -2.2938947677612305,
+      "absolute_difference": 0.0
+    }
+  ],
+  "maximum_absolute_difference": 4.76837158203125e-07,
+  "validation_is_not_final_test": true
+}

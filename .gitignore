@@ -1,0 +1,47 @@
+# Local environments, downloaded sources, generated simulator and model files.
+.venv
+.model-venv
+.download-tools
+.local-configs/
+/models
+/third_party
+/runtime
+/checkpoints
+/runs
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.local-configs/
+
+# Captured evidence is added explicitly from docs/export_manifest.json.
+research_outputs/
+verification/
+*.jsonl
+*.log
+*.pid
+*.lock
+*.partial*
+*.safetensors
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.bin
+*.npy
+
+# Credentials and editor/machine files never belong to this research snapshot.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.DS_Store
+.idea/
+.vscode/
+.codex/
+.ssh/
+.aws/
+.bash_history
+.lesshst

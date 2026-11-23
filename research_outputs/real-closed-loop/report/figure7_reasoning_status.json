@@ -1,0 +1,4 @@
+{
+  "status": "not_run",
+  "reason": "Requires actual reason records and explicit embedding analysis; paper embedding model is not silently replaced."
+}

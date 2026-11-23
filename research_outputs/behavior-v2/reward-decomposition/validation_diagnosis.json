@@ -1,0 +1,99 @@
+[
+  {
+    "stage": "validation_baseline",
+    "components": {
+      "action_cost": -43,
+      "RIA": -61,
+      "LWF": -28
+    },
+    "largest_local_work_loss_hosts": [
+      [
+        "public_access_zone_subnet_user_host_5",
+        18
+      ],
+      [
+        "restricted_zone_a_subnet_user_host_1",
+        10
+      ],
+      [
+        "contractor_network_subnet_user_host_2",
+        0
+      ],
+      [
+        "contractor_network_subnet_user_host_3",
+        0
+      ],
+      [
+        "contractor_network_subnet_user_host_9",
+        0
+      ]
+    ],
+    "llm_actions_on_these_hosts": {
+      "public_access_zone_subnet_user_host_5": {
+        "Analyse": 3,
+        "Restore": 1
+      },
+      "restricted_zone_a_subnet_user_host_1": {},
+      "contractor_network_subnet_user_host_2": {},
+      "contractor_network_subnet_user_host_3": {},
+      "contractor_network_subnet_user_host_9": {}
+    },
+    "restore_without_retained_admin_evidence": {
+      "office_network_subnet_server_host_1": 1,
+      "office_network_subnet_server_host_0": 1
+    },
+    "offline_diagnosis_only": true
+  },
+  {
+    "stage": "validation_initial",
+    "components": {
+      "action_cost": -45,
+      "RIA": -42,
+      "LWF": -126,
+      "ASF": -12
+    },
+    "largest_local_work_loss_hosts": [
+      [
+        "public_access_zone_subnet_user_host_5",
+        105
+      ],
+      [
+        "public_access_zone_subnet_user_host_9",
+        18
+      ],
+      [
+        "restricted_zone_a_subnet_user_host_2",
+        3
+      ],
+      [
+        "contractor_network_subnet_user_host_4",
+        0
+      ],
+      [
+        "contractor_network_subnet_user_host_9",
+        0
+      ]
+    ],
+    "llm_actions_on_these_hosts": {
+      "public_access_zone_subnet_user_host_5": {},
+      "public_access_zone_subnet_user_host_9": {
+        "Remove": 1,
+        "Analyse": 1,
+        "DeployDecoy": 1
+      },
+      "restricted_zone_a_subnet_user_host_2": {},
+      "contractor_network_subnet_user_host_4": {},
+      "contractor_network_subnet_user_host_9": {}
+    },
+    "restore_without_retained_admin_evidence": {
+      "office_network_subnet_server_host_0": 2,
+      "office_network_subnet_server_host_1": 1,
+      "office_network_subnet_user_host_3": 2,
+      "public_access_zone_subnet_user_host_1": 1,
+      "office_network_subnet_user_host_1": 1,
+      "public_access_zone_subnet_user_host_6": 1,
+      "office_network_subnet_user_host_2": 1
+    },
+    "offline_diagnosis_only": true
+  }
+]

@@ -1,0 +1,15 @@
+# Offline wiring verification, NOT model quality or paper score reproduction.
+name: paper-mixed-offline-smoke
+team: mixed
+red: finite
+communication: paper
+episodes: 1
+steps: 12
+seed: 42
+threads: 1
+weights: checkpoints/paper-smoke
+output: runs
+model:
+  backend: mock
+  enabled: false
+  mock_action: Sleep

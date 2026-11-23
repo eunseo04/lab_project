@@ -1,0 +1,233 @@
+{
+  "status": "completed",
+  "audit_passed": true,
+  "known_debug_seed_not_heldout": true,
+  "seed": 24001,
+  "manual_initialization_not_learning": true,
+  "arms": {
+    "E0": {
+      "arm": "E0",
+      "red": "finite",
+      "seed": 24001,
+      "return": -272.0,
+      "behavior": {
+        "role": "llm",
+        "world_ticks": 499,
+        "free_opportunities": 369,
+        "busy_ticks": 130,
+        "policy_generations": 369,
+        "all_tick_requests": {
+          "Analyse": 76,
+          "Sleep": 403,
+          "Restore": 9,
+          "Remove": 7,
+          "DeployDecoy": 4
+        },
+        "free_choice_actions": {
+          "Analyse": 76,
+          "Sleep": 273,
+          "Restore": 9,
+          "Remove": 7,
+          "DeployDecoy": 4
+        },
+        "environment_last_action_ticks": {
+          "Sleep": 403,
+          "Analyse": 76,
+          "Restore": 9,
+          "Remove": 7,
+          "DeployDecoy": 4
+        },
+        "generated_choice_actions": {
+          "Analyse": 76,
+          "Sleep": 273,
+          "Restore": 9,
+          "Remove": 7,
+          "DeployDecoy": 4
+        },
+        "valid_generated_choice_actions": {
+          "Analyse": 76,
+          "Sleep": 273,
+          "Restore": 9,
+          "Remove": 7,
+          "DeployDecoy": 4
+        },
+        "invalid_policy_fallback_actions": {},
+        "automatic_monitor_ticks": 499,
+        "parse_errors": 0,
+        "learned_skill_decisions": 0,
+        "skill_usage": {
+          "NONE": 369
+        },
+        "observable_diagnostics": {
+          "free_policy_decision": 369,
+          "automatic_busy_wait": 130,
+          "sleep_with_open_case": 215,
+          "repeated_analysis_same_evidence": 35,
+          "analysis_before_unhandled_flagged_pid": 12,
+          "duplicate_successful_decoy": 1,
+          "open_case_opportunities": 287,
+          "unhandled_flagged_pid_opportunities": 41,
+          "targeted_response_to_flagged_pid": 10,
+          "observed_admin_opportunities": 1,
+          "targeted_restore_with_admin_evidence": 1,
+          "restore_requests": 9,
+          "restore_without_retained_admin_evidence": 8,
+          "waiting_for_action_while_already_free": 11,
+          "decoy_with_open_case": 4
+        },
+        "completed_own_operations": {
+          "Analyse:TRUE": 76,
+          "Restore:TRUE": 9,
+          "Remove:TRUE": 7,
+          "DeployDecoy:TRUE": 4
+        },
+        "decoy_deployment_diagnostics": {
+          "successful_deployments": 4,
+          "same_host_successful_redeployments": 1,
+          "same_host_new_observed_service": 1
+        },
+        "rule_based_reason_categories": {
+          "investigation": 74,
+          "quiet_observation": 239,
+          "waiting": 34,
+          "other": 6,
+          "compromise_response": 16
+        },
+        "mean_observed_evidence_age_at_response": 1.1818181818181819,
+        "response_age_samples": 11,
+        "noncanonical_response_opcode": 0,
+        "stored_context_replay_verified": true
+      },
+      "meta": {
+        "selection_xml_errors": 0,
+        "termination_xml_errors": 0,
+        "unknown_selection_names": 0
+      },
+      "due_lead_opportunities": 295,
+      "targeted_lead_investigations": 57,
+      "source": "research_outputs/behavior-v4-lifecycle-development/E0/summary.json"
+    },
+    "E3": {
+      "arm": "E3",
+      "red": "finite",
+      "seed": 24001,
+      "return": -220.0,
+      "behavior": {
+        "role": "llm",
+        "world_ticks": 499,
+        "free_opportunities": 306,
+        "busy_ticks": 193,
+        "policy_generations": 306,
+        "all_tick_requests": {
+          "Analyse": 104,
+          "Sleep": 357,
+          "Remove": 24,
+          "Restore": 9,
+          "DeployDecoy": 5
+        },
+        "free_choice_actions": {
+          "Analyse": 104,
+          "Sleep": 164,
+          "Remove": 24,
+          "Restore": 9,
+          "DeployDecoy": 5
+        },
+        "environment_last_action_ticks": {
+          "Sleep": 357,
+          "Analyse": 104,
+          "Remove": 24,
+          "Restore": 9,
+          "DeployDecoy": 5
+        },
+        "generated_choice_actions": {
+          "Analyse": 104,
+          "Sleep": 164,
+          "Remove": 24,
+          "Restore": 9,
+          "DeployDecoy": 5
+        },
+        "valid_generated_choice_actions": {
+          "Analyse": 104,
+          "Sleep": 164,
+          "Remove": 24,
+          "Restore": 9,
+          "DeployDecoy": 5
+        },
+        "invalid_policy_fallback_actions": {},
+        "automatic_monitor_ticks": 499,
+        "parse_errors": 0,
+        "learned_skill_decisions": 0,
+        "skill_usage": {
+          "NONE": 134,
+          "SelectiveDeception": 18,
+          "RiskBasedInvestigation": 67,
+          "NetworkContainment": 14,
+          "RapidProcessResponse": 23,
+          "EscalationDiagnosis": 48,
+          "PrivilegedRecovery": 2
+        },
+        "observable_diagnostics": {
+          "free_policy_decision": 306,
+          "automatic_busy_wait": 193,
+          "sleep_with_open_case": 14,
+          "repeated_analysis_same_evidence": 57,
+          "analysis_before_unhandled_flagged_pid": 9,
+          "duplicate_successful_decoy": 1,
+          "open_case_opportunities": 78,
+          "unhandled_flagged_pid_opportunities": 34,
+          "targeted_response_to_flagged_pid": 8,
+          "observed_admin_opportunities": 4,
+          "targeted_restore_with_admin_evidence": 4,
+          "restore_requests": 9,
+          "restore_without_retained_admin_evidence": 5,
+          "waiting_for_action_while_already_free": 1
+        },
+        "completed_own_operations": {
+          "Analyse:TRUE": 104,
+          "Remove:TRUE": 24,
+          "Restore:TRUE": 9,
+          "DeployDecoy:TRUE": 5
+        },
+        "decoy_deployment_diagnostics": {
+          "successful_deployments": 5,
+          "same_host_successful_redeployments": 1,
+          "same_host_new_observed_service": 1
+        },
+        "rule_based_reason_categories": {
+          "investigation": 44,
+          "quiet_observation": 151,
+          "other": 68,
+          "compromise_response": 32,
+          "privilege_or_admin": 3,
+          "waiting": 8
+        },
+        "mean_observed_evidence_age_at_response": 0,
+        "response_age_samples": 12,
+        "noncanonical_response_opcode": 0,
+        "stored_context_replay_verified": true
+      },
+      "meta": {
+        "selection_xml_errors": 0,
+        "termination_xml_errors": 0,
+        "unknown_selection_names": 1
+      },
+      "due_lead_opportunities": 147,
+      "targeted_lead_investigations": 69,
+      "source": "research_outputs/behavior-v4-lifecycle-development/E3/summary.json"
+    }
+  },
+  "E3_minus_E0": 52.0,
+  "criterion_passed": true,
+  "fidelity": {
+    "changed_source_files": [
+      "research/evolution.py",
+      "research/behavior.py"
+    ],
+    "evolution_control_flow_unchanged_only_string_facts_changed": true,
+    "gate_score_maintenance_selector_simulator_reward_and_weights_unchanged": true,
+    "tests_passed": 99,
+    "initial_actor_input_equal": true,
+    "raw_observable_history_replayed": true
+  },
+  "decision": "Fresh prospective N4 is required before a superiority claim"
+}

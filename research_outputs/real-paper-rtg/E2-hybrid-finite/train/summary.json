@@ -1,0 +1,2174 @@
+{
+  "status": "completed",
+  "stage": "train",
+  "config": {
+    "arm": "E2",
+    "composition": "hybrid",
+    "red": "finite",
+    "steps": 20,
+    "episodes": 2,
+    "train_episodes": 2,
+    "iterations": 1,
+    "train_seed": 100,
+    "eval_seed": 10000,
+    "threads": 1,
+    "validation_seed": 5000,
+    "validation_episodes": 1,
+    "profile": "controlled-comparison",
+    "scoring": "official",
+    "communication": "paper_projected_keep",
+    "skip_busy_policy": true,
+    "pool_size": 10,
+    "weights": "/home/jeonges/proposed/third_party/cage-4-submission/weights",
+    "output": "/home/jeonges/proposed/research_outputs/real-paper-rtg",
+    "model": {
+      "endpoint": "http://127.0.0.1:8018",
+      "model": "Qwen/Qwen3-8B",
+      "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+      "temperature": 1.0,
+      "max_tokens": 192,
+      "timeout_seconds": 240
+    },
+    "selector": {
+      "epsilon": 0.1,
+      "max_skill_age": 8
+    },
+    "evolution": {
+      "enabled": true,
+      "gate_mode": "paper_rtg",
+      "ppo_gate": true,
+      "semantic_gradient": true,
+      "score_maintenance": true,
+      "threshold": 2,
+      "best_of_n": 2,
+      "max_evolutions": 1,
+      "semantic_chunk_steps": 4,
+      "clip": 0.2,
+      "gamma": 0.99,
+      "ema_alpha": 0.1,
+      "acceptance_margin": 0.0,
+      "maintenance_mode": "paper_score"
+    }
+  },
+  "episodes": [
+    {
+      "status": "completed",
+      "episode_id": 0,
+      "seed": 100,
+      "steps_requested": 20,
+      "joint_transitions": 19,
+      "scored_transitions": 18,
+      "joint_return": -2.0,
+      "raw_joint_return": -2.0,
+      "execution_time_s": 33.647545638959855,
+      "raw_joint_rewards": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        -1.0,
+        0.0,
+        0.0,
+        0.0,
+        -1.0,
+        0.0,
+        0.0
+      ],
+      "scored_step_rewards": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        -1.0,
+        0.0,
+        0.0,
+        0.0,
+        -1.0,
+        0.0,
+        0.0
+      ],
+      "requested_action_counts": {
+        "Analyse": 8,
+        "AllowTrafficZone": 27,
+        "Monitor": 7,
+        "BlockTrafficZone": 7,
+        "Sleep": 15,
+        "DeployDecoy": 4,
+        "Remove": 5,
+        "Restore": 1
+      },
+      "executed_action_counts": {
+        "Sleep": 38,
+        "AllowTrafficZone": 27,
+        "Monitor": 7,
+        "BlockTrafficZone": 7,
+        "Analyse": 8,
+        "DeployDecoy": 4,
+        "Remove": 3,
+        "Restore": 1
+      },
+      "automatic_action_counts": {
+        "Monitor": 95
+      },
+      "invalid_json": 0,
+      "model_identity": {
+        "model": "Qwen/Qwen3-8B",
+        "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+        "backend": "transformers",
+        "transformers": "4.51.3",
+        "torch": "2.6.0+cu124",
+        "dtype": "bfloat16",
+        "weights_frozen": true,
+        "temperature_scoring": true,
+        "scoring_mode": "incremental_teacher_forcing",
+        "chat_template_sha256": "a55ee1b1660128b7098723e0abcd92caa0788061051c62d51cbe87d9cf1974d8"
+      },
+      "kind": "real_cage4",
+      "weights": {
+        "blue_agent_0": {
+          "file": "/home/jeonges/proposed/third_party/cage-4-submission/weights/gnn_ppo-0.pt",
+          "sha256": "991d96cb5132eec36595f6d407e67b93b2e5045c960dc4d25586e0c0bf124e60",
+          "input_features": 192,
+          "training": null
+        },
+        "blue_agent_1": {
+          "file": "/home/jeonges/proposed/third_party/cage-4-submission/weights/gnn_ppo-1.pt",
+          "sha256": "27072ef12bab1e1b2ec9b9143845d07af7545c615c92ef44c59b67268cb98502",
+          "input_features": 192,
+          "training": null
+        },
+        "blue_agent_2": {
+          "file": "/home/jeonges/proposed/third_party/cage-4-submission/weights/gnn_ppo-2.pt",
+          "sha256": "a76ea99d830976aa4c7f370c1fc575746de7c8a1618dd239ff34f0525da11478",
+          "input_features": 192,
+          "training": null
+        },
+        "blue_agent_3": {
+          "file": "/home/jeonges/proposed/third_party/cage-4-submission/weights/gnn_ppo-3.pt",
+          "sha256": "acca6460545401e47c1dfe30d9f761f4955437b9c13f8098d5856e7995163fe4",
+          "input_features": 192,
+          "training": null
+        }
+      },
+      "trace": "/home/jeonges/proposed/research_outputs/real-paper-rtg/E2-hybrid-finite/train/episode-0000.jsonl",
+      "calls": [
+        {
+          "purpose": "skill_selection",
+          "input_tokens": 1319,
+          "output_tokens": 10,
+          "seconds": 0.6155138679314405
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 3093,
+          "output_tokens": 32,
+          "seconds": 1.878125722054392
+        },
+        {
+          "purpose": "termination",
+          "input_tokens": 328,
+          "output_tokens": 9,
+          "seconds": 0.36197371408343315
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2265,
+          "output_tokens": 23,
+          "seconds": 1.289329475024715
+        },
+        {
+          "purpose": "termination",
+          "input_tokens": 319,
+          "output_tokens": 9,
+          "seconds": 0.35921048815362155
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2256,
+          "output_tokens": 26,
+          "seconds": 1.398292007157579
+        },
+        {
+          "purpose": "termination",
+          "input_tokens": 319,
+          "output_tokens": 9,
+          "seconds": 0.35477529396303
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2256,
+          "output_tokens": 26,
+          "seconds": 1.4008761188015342
+        },
+        {
+          "purpose": "termination",
+          "input_tokens": 319,
+          "output_tokens": 9,
+          "seconds": 0.35694170417264104
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2256,
+          "output_tokens": 23,
+          "seconds": 1.2926974890287966
+        },
+        {
+          "purpose": "termination",
+          "input_tokens": 417,
+          "output_tokens": 9,
+          "seconds": 0.3752529581543058
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2354,
+          "output_tokens": 29,
+          "seconds": 1.536867531016469
+        },
+        {
+          "purpose": "termination",
+          "input_tokens": 321,
+          "output_tokens": 8,
+          "seconds": 0.3293243001680821
+        },
+        {
+          "purpose": "skill_selection",
+          "input_tokens": 484,
+          "output_tokens": 8,
+          "seconds": 0.34485306893475354
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2160,
+          "output_tokens": 33,
+          "seconds": 1.620036002015695
+        },
+        {
+          "purpose": "skill_selection",
+          "input_tokens": 484,
+          "output_tokens": 8,
+          "seconds": 0.34193141502328217
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2160,
+          "output_tokens": 21,
+          "seconds": 1.1918312578927726
+        },
+        {
+          "purpose": "skill_selection",
+          "input_tokens": 482,
+          "output_tokens": 8,
+          "seconds": 0.3433142399881035
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 26,
+          "seconds": 1.370384023990482
+        },
+        {
+          "purpose": "skill_selection",
+          "input_tokens": 482,
+          "output_tokens": 8,
+          "seconds": 0.3430617740377784
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 16,
+          "seconds": 1.0125748459249735
+        },
+        {
+          "purpose": "skill_selection",
+          "input_tokens": 482,
+          "output_tokens": 8,
+          "seconds": 0.3451563341077417
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 26,
+          "seconds": 1.3738964481744915
+        },
+        {
+          "purpose": "skill_selection",
+          "input_tokens": 482,
+          "output_tokens": 8,
+          "seconds": 0.34134212392382324
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 26,
+          "seconds": 1.373262648936361
+        },
+        {
+          "purpose": "skill_selection",
+          "input_tokens": 482,
+          "output_tokens": 8,
+          "seconds": 0.3428403672296554
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 26,
+          "seconds": 1.3724841610528529
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 26,
+          "seconds": 1.3705541458912194
+        },
+        {
+          "purpose": "skill_selection",
+          "input_tokens": 482,
+          "output_tokens": 8,
+          "seconds": 0.34057355113327503
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 21,
+          "seconds": 1.1877415089402348
+        },
+        {
+          "purpose": "skill_selection",
+          "input_tokens": 482,
+          "output_tokens": 8,
+          "seconds": 0.3404820440337062
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 21,
+          "seconds": 1.1890536721330136
+        },
+        {
+          "purpose": "skill_selection",
+          "input_tokens": 482,
+          "output_tokens": 8,
+          "seconds": 0.34202866815030575
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2158,
+          "output_tokens": 21,
+          "seconds": 1.1901217768900096
+        },
+        {
+          "purpose": "skill_selection",
+          "input_tokens": 576,
+          "output_tokens": 10,
+          "seconds": 0.44376954692415893
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2350,
+          "output_tokens": 30,
+          "seconds": 1.5755264509934932
+        }
+      ]
+    },
+    {
+      "status": "completed",
+      "episode_id": 1,
+      "seed": 101,
+      "steps_requested": 20,
+      "joint_transitions": 19,
+      "scored_transitions": 18,
+      "joint_return": -11.0,
+      "raw_joint_return": -21.0,
+      "execution_time_s": 34.65931874583475,
+      "raw_joint_rewards": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        -10.0,
+        -1.0,
+        -10.0
+      ],
+      "scored_step_rewards": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        -10.0,
+        -1.0,
+        0.0
+      ],
+      "requested_action_counts": {
+        "AllowTrafficZone": 29,
+        "Analyse": 14,
+        "BlockTrafficZone": 10,
+        "Sleep": 14,
+        "Monitor": 5,
+        "DeployDecoy": 5,
+        "Restore": 1
+      },
+      "executed_action_counts": {
+        "AllowTrafficZone": 29,
+        "Sleep": 33,
+        "BlockTrafficZone": 10,
+        "Analyse": 14,
+        "Monitor": 5,
+        "DeployDecoy": 4
+      },
+      "automatic_action_counts": {
+        "Monitor": 95
+      },
+      "invalid_json": 4,
+      "model_identity": {
+        "model": "Qwen/Qwen3-8B",
+        "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+        "backend": "transformers",
+        "transformers": "4.51.3",
+        "torch": "2.6.0+cu124",
+        "dtype": "bfloat16",
+        "weights_frozen": true,
+        "temperature_scoring": true,
+        "scoring_mode": "incremental_teacher_forcing",
+        "chat_template_sha256": "a55ee1b1660128b7098723e0abcd92caa0788061051c62d51cbe87d9cf1974d8"
+      },
+      "kind": "real_cage4",
+      "weights": {
+        "blue_agent_0": {
+          "file": "/home/jeonges/proposed/third_party/cage-4-submission/weights/gnn_ppo-0.pt",
+          "sha256": "991d96cb5132eec36595f6d407e67b93b2e5045c960dc4d25586e0c0bf124e60",
+          "input_features": 192,
+          "training": null
+        },
+        "blue_agent_1": {
+          "file": "/home/jeonges/proposed/third_party/cage-4-submission/weights/gnn_ppo-1.pt",
+          "sha256": "27072ef12bab1e1b2ec9b9143845d07af7545c615c92ef44c59b67268cb98502",
+          "input_features": 192,
+          "training": null
+        },
+        "blue_agent_2": {
+          "file": "/home/jeonges/proposed/third_party/cage-4-submission/weights/gnn_ppo-2.pt",
+          "sha256": "a76ea99d830976aa4c7f370c1fc575746de7c8a1618dd239ff34f0525da11478",
+          "input_features": 192,
+          "training": null
+        },
+        "blue_agent_3": {
+          "file": "/home/jeonges/proposed/third_party/cage-4-submission/weights/gnn_ppo-3.pt",
+          "sha256": "acca6460545401e47c1dfe30d9f761f4955437b9c13f8098d5856e7995163fe4",
+          "input_features": 192,
+          "training": null
+        }
+      },
+      "trace": "/home/jeonges/proposed/research_outputs/real-paper-rtg/E2-hybrid-finite/train/episode-0001.jsonl",
+      "calls": [
+        {
+          "purpose": "skill_selection",
+          "input_tokens": 1445,
+          "output_tokens": 10,
+          "seconds": 0.6205235791858286
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 3219,
+          "output_tokens": 29,
+          "seconds": 1.803337920922786
+        },
+        {
+          "purpose": "termination",
+          "input_tokens": 328,
+          "output_tokens": 9,
+          "seconds": 0.35800609178841114
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2265,
+          "output_tokens": 26,
+          "seconds": 1.4020715621300042
+        },
+        {
+          "purpose": "termination",
+          "input_tokens": 319,
+          "output_tokens": 9,
+          "seconds": 0.3595852549187839
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2256,
+          "output_tokens": 23,
+          "seconds": 1.294911045115441
+        },
+        {
+          "purpose": "termination",
+          "input_tokens": 319,
+          "output_tokens": 9,
+          "seconds": 0.3546830720733851
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2256,
+          "output_tokens": 26,
+          "seconds": 1.4047638659831136
+        },
+        {
+          "purpose": "termination",
+          "input_tokens": 319,
+          "output_tokens": 9,
+          "seconds": 0.3598069699946791
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2256,
+          "output_tokens": 26,
+          "seconds": 1.4053701679222286
+        },
+        {
+          "purpose": "termination",
+          "input_tokens": 345,
+          "output_tokens": 9,
+          "seconds": 0.3639672971330583
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2282,
+          "output_tokens": 29,
+          "seconds": 1.5147707657888532
+        },
+        {
+          "purpose": "skill_selection",
+          "input_tokens": 490,
+          "output_tokens": 8,
+          "seconds": 0.34521409193985164
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2166,
+          "output_tokens": 32,
+          "seconds": 1.5886361440643668
+        },
+        {
+          "purpose": "skill_selection",
+          "input_tokens": 580,
+          "output_tokens": 10,
+          "seconds": 0.4429379301145673
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2354,
+          "output_tokens": 29,
+          "seconds": 1.54249450401403
+        },
+        {
+          "purpose": "termination",
+          "input_tokens": 321,
+          "output_tokens": 8,
+          "seconds": 0.3295966980513185
+        },
+        {
+          "purpose": "skill_selection",
+          "input_tokens": 484,
+          "output_tokens": 10,
+          "seconds": 0.40691199409775436
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2258,
+          "output_tokens": 31,
+          "seconds": 1.588073133956641
+        },
+        {
+          "purpose": "termination",
+          "input_tokens": 321,
+          "output_tokens": 9,
+          "seconds": 0.3631087311077863
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2258,
+          "output_tokens": 31,
+          "seconds": 1.5873776390217245
+        },
+        {
+          "purpose": "termination",
+          "input_tokens": 483,
+          "output_tokens": 9,
+          "seconds": 0.38074007513932884
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2420,
+          "output_tokens": 40,
+          "seconds": 1.956015801988542
+        },
+        {
+          "purpose": "termination",
+          "input_tokens": 319,
+          "output_tokens": 9,
+          "seconds": 0.3574869998265058
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2256,
+          "output_tokens": 26,
+          "seconds": 1.4075738219544291
+        },
+        {
+          "purpose": "termination",
+          "input_tokens": 319,
+          "output_tokens": 9,
+          "seconds": 0.35674336878582835
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2256,
+          "output_tokens": 26,
+          "seconds": 1.4091309469658881
+        },
+        {
+          "purpose": "termination",
+          "input_tokens": 319,
+          "output_tokens": 9,
+          "seconds": 0.35227055405266583
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2256,
+          "output_tokens": 22,
+          "seconds": 1.2607347960583866
+        },
+        {
+          "purpose": "termination",
+          "input_tokens": 319,
+          "output_tokens": 9,
+          "seconds": 0.3579980379436165
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2256,
+          "output_tokens": 21,
+          "seconds": 1.2265779310837388
+        },
+        {
+          "purpose": "termination",
+          "input_tokens": 412,
+          "output_tokens": 9,
+          "seconds": 0.3694818951189518
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2349,
+          "output_tokens": 26,
+          "seconds": 1.4378173158038408
+        },
+        {
+          "purpose": "skill_selection",
+          "input_tokens": 579,
+          "output_tokens": 10,
+          "seconds": 0.44074700493365526
+        },
+        {
+          "purpose": "policy",
+          "input_tokens": 2353,
+          "output_tokens": 42,
+          "seconds": 2.0173442610539496
+        }
+      ]
+    }
+  ],
+  "metrics": {
+    "n": 2,
+    "mean_joint_reward": -6.5,
+    "reward_std": 6.363961030678928,
+    "execution_time_s": 68.30686438479461,
+    "mean_episode_time_s": 34.153432192397304
+  },
+  "result_kind": "real_cage4",
+  "history": [
+    {
+      "iteration": 1,
+      "episodes": 2,
+      "reward_mean": -6.5,
+      "baseline": -5.304184442967759,
+      "evolution": [
+        {
+          "iteration": 1,
+          "parent": "NetworkContainment",
+          "old_skill": {
+            "name": "NetworkContainment",
+            "initiation": "When observable repeated malicious connections or communicated threat justify limiting a zone.",
+            "policy": [
+              "Check the visible mission phase and relevant communication vectors.",
+              "Choose a valid subnet for BlockTrafficZone without gratuitous availability loss.",
+              "Observe success/failure and reassess the containment need."
+            ],
+            "termination": "The block action result is known and the immediate containment decision has been reassessed.",
+            "frequency": 6,
+            "avg_gain": -0.10784313725490197,
+            "total_gain": -0.6470588235294118,
+            "maturity": 1,
+            "success_count": 0,
+            "last_evolved_iter": 0,
+            "parent_id": "",
+            "version": 1,
+            "allowed_actions": [
+              "BlockTrafficZone"
+            ],
+            "family": "NetworkContainment"
+          },
+          "candidates": [
+            {
+              "index": 0,
+              "type": "REFINE",
+              "score": -1.3113025476768583,
+              "accepted": false,
+              "skill": {
+                "name": "NetworkContainment_v2",
+                "initiation": "IF observable repeated malicious connections OR communicated threats are detected AND mission phase aligns with active threat response",
+                "policy": [
+                  "Confirm the presence of repeated malicious connections or communicated threats through thorough analysis of communication vectors and mission phase.",
+                  "Select a subnet for BlockTrafficZone that is narrowly scoped, validated, and aligned with the threat source to minimize impact on legitimate traffic.",
+                  "Execute the BlockTrafficZone action and monitor the result, ensuring to reassess the containment need based on observed outcomes and threat evolution."
+                ],
+                "termination": "Stop IF the block action result is confirmed successful AND the containment need has been fully reassessed and resolved.",
+                "frequency": 0,
+                "avg_gain": 0.0,
+                "total_gain": 0.0,
+                "maturity": 0,
+                "success_count": 0,
+                "last_evolved_iter": 0,
+                "parent_id": "NetworkContainment",
+                "version": 2,
+                "family": "NetworkContainment",
+                "allowed_actions": [
+                  "BlockTrafficZone"
+                ]
+              },
+              "diagnostics": [
+                {
+                  "n": 13,
+                  "ratio_min": 0.001852146634993961,
+                  "ratio_max": 5.072435362613779,
+                  "old_logprobs": [
+                    -3.055290460586548,
+                    -1.110733151435852,
+                    -1.9661803245544434,
+                    -0.22291989624500275,
+                    -0.4227808117866516,
+                    -0.06669463962316513,
+                    -7.840280055999756,
+                    -2.091920852661133,
+                    -4.556219577789307,
+                    -0.07129591703414917,
+                    -0.061121225357055664,
+                    -0.8287018537521362,
+                    -1.5631517171859741
+                  ],
+                  "new_logprobs": [
+                    -3.7000277042388916,
+                    -1.8140026330947876,
+                    -0.3423592746257782,
+                    -1.3429594039916992,
+                    -1.3349032402038574,
+                    -0.2647213339805603,
+                    -11.50029468536377,
+                    -6.298600196838379,
+                    -10.84762954711914,
+                    -0.11163143068552017,
+                    -0.24440932273864746,
+                    -2.261730909347534,
+                    -1.9118711948394775
+                  ],
+                  "importance_ratios": [
+                    0.5248004186330818,
+                    0.49496437848525393,
+                    5.072435362613779,
+                    0.3262669042981969,
+                    0.4016708011667735,
+                    0.8203479541840657,
+                    0.025732136278817885,
+                    0.01489574996186714,
+                    0.001852146634993961,
+                    0.9604671352510974,
+                    0.8325282719685521,
+                    0.23858513895711383,
+                    0.7055910365633313
+                  ],
+                  "clipped_surrogates": [
+                    -3.242669169091938,
+                    -3.3946656314906485,
+                    -22.01321092844632,
+                    -3.5497482377540006,
+                    -3.628466377068427,
+                    -3.8022918991224506,
+                    -3.9513709844240488,
+                    -4.034145919159385,
+                    -4.117756964346594,
+                    -5.1475290697477005,
+                    -4.551527434820168,
+                    -4.460732445625793,
+                    -4.548652445625794
+                  ],
+                  "advantages": [
+                    -4.053336461364922,
+                    -4.2433320393633105,
+                    -4.339771599790898,
+                    -4.4371852971925,
+                    -4.535582971335534,
+                    -4.634974561379001,
+                    -4.939213730530061,
+                    -5.042682398949231,
+                    -5.147196205433242,
+                    -5.359401567032243,
+                    -5.467114557032242,
+                    -5.575915557032242,
+                    -5.6858155570322415
+                  ],
+                  "surrogate_mean": -5.418674423594097,
+                  "transitions": [
+                    {
+                      "seed": 101,
+                      "agent": "blue_agent_4",
+                      "step": 0,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    },
+                    {
+                      "seed": 101,
+                      "agent": "blue_agent_4",
+                      "step": 2,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    },
+                    {
+                      "seed": 101,
+                      "agent": "blue_agent_4",
+                      "step": 3,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    },
+                    {
+                      "seed": 101,
+                      "agent": "blue_agent_4",
+                      "step": 4,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    },
+                    {
+                      "seed": 101,
+                      "agent": "blue_agent_4",
+                      "step": 5,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    },
+                    {
+                      "seed": 101,
+                      "agent": "blue_agent_4",
+                      "step": 6,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    },
+                    {
+                      "seed": 101,
+                      "agent": "blue_agent_4",
+                      "step": 9,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    },
+                    {
+                      "seed": 101,
+                      "agent": "blue_agent_4",
+                      "step": 10,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    },
+                    {
+                      "seed": 101,
+                      "agent": "blue_agent_4",
+                      "step": 11,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    },
+                    {
+                      "seed": 101,
+                      "agent": "blue_agent_4",
+                      "step": 13,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    },
+                    {
+                      "seed": 101,
+                      "agent": "blue_agent_4",
+                      "step": 14,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    },
+                    {
+                      "seed": 101,
+                      "agent": "blue_agent_4",
+                      "step": 15,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    },
+                    {
+                      "seed": 101,
+                      "agent": "blue_agent_4",
+                      "step": 16,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    }
+                  ]
+                },
+                {
+                  "n": 7,
+                  "ratio_min": 0.00016367508457516762,
+                  "ratio_max": 5.072435362613779,
+                  "old_logprobs": [
+                    -1.6655261516571045,
+                    -1.394411563873291,
+                    -0.3020055294036865,
+                    -0.3898700177669525,
+                    -1.9661803245544434,
+                    -3.9170353412628174,
+                    -3.4731101989746094
+                  ],
+                  "new_logprobs": [
+                    -1.8304681777954102,
+                    -0.32600292563438416,
+                    -1.7175394296646118,
+                    -1.7240993976593018,
+                    -0.3423592746257782,
+                    -12.634662628173828,
+                    -2.4852230548858643
+                  ],
+                  "importance_ratios": [
+                    0.8479428611851477,
+                    2.9107437660648063,
+                    0.2427959500170868,
+                    0.26336104859654874,
+                    5.072435362613779,
+                    0.00016367508457516762,
+                    2.6855542845081204
+                  ],
+                  "clipped_surrogates": [
+                    3.0240540699891083,
+                    4.237267866227971,
+                    0.8529776624974242,
+                    0.9204613172627736,
+                    4.172137008962463,
+                    0.0005660411816106544,
+                    6.3650213315613104
+                  ],
+                  "advantages": [
+                    3.566341800156754,
+                    3.531056555189976,
+                    3.51314617248515,
+                    3.4950548768237093,
+                    3.4767808408020526,
+                    3.4583222185579543,
+                    5.304184442967759
+                  ],
+                  "surrogate_mean": 2.7960693282403803,
+                  "transitions": [
+                    {
+                      "seed": 100,
+                      "agent": "blue_agent_4",
+                      "step": 0,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    },
+                    {
+                      "seed": 100,
+                      "agent": "blue_agent_4",
+                      "step": 2,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    },
+                    {
+                      "seed": 100,
+                      "agent": "blue_agent_4",
+                      "step": 3,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    },
+                    {
+                      "seed": 100,
+                      "agent": "blue_agent_4",
+                      "step": 4,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    },
+                    {
+                      "seed": 100,
+                      "agent": "blue_agent_4",
+                      "step": 5,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    },
+                    {
+                      "seed": 100,
+                      "agent": "blue_agent_4",
+                      "step": 6,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    },
+                    {
+                      "seed": 100,
+                      "agent": "blue_agent_4",
+                      "step": 18,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "index": 1,
+              "type": "REFINE",
+              "score": -1.304459800067675,
+              "accepted": false,
+              "skill": {
+                "name": "NetworkContainment_v2",
+                "initiation": "IF suspicious activity (e.g., unknown processes, repeated connections, threat communication vectors) is detected in a monitored subnet AND the activity exceeds predefined threat thresholds",
+                "policy": [
+                  "Step 1: Validate the presence of suspicious activity, such as repeated connections or unknown processes, in the observed subnet.",
+                  "Step 2: Confirm the subnet's relevance to the threat by cross-referencing with known malicious IPs or anomalous behavior patterns.",
+                  "Step 3: Execute BlockTrafficZone on the validated subnet, ensuring the subnet format is correct and the action aligns with observed threat indicators.",
+                  "Step 4: Reassess the containment effect and determine whether further action is required based on the outcome."
+                ],
+                "termination": "Stop IF the containment action result is confirmed (success or failure) AND the containment decision has been thoroughly reassessed for necessity and effectiveness.",
+                "frequency": 0,
+                "avg_gain": 0.0,
+                "total_gain": 0.0,
+                "maturity": 0,
+                "success_count": 0,
+                "last_evolved_iter": 0,
+                "parent_id": "NetworkContainment",
+                "version": 2,
+                "family": "NetworkContainment",
+                "allowed_actions": [
+                  "BlockTrafficZone"
+                ]
+              },
+              "diagnostics": [
+                {
+                  "n": 13,
+                  "ratio_min": 0.00021310930485976068,
+                  "ratio_max": 1.1332657101547676,
+                  "old_logprobs": [
+                    -3.055290460586548,
+                    -1.110733151435852,
+                    -1.9661803245544434,
+                    -0.22291989624500275,
+                    -0.4227808117866516,
+                    -0.06669463962316513,
+                    -7.840280055999756,
+                    -2.091920852661133,
+                    -4.556219577789307,
+                    -0.07129591703414917,
+                    -0.061121225357055664,
+                    -0.8287018537521362,
+                    -1.5631517171859741
+                  ],
+                  "new_logprobs": [
+                    -3.397515296936035,
+                    -5.665072917938232,
+                    -6.175886154174805,
+                    -8.67662525177002,
+                    -7.915264129638672,
+                    -0.09685123711824417,
+                    -7.715176582336426,
+                    -4.929227352142334,
+                    -9.381490707397461,
+                    -5.591517925262451,
+                    -5.617954730987549,
+                    -6.421258926391602,
+                    -6.802982330322266
+                  ],
+                  "importance_ratios": [
+                    0.7101885105651625,
+                    0.010521444549560222,
+                    0.014850736342334336,
+                    0.00021310930485976068,
+                    0.0005572573935563852,
+                    0.9702935761072317,
+                    1.1332657101547676,
+                    0.05858324765399805,
+                    0.008024377928983846,
+                    0.0040049587095980655,
+                    0.0038609828420226363,
+                    0.003725489327691026,
+                    0.00530115470579422
+                  ],
+                  "clipped_surrogates": [
+                    -3.242669169091938,
+                    -3.3946656314906485,
+                    -3.4718172798327185,
+                    -3.5497482377540006,
+                    -3.628466377068427,
+                    -4.497286042326478,
+                    -5.597441555935329,
+                    -4.034145919159385,
+                    -4.117756964346594,
+                    -4.287521253625794,
+                    -4.373691645625794,
+                    -4.460732445625793,
+                    -4.548652445625794
+                  ],
+                  "advantages": [
+                    -4.053336461364922,
+                    -4.2433320393633105,
+                    -4.339771599790898,
+                    -4.4371852971925,
+                    -4.535582971335534,
+                    -4.634974561379001,
+                    -4.939213730530061,
+                    -5.042682398949231,
+                    -5.147196205433242,
+                    -5.359401567032243,
+                    -5.467114557032242,
+                    -5.575915557032242,
+                    -5.6858155570322415
+                  ],
+                  "surrogate_mean": -4.092661151346823,
+                  "transitions": [
+                    {
+                      "seed": 101,
+                      "agent": "blue_agent_4",
+                      "step": 0,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    },
+                    {
+                      "seed": 101,
+                      "agent": "blue_agent_4",
+                      "step": 2,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    },
+                    {
+                      "seed": 101,
+                      "agent": "blue_agent_4",
+                      "step": 3,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    },
+                    {
+                      "seed": 101,
+                      "agent": "blue_agent_4",
+                      "step": 4,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    },
+                    {
+                      "seed": 101,
+                      "agent": "blue_agent_4",
+                      "step": 5,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    },
+                    {
+                      "seed": 101,
+                      "agent": "blue_agent_4",
+                      "step": 6,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    },
+                    {
+                      "seed": 101,
+                      "agent": "blue_agent_4",
+                      "step": 9,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    },
+                    {
+                      "seed": 101,
+                      "agent": "blue_agent_4",
+                      "step": 10,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    },
+                    {
+                      "seed": 101,
+                      "agent": "blue_agent_4",
+                      "step": 11,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    },
+                    {
+                      "seed": 101,
+                      "agent": "blue_agent_4",
+                      "step": 13,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    },
+                    {
+                      "seed": 101,
+                      "agent": "blue_agent_4",
+                      "step": 14,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    },
+                    {
+                      "seed": 101,
+                      "agent": "blue_agent_4",
+                      "step": 15,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    },
+                    {
+                      "seed": 101,
+                      "agent": "blue_agent_4",
+                      "step": 16,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    }
+                  ]
+                },
+                {
+                  "n": 7,
+                  "ratio_min": 0.0005936962615665175,
+                  "ratio_max": 10.285428380724033,
+                  "old_logprobs": [
+                    -1.6655261516571045,
+                    -1.394411563873291,
+                    -0.3020055294036865,
+                    -0.3898700177669525,
+                    -1.9661803245544434,
+                    -3.9170353412628174,
+                    -3.4731101989746094
+                  ],
+                  "new_logprobs": [
+                    -5.319985866546631,
+                    -1.3041014671325684,
+                    -7.046272277832031,
+                    -6.712222099304199,
+                    -6.175886154174805,
+                    -11.34617805480957,
+                    -1.142382025718689
+                  ],
+                  "importance_ratios": [
+                    0.025875473840459223,
+                    1.0945136361977015,
+                    0.001177611848554215,
+                    0.0017957148673427312,
+                    0.014850736342334336,
+                    0.0005936962615665175,
+                    10.285428380724033
+                  ],
+                  "clipped_surrogates": [
+                    0.09228078395609235,
+                    3.8647895498407108,
+                    0.004137122558421403,
+                    0.006276122004491053,
+                    0.051632755586830774,
+                    0.0020531929724502823,
+                    6.3650213315613104
+                  ],
+                  "advantages": [
+                    3.566341800156754,
+                    3.531056555189976,
+                    3.51314617248515,
+                    3.4950548768237093,
+                    3.4767808408020526,
+                    3.4583222185579543,
+                    5.304184442967759
+                  ],
+                  "surrogate_mean": 1.4837415512114727,
+                  "transitions": [
+                    {
+                      "seed": 100,
+                      "agent": "blue_agent_4",
+                      "step": 0,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    },
+                    {
+                      "seed": 100,
+                      "agent": "blue_agent_4",
+                      "step": 2,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    },
+                    {
+                      "seed": 100,
+                      "agent": "blue_agent_4",
+                      "step": 3,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    },
+                    {
+                      "seed": 100,
+                      "agent": "blue_agent_4",
+                      "step": 4,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    },
+                    {
+                      "seed": 100,
+                      "agent": "blue_agent_4",
+                      "step": 5,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    },
+                    {
+                      "seed": 100,
+                      "agent": "blue_agent_4",
+                      "step": 6,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    },
+                    {
+                      "seed": 100,
+                      "agent": "blue_agent_4",
+                      "step": 18,
+                      "skill_id": "NetworkContainment",
+                      "skill_version": 1
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "accepted": false,
+          "error": null,
+          "semantic_gradients": [
+            {
+              "skill": "NetworkContainment",
+              "steps": [
+                0,
+                1,
+                2,
+                3
+              ],
+              "gradient": {
+                "initiation": "The skill should have initiated earlier when suspicious activity was detected on the host. The agent did not trigger containment in response to the detected threat, which is a critical step in the containment process.",
+                "execution": "The skill missed a key step by not properly assessing the communication vectors and threats. It should have implemented the BlockTrafficZone action to isolate the subnet. The analysis of the host's activities should have led to a containment decision, not just a sleep or observation phase.",
+                "termination": "The skill terminated prematurely without fully reassessing the need for containment. It should have continued monitoring and decision-making until the threat was confirmed contained or mitigated."
+              },
+              "related": true
+            },
+            {
+              "skill": "NetworkContainment",
+              "steps": [
+                4,
+                5,
+                6,
+                7
+              ],
+              "gradient": {
+                "initiation": "The skill was initiated prematurely without sufficient evidence of malicious activity. It should only start when there is clear, repeated malicious connections or communicated threats.",
+                "execution": "The policy incorrectly identified a non-threatening activity as suspicious, leading to an unnecessary analysis step. It missed the step of properly assessing the communication vectors and phase before taking action.",
+                "termination": "The termination was premature, stopping after a single analysis step without re-evaluating the containment need based on observed outcomes. The skill should continue reassessing until the block action result is known and the need for containment is fully evaluated."
+              },
+              "related": true
+            },
+            {
+              "skill": "NetworkContainment",
+              "steps": [
+                9,
+                10,
+                11,
+                12
+              ],
+              "gradient": {
+                "initiation": "The skill initiated correctly by blocking the subnet based on repeated malicious connections. However, the initial subnet chosen ('office_network_subnet') might have been too broad or not aligned with the precise threat source, leading to unnecessary restrictions.",
+                "execution": "The policy failed to properly validate the target subnet before blocking, leading to errors and repeated failed AllowTrafficZone actions. The agent did not correctly reassess the threat after the initial block and attempted to allow traffic without sufficient validation.",
+                "termination": "The skill did not terminate properly. The containment process should have stopped once the block was verified successful, but the agent continued with unnecessary actions without proper reassessment."
+              },
+              "related": true
+            },
+            {
+              "skill": "NetworkContainment",
+              "steps": [
+                13,
+                14,
+                15,
+                16
+              ],
+              "gradient": {
+                "initiation": "The skill should not have been initiated at this stage, as there was no clear justification for network containment based on the observations. The mission phase was pre-planning, and the threat level was low.",
+                "execution": "The policy failed to detect and respond to the suspicious internal connections (e.g., local_address == remote_address). It should have triggered a containment action such as BlockTrafficZone instead of continuing with Sleep.",
+                "termination": "The skill did not terminate appropriately. It continued to execute without reassessing the containment need, leading to a prolonged failure to address the potential threat."
+              },
+              "related": true
+            },
+            {
+              "skill": "NetworkContainment",
+              "steps": [
+                17,
+                18
+              ],
+              "gradient": {
+                "initiation": "The skill initiated containment prematurely based on insufficient evidence of malicious activity, leading to unnecessary actions.",
+                "execution": "The policy incorrectly identified subnets (e.g., 'office_network' and '10.0.102.0/24') as valid, which were not recognized by the system. This indicates a lack of proper subnet validation.",
+                "termination": "The skill terminated after unsuccessful containment attempts without re-evaluating the situation, leading to incomplete resolution."
+              },
+              "related": true
+            },
+            {
+              "skill": "NetworkContainment",
+              "steps": [
+                0,
+                1,
+                2,
+                3
+              ],
+              "gradient": {
+                "initiation": "The skill should not have initiated at this stage since there was no clear evidence of repeated malicious connections or communicated threats that justified limiting a zone.",
+                "execution": "The skill missed the critical step of choosing a valid subnet for BlockTrafficZone and did not observe the success or failure of the containment actions. It also failed to reassess the containment need after the initial analysis.",
+                "termination": "The skill terminated too early without completing the required steps for containment, leading to an incomplete response and failure to address the potential threat."
+              },
+              "related": true
+            },
+            {
+              "skill": "NetworkContainment",
+              "steps": [
+                4,
+                5,
+                6,
+                18
+              ],
+              "gradient": {
+                "initiation": "The skill should have initiated earlier when suspicious connections were first detected (step 5), instead of waiting until later steps. Early initiation may have led to more effective containment.",
+                "execution": "The policy missed the repeated pattern of connections (step 5 and 6), which justified the containment action. A more proactive detection mechanism should be added to identify and respond to repeated malicious connections more efficiently.",
+                "termination": "The termination was appropriate as the containment action was confirmed successful (TRUE), but the skill could benefit from reassessing the necessity of further containment steps after confirming initial success."
+              },
+              "related": true
+            },
+            {
+              "skill": "NetworkContainment",
+              "steps": [
+                0,
+                1,
+                2,
+                3
+              ],
+              "gradient": {
+                "initiation": "The skill should have initiated earlier when suspicious activity (e.g., unknown processes, sessions) was detected in the public_access_zone_subnet_user_host_0.",
+                "execution": "The policy failed to properly analyze the host's activity, leading to incorrect inaction. It should have followed up with a containment strategy such as blocking the subnet or isolating the host instead of just sleeping.",
+                "termination": "The skill terminated too early without sufficient assessment. It should have continued analyzing other hosts or implementing a containment strategy before terminating."
+              },
+              "related": true
+            },
+            {
+              "skill": "NetworkContainment",
+              "steps": [
+                4,
+                5,
+                6,
+                7
+              ],
+              "gradient": {
+                "initiation": "The skill should have initiated containment earlier when suspicious activity was detected, rather than waiting for explicit confirmation of malicious connections.",
+                "execution": "The policy missed the step of identifying and blocking the subnet after analyzing the host. It should have automatically triggered containment after analyzing the host's connections.",
+                "termination": "The skill terminated prematurely without verifying the effectiveness of the containment action. It should have continued until the containment was confirmed or deemed unnecessary."
+              },
+              "related": true
+            },
+            {
+              "skill": "NetworkContainment",
+              "steps": [
+                9,
+                10,
+                11,
+                12
+              ],
+              "gradient": {
+                "initiation": "The skill was initiated prematurely on a subnet (office_network_subnet) without sufficient evidence of malicious activity. The repeated connections to the same IP were not clearly deemed threatening enough to justify immediate containment.",
+                "execution": "The skill hallucinated during the 'AllowTrafficZone' step by attempting to allow traffic on a subnet that was not previously blocked, leading to failure. Additionally, the subnet '10.0.151.0/24' was incorrectly referenced and did not exist in the environment, causing a parse error.",
+                "termination": "The termination was not handled correctly. The skill did not fully reassess the containment decision after the BlockTrafficZone success, and the loop continued without proper termination logic, resulting in an incomplete resolution."
+              },
+              "related": true
+            },
+            {
+              "skill": "NetworkContainment",
+              "steps": [
+                13,
+                14,
+                15,
+                16
+              ],
+              "gradient": {
+                "initiation": "The skill should have initiated earlier when the first internal connection was detected. It should not have waited until step 16 to consider containment.",
+                "execution": "The skill missed a key step in the policy: checking for repeated malicious connections or threat communication vectors. It failed to assess the internal traffic as a threat and did not block the subnet as needed.",
+                "termination": "The skill should not have terminated early. It looped without reassessing the containment need, and the termination condition should have been triggered once the threat was identified."
+              },
+              "related": true
+            },
+            {
+              "skill": "NetworkContainment",
+              "steps": [
+                17,
+                18
+              ],
+              "gradient": {
+                "initiation": "The skill should not have initiated at this stage as the observed malicious connections were not sufficient to justify containment. The repeated connections were likely benign or not indicative of a threat.",
+                "execution": "The skill hallucinated the subnet during containment. It should have validated the subnet format and ensured it matched known subnets before attempting to block traffic. Additionally, it missed verifying if the chosen subnet was relevant to the threat observed.",
+                "termination": "The skill terminated prematurely without confirming the success or failure of the containment action. It should have reassessed the outcome and only terminated after ensuring the containment decision was properly evaluated."
+              },
+              "related": true
+            },
+            {
+              "skill": "NetworkContainment",
+              "steps": [
+                0,
+                1,
+                2,
+                3
+              ],
+              "gradient": {
+                "initiation": "The skill should have been initiated earlier when more suspicious activity was observed. The agent's initial analysis was insufficient to justify containment.",
+                "execution": "The agent should have followed the full strategy steps, including reassessing the containment need after the analysis. It missed the opportunity to block traffic or isolate the zone based on the suspicious behavior detected.",
+                "termination": "The skill terminated prematurely without fully executing the containment process. The agent should not have stopped until the block action result was confirmed and the containment decision was reassessed."
+              },
+              "related": true
+            },
+            {
+              "skill": "NetworkContainment",
+              "steps": [
+                4,
+                5,
+                6,
+                18
+              ],
+              "gradient": {
+                "initiation": "The skill initiated when suspicious activity was identified, but the threshold for triggering containment was possibly too low, leading to unnecessary actions.",
+                "execution": "The agent performed a BlockTrafficZone action without sufficient validation of the threat, possibly missing a step to verify the nature of the connections before containment.",
+                "termination": "The skill terminated after the first containment action, but a more thorough reassessment of the threat and its impact would have been necessary to avoid over-containment."
+              },
+              "related": true
+            }
+          ]
+        }
+      ],
+      "maintenance": [
+        {
+          "name": "NetworkContainment",
+          "stage": "paper_nonpositive_observed_score",
+          "score": -0.10784313725490197
+        }
+      ],
+      "seconds": 223.51099233306013,
+      "pool_size": 6,
+      "model_calls": [
+        {
+          "purpose": "gate_score",
+          "samples": 20
+        },
+        {
+          "purpose": "evolution",
+          "input_tokens": 9711,
+          "output_tokens": 210,
+          "seconds": 14.280197295127437
+        },
+        {
+          "purpose": "evolution",
+          "input_tokens": 2121,
+          "output_tokens": 181,
+          "seconds": 6.8888079260941595
+        },
+        {
+          "purpose": "evolution",
+          "input_tokens": 3114,
+          "output_tokens": 191,
+          "seconds": 8.008217351976782
+        },
+        {
+          "purpose": "evolution",
+          "input_tokens": 1949,
+          "output_tokens": 188,
+          "seconds": 7.007429193006828
+        },
+        {
+          "purpose": "evolution",
+          "input_tokens": 2162,
+          "output_tokens": 158,
+          "seconds": 6.089765866985545
+        },
+        {
+          "purpose": "evolution",
+          "input_tokens": 8775,
+          "output_tokens": 171,
+          "seconds": 11.348451479105279
+        },
+        {
+          "purpose": "evolution",
+          "input_tokens": 2564,
+          "output_tokens": 205,
+          "seconds": 8.102702617878094
+        },
+        {
+          "purpose": "evolution",
+          "input_tokens": 1164,
+          "output_tokens": 155,
+          "seconds": 5.357056129956618
+        },
+        {
+          "purpose": "gate_score",
+          "samples": 20
+        },
+        {
+          "purpose": "evolution",
+          "input_tokens": 9711,
+          "output_tokens": 186,
+          "seconds": 12.898410886991769
+        },
+        {
+          "purpose": "evolution",
+          "input_tokens": 2121,
+          "output_tokens": 151,
+          "seconds": 5.815775190945715
+        },
+        {
+          "purpose": "evolution",
+          "input_tokens": 3114,
+          "output_tokens": 220,
+          "seconds": 9.117783852154389
+        },
+        {
+          "purpose": "evolution",
+          "input_tokens": 1949,
+          "output_tokens": 184,
+          "seconds": 6.8587389551103115
+        },
+        {
+          "purpose": "evolution",
+          "input_tokens": 2162,
+          "output_tokens": 187,
+          "seconds": 7.129225270822644
+        },
+        {
+          "purpose": "evolution",
+          "input_tokens": 8775,
+          "output_tokens": 181,
+          "seconds": 11.897929311962798
+        },
+        {
+          "purpose": "evolution",
+          "input_tokens": 2564,
+          "output_tokens": 170,
+          "seconds": 6.809461422031745
+        },
+        {
+          "purpose": "evolution",
+          "input_tokens": 1118,
+          "output_tokens": 203,
+          "seconds": 6.920939648989588
+        },
+        {
+          "purpose": "gate_score",
+          "samples": 20
+        }
+      ],
+      "validation_reward_mean": -4.0,
+      "validation_episodes": [
+        {
+          "status": "completed",
+          "episode_id": 0,
+          "seed": 5000,
+          "steps_requested": 20,
+          "joint_transitions": 19,
+          "scored_transitions": 18,
+          "joint_return": -4.0,
+          "raw_joint_return": -4.0,
+          "execution_time_s": 28.332544028991833,
+          "raw_joint_rewards": [
+            0.0,
+            0.0,
+            0.0,
+            -1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            -1.0,
+            -1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            -1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scored_step_rewards": [
+            0.0,
+            0.0,
+            0.0,
+            -1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            -1.0,
+            -1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            -1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "requested_action_counts": {
+            "Analyse": 13,
+            "AllowTrafficZone": 20,
+            "Monitor": 5,
+            "Sleep": 15,
+            "BlockTrafficZone": 7,
+            "Restore": 4,
+            "Remove": 2,
+            "DeployDecoy": 1
+          },
+          "executed_action_counts": {
+            "Sleep": 46,
+            "AllowTrafficZone": 20,
+            "Analyse": 12,
+            "Monitor": 5,
+            "BlockTrafficZone": 7,
+            "Restore": 3,
+            "Remove": 2
+          },
+          "automatic_action_counts": {
+            "Monitor": 95
+          },
+          "invalid_json": 0,
+          "model_identity": {
+            "model": "Qwen/Qwen3-8B",
+            "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+            "backend": "transformers",
+            "transformers": "4.51.3",
+            "torch": "2.6.0+cu124",
+            "dtype": "bfloat16",
+            "weights_frozen": true,
+            "temperature_scoring": true,
+            "scoring_mode": "incremental_teacher_forcing",
+            "chat_template_sha256": "a55ee1b1660128b7098723e0abcd92caa0788061051c62d51cbe87d9cf1974d8"
+          },
+          "kind": "real_cage4",
+          "weights": {
+            "blue_agent_0": {
+              "file": "/home/jeonges/proposed/third_party/cage-4-submission/weights/gnn_ppo-0.pt",
+              "sha256": "991d96cb5132eec36595f6d407e67b93b2e5045c960dc4d25586e0c0bf124e60",
+              "input_features": 192,
+              "training": null
+            },
+            "blue_agent_1": {
+              "file": "/home/jeonges/proposed/third_party/cage-4-submission/weights/gnn_ppo-1.pt",
+              "sha256": "27072ef12bab1e1b2ec9b9143845d07af7545c615c92ef44c59b67268cb98502",
+              "input_features": 192,
+              "training": null
+            },
+            "blue_agent_2": {
+              "file": "/home/jeonges/proposed/third_party/cage-4-submission/weights/gnn_ppo-2.pt",
+              "sha256": "a76ea99d830976aa4c7f370c1fc575746de7c8a1618dd239ff34f0525da11478",
+              "input_features": 192,
+              "training": null
+            },
+            "blue_agent_3": {
+              "file": "/home/jeonges/proposed/third_party/cage-4-submission/weights/gnn_ppo-3.pt",
+              "sha256": "acca6460545401e47c1dfe30d9f761f4955437b9c13f8098d5856e7995163fe4",
+              "input_features": 192,
+              "training": null
+            }
+          },
+          "trace": "/home/jeonges/proposed/research_outputs/real-paper-rtg/E2-hybrid-finite/train/validation-iteration-0001/episode-0000.jsonl",
+          "calls": [
+            {
+              "purpose": "skill_selection",
+              "input_tokens": 1374,
+              "output_tokens": 10,
+              "seconds": 0.6125670159235597
+            },
+            {
+              "purpose": "policy",
+              "input_tokens": 3156,
+              "output_tokens": 29,
+              "seconds": 1.787976949941367
+            },
+            {
+              "purpose": "termination",
+              "input_tokens": 319,
+              "output_tokens": 9,
+              "seconds": 0.35935862897895277
+            },
+            {
+              "purpose": "policy",
+              "input_tokens": 2255,
+              "output_tokens": 22,
+              "seconds": 1.2649737920146435
+            },
+            {
+              "purpose": "termination",
+              "input_tokens": 310,
+              "output_tokens": 9,
+              "seconds": 0.3562018091324717
+            },
+            {
+              "purpose": "policy",
+              "input_tokens": 2246,
+              "output_tokens": 19,
+              "seconds": 1.1554597709327936
+            },
+            {
+              "purpose": "termination",
+              "input_tokens": 310,
+              "output_tokens": 9,
+              "seconds": 0.35557202505879104
+            },
+            {
+              "purpose": "policy",
+              "input_tokens": 2246,
+              "output_tokens": 16,
+              "seconds": 1.04587916797027
+            },
+            {
+              "purpose": "termination",
+              "input_tokens": 310,
+              "output_tokens": 9,
+              "seconds": 0.360625219065696
+            },
+            {
+              "purpose": "policy",
+              "input_tokens": 2246,
+              "output_tokens": 23,
+              "seconds": 1.2982886168174446
+            },
+            {
+              "purpose": "termination",
+              "input_tokens": 310,
+              "output_tokens": 9,
+              "seconds": 0.3574934888165444
+            },
+            {
+              "purpose": "policy",
+              "input_tokens": 2246,
+              "output_tokens": 16,
+              "seconds": 1.046040860004723
+            },
+            {
+              "purpose": "termination",
+              "input_tokens": 310,
+              "output_tokens": 9,
+              "seconds": 0.356351908063516
+            },
+            {
+              "purpose": "policy",
+              "input_tokens": 2246,
+              "output_tokens": 19,
+              "seconds": 1.1562012238427997
+            },
+            {
+              "purpose": "skill_selection",
+              "input_tokens": 558,
+              "output_tokens": 10,
+              "seconds": 0.44493084005080163
+            },
+            {
+              "purpose": "policy",
+              "input_tokens": 2340,
+              "output_tokens": 27,
+              "seconds": 1.4733798240777105
+            },
+            {
+              "purpose": "termination",
+              "input_tokens": 318,
+              "output_tokens": 9,
+              "seconds": 0.35938676493242383
+            },
+            {
+              "purpose": "policy",
+              "input_tokens": 2254,
+              "output_tokens": 21,
+              "seconds": 1.226778062991798
+            },
+            {
+              "purpose": "termination",
+              "input_tokens": 310,
+              "output_tokens": 9,
+              "seconds": 0.35236164811067283
+            },
+            {
+              "purpose": "policy",
+              "input_tokens": 2246,
+              "output_tokens": 19,
+              "seconds": 1.1542085281107575
+            },
+            {
+              "purpose": "termination",
+              "input_tokens": 400,
+              "output_tokens": 9,
+              "seconds": 0.37308182287961245
+            },
+            {
+              "purpose": "policy",
+              "input_tokens": 2336,
+              "output_tokens": 26,
+              "seconds": 1.4342089931014925
+            },
+            {
+              "purpose": "termination",
+              "input_tokens": 318,
+              "output_tokens": 9,
+              "seconds": 0.35975800012238324
+            },
+            {
+              "purpose": "policy",
+              "input_tokens": 2254,
+              "output_tokens": 21,
+              "seconds": 1.2280630092136562
+            },
+            {
+              "purpose": "termination",
+              "input_tokens": 310,
+              "output_tokens": 9,
+              "seconds": 0.357735943980515
+            },
+            {
+              "purpose": "policy",
+              "input_tokens": 2246,
+              "output_tokens": 21,
+              "seconds": 1.227810038952157
+            },
+            {
+              "purpose": "skill_selection",
+              "input_tokens": 464,
+              "output_tokens": 8,
+              "seconds": 0.347265874966979
+            },
+            {
+              "purpose": "policy",
+              "input_tokens": 2158,
+              "output_tokens": 21,
+              "seconds": 1.194704590830952
+            },
+            {
+              "purpose": "skill_selection",
+              "input_tokens": 464,
+              "output_tokens": 8,
+              "seconds": 0.34662734996527433
+            },
+            {
+              "purpose": "policy",
+              "input_tokens": 2158,
+              "output_tokens": 21,
+              "seconds": 1.19329401711002
+            },
+            {
+              "purpose": "skill_selection",
+              "input_tokens": 554,
+              "output_tokens": 10,
+              "seconds": 0.4407662961166352
+            },
+            {
+              "purpose": "policy",
+              "input_tokens": 2336,
+              "output_tokens": 27,
+              "seconds": 1.4743073149584234
+            }
+          ]
+        }
+      ],
+      "pool_snapshot": {
+        "max_size": 10,
+        "skills": [
+          {
+            "name": "HostInvestigation",
+            "initiation": "When an assigned host has suspicious process/connection events that need investigation.",
+            "policy": [
+              "Identify an assigned host with observable suspicious events.",
+              "Analyse that host.",
+              "Wait for completion and inspect the actual result before escalation."
+            ],
+            "termination": "Analysis has completed and its observable findings have been inspected, or no relevant host remains.",
+            "frequency": 0,
+            "avg_gain": 0.0,
+            "total_gain": 0.0,
+            "maturity": 1,
+            "success_count": 0,
+            "last_evolved_iter": 0,
+            "parent_id": "",
+            "version": 1,
+            "allowed_actions": [
+              "Analyse"
+            ],
+            "family": "HostInvestigation"
+          },
+          {
+            "name": "ThreatRemoval",
+            "initiation": "When observable events support a user-level compromise or a malicious process on an assigned host.",
+            "policy": [
+              "Check the affected host and previous analysis/monitor evidence.",
+              "Remove malicious processes on that host.",
+              "Verify the returned status; re-analyse if evidence is inconclusive."
+            ],
+            "termination": "Removal completed and subsequent observations no longer support the same malicious process, or removal failed and further analysis is needed.",
+            "frequency": 0,
+            "avg_gain": 0.0,
+            "total_gain": 0.0,
+            "maturity": 1,
+            "success_count": 0,
+            "last_evolved_iter": 0,
+            "parent_id": "",
+            "version": 1,
+            "allowed_actions": [
+              "Remove",
+              "Analyse"
+            ],
+            "family": "ThreatRemoval"
+          },
+          {
+            "name": "HostRecovery",
+            "initiation": "When an assigned host has observable admin-level compromise and removal is insufficient.",
+            "policy": [
+              "Confirm observable admin-compromise evidence on the specific host.",
+              "Restore the host, considering its availability cost.",
+              "Wait for the restore action and check the observed result."
+            ],
+            "termination": "Restore has completed with observable confirmation, or the action has failed.",
+            "frequency": 0,
+            "avg_gain": 0.0,
+            "total_gain": 0.0,
+            "maturity": 1,
+            "success_count": 0,
+            "last_evolved_iter": 0,
+            "parent_id": "",
+            "version": 1,
+            "allowed_actions": [
+              "Restore",
+              "Analyse"
+            ],
+            "family": "HostRecovery"
+          },
+          {
+            "name": "DeceptionDeployment",
+            "initiation": "When the defender is available and a legitimate assigned host can host a useful decoy.",
+            "policy": [
+              "Choose a valid assigned host without repeating a failed deployment blindly.",
+              "DeployDecoy on the host.",
+              "Wait for completion and examine status and subsequent monitor events."
+            ],
+            "termination": "Deployment has completed or failed and its result has been checked.",
+            "frequency": 0,
+            "avg_gain": 0.0,
+            "total_gain": 0.0,
+            "maturity": 1,
+            "success_count": 0,
+            "last_evolved_iter": 0,
+            "parent_id": "",
+            "version": 1,
+            "allowed_actions": [
+              "DeployDecoy",
+              "Analyse"
+            ],
+            "family": "DeceptionDeployment"
+          },
+          {
+            "name": "TrafficRecovery",
+            "initiation": "When the defender has observable evidence of its previous traffic block and can reassess its need.",
+            "policy": [
+              "Identify the previously blocked subnet from observed action history.",
+              "Check current phase and available threat evidence.",
+              "AllowTrafficZone when recovery is justified and check the actual status."
+            ],
+            "termination": "Traffic restoration has completed or failed and its result has been inspected.",
+            "frequency": 0,
+            "avg_gain": 0.0,
+            "total_gain": 0.0,
+            "maturity": 1,
+            "success_count": 0,
+            "last_evolved_iter": 0,
+            "parent_id": "",
+            "version": 1,
+            "allowed_actions": [
+              "AllowTrafficZone"
+            ],
+            "family": "TrafficRecovery"
+          },
+          {
+            "name": "WaitVerification",
+            "initiation": "When an action is still in progress or an already initiated response must be checked before another intervention.",
+            "policy": [
+              "Inspect Last Action Status and the busy bit.",
+              "Sleep while the previous action remains in progress.",
+              "Read the completed action status and automatic Monitor observations before continuing."
+            ],
+            "termination": "The outstanding action has completed and its observable outcome is available.",
+            "frequency": 0,
+            "avg_gain": 0.0,
+            "total_gain": 0.0,
+            "maturity": 1,
+            "success_count": 0,
+            "last_evolved_iter": 0,
+            "parent_id": "",
+            "version": 1,
+            "allowed_actions": [
+              "Sleep"
+            ],
+            "family": "WaitVerification"
+          }
+        ]
+      }
+    }
+  ],
+  "planned_episodes": 2,
+  "pool_frozen": false,
+  "model_identity": {
+    "model": "Qwen/Qwen3-8B",
+    "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+    "backend": "transformers",
+    "transformers": "4.51.3",
+    "torch": "2.6.0+cu124",
+    "dtype": "bfloat16",
+    "weights_frozen": true,
+    "temperature_scoring": true,
+    "scoring_mode": "incremental_teacher_forcing",
+    "chat_template_sha256": "a55ee1b1660128b7098723e0abcd92caa0788061051c62d51cbe87d9cf1974d8"
+  },
+  "training_provenance": null,
+  "pool_sha256": "35d95d52a6fb4383f8dcc113148320eb36d0e6d0d85d61096336ccfb26858cf3",
+  "initial_pool_sha256": "c99d55f44b85bbc9e3e0dc6e186eb192701dad1455428af9468653f37301de0f"
+}

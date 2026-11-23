@@ -1,0 +1,818 @@
+{
+  "passed": true,
+  "cases": [
+    {
+      "case": "baseline_context-seed-22001",
+      "source_sha256": "0f5f6beb70a62e95e0beb12af89e8aebf388b9c6a6b7fb1ac24a652d63c8f770",
+      "ASF": -7,
+      "exclusive_actor_group_rewards": {
+        "blue_agent_2": -7
+      },
+      "events": [
+        {
+          "step": 485,
+          "phase": 2,
+          "host": "restricted_zone_b_subnet_user_host_1",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "restricted_zone_b_subnet",
+              "to_subnet": "admin_network_subnet",
+              "owner": {
+                "step": 485,
+                "order": 21259,
+                "agent": "blue_agent_2",
+                "from_subnet": "admin_network_subnet",
+                "to_subnet": "restricted_zone_b_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 486,
+          "phase": 2,
+          "host": "restricted_zone_b_subnet_user_host_3",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "restricted_zone_b_subnet",
+              "to_subnet": "admin_network_subnet",
+              "owner": {
+                "step": 485,
+                "order": 21259,
+                "agent": "blue_agent_2",
+                "from_subnet": "admin_network_subnet",
+                "to_subnet": "restricted_zone_b_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 489,
+          "phase": 2,
+          "host": "admin_network_subnet_user_host_2",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "restricted_zone_b_subnet",
+              "to_subnet": "admin_network_subnet",
+              "owner": {
+                "step": 485,
+                "order": 21259,
+                "agent": "blue_agent_2",
+                "from_subnet": "admin_network_subnet",
+                "to_subnet": "restricted_zone_b_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 493,
+          "phase": 2,
+          "host": "restricted_zone_b_subnet_user_host_1",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "restricted_zone_b_subnet",
+              "to_subnet": "admin_network_subnet",
+              "owner": {
+                "step": 485,
+                "order": 21259,
+                "agent": "blue_agent_2",
+                "from_subnet": "admin_network_subnet",
+                "to_subnet": "restricted_zone_b_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 494,
+          "phase": 2,
+          "host": "restricted_zone_b_subnet_user_host_1",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "restricted_zone_b_subnet",
+              "to_subnet": "admin_network_subnet",
+              "owner": {
+                "step": 485,
+                "order": 21259,
+                "agent": "blue_agent_2",
+                "from_subnet": "admin_network_subnet",
+                "to_subnet": "restricted_zone_b_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 494,
+          "phase": 2,
+          "host": "restricted_zone_b_subnet_user_host_3",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "restricted_zone_b_subnet",
+              "to_subnet": "admin_network_subnet",
+              "owner": {
+                "step": 485,
+                "order": 21259,
+                "agent": "blue_agent_2",
+                "from_subnet": "admin_network_subnet",
+                "to_subnet": "restricted_zone_b_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 497,
+          "phase": 2,
+          "host": "restricted_zone_b_subnet_user_host_1",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "restricted_zone_b_subnet",
+              "to_subnet": "admin_network_subnet",
+              "owner": {
+                "step": 485,
+                "order": 21259,
+                "agent": "blue_agent_2",
+                "from_subnet": "admin_network_subnet",
+                "to_subnet": "restricted_zone_b_subnet"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "static-seed-22000",
+      "source_sha256": "146a3230bb7563db3e9dd70d8bdddf07c1fa4cb5514a564209002732a8329ca4",
+      "ASF": -2,
+      "exclusive_actor_group_rewards": {
+        "blue_agent_4": -2
+      },
+      "events": [
+        {
+          "step": 433,
+          "phase": 2,
+          "host": "public_access_zone_subnet_user_host_0",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "contractor_network_subnet",
+              "to_subnet": "public_access_zone_subnet",
+              "owner": {
+                "step": 433,
+                "order": 19301,
+                "agent": "blue_agent_4",
+                "from_subnet": "public_access_zone_subnet",
+                "to_subnet": "contractor_network_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 440,
+          "phase": 2,
+          "host": "public_access_zone_subnet_user_host_2",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "contractor_network_subnet",
+              "to_subnet": "public_access_zone_subnet",
+              "owner": {
+                "step": 440,
+                "order": 19644,
+                "agent": "blue_agent_4",
+                "from_subnet": "public_access_zone_subnet",
+                "to_subnet": "contractor_network_subnet"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "static-seed-22001",
+      "source_sha256": "29e97b89985586a1e871c36d92351e822cb065b4963d5d1d5e24259ca28bccab",
+      "ASF": -32,
+      "exclusive_actor_group_rewards": {
+        "blue_agent_3": -32
+      },
+      "events": [
+        {
+          "step": 207,
+          "phase": 1,
+          "host": "operational_zone_b_subnet_user_host_0",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "operational_zone_b_subnet",
+              "to_subnet": "restricted_zone_b_subnet",
+              "owner": {
+                "step": 205,
+                "order": 8766,
+                "agent": "blue_agent_3",
+                "from_subnet": "restricted_zone_b_subnet",
+                "to_subnet": "operational_zone_b_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 207,
+          "phase": 1,
+          "host": "operational_zone_b_subnet_user_host_1",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "operational_zone_b_subnet",
+              "to_subnet": "restricted_zone_b_subnet",
+              "owner": {
+                "step": 205,
+                "order": 8766,
+                "agent": "blue_agent_3",
+                "from_subnet": "restricted_zone_b_subnet",
+                "to_subnet": "operational_zone_b_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 209,
+          "phase": 1,
+          "host": "operational_zone_b_subnet_user_host_4",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "operational_zone_b_subnet",
+              "to_subnet": "restricted_zone_b_subnet",
+              "owner": {
+                "step": 205,
+                "order": 8766,
+                "agent": "blue_agent_3",
+                "from_subnet": "restricted_zone_b_subnet",
+                "to_subnet": "operational_zone_b_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 214,
+          "phase": 1,
+          "host": "operational_zone_b_subnet_user_host_3",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "operational_zone_b_subnet",
+              "to_subnet": "restricted_zone_b_subnet",
+              "owner": {
+                "step": 205,
+                "order": 8766,
+                "agent": "blue_agent_3",
+                "from_subnet": "restricted_zone_b_subnet",
+                "to_subnet": "operational_zone_b_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 215,
+          "phase": 1,
+          "host": "restricted_zone_b_subnet_user_host_3",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "operational_zone_b_subnet",
+              "to_subnet": "restricted_zone_b_subnet",
+              "owner": {
+                "step": 205,
+                "order": 8766,
+                "agent": "blue_agent_3",
+                "from_subnet": "restricted_zone_b_subnet",
+                "to_subnet": "operational_zone_b_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 285,
+          "phase": 1,
+          "host": "restricted_zone_b_subnet_user_host_1",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "operational_zone_b_subnet",
+              "to_subnet": "restricted_zone_b_subnet",
+              "owner": {
+                "step": 285,
+                "order": 12281,
+                "agent": "blue_agent_3",
+                "from_subnet": "restricted_zone_b_subnet",
+                "to_subnet": "operational_zone_b_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 285,
+          "phase": 1,
+          "host": "operational_zone_b_subnet_user_host_4",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "operational_zone_b_subnet",
+              "to_subnet": "restricted_zone_b_subnet",
+              "owner": {
+                "step": 285,
+                "order": 12281,
+                "agent": "blue_agent_3",
+                "from_subnet": "restricted_zone_b_subnet",
+                "to_subnet": "operational_zone_b_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 286,
+          "phase": 1,
+          "host": "restricted_zone_b_subnet_user_host_0",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "operational_zone_b_subnet",
+              "to_subnet": "restricted_zone_b_subnet",
+              "owner": {
+                "step": 285,
+                "order": 12281,
+                "agent": "blue_agent_3",
+                "from_subnet": "restricted_zone_b_subnet",
+                "to_subnet": "operational_zone_b_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 286,
+          "phase": 1,
+          "host": "operational_zone_b_subnet_user_host_4",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "operational_zone_b_subnet",
+              "to_subnet": "restricted_zone_b_subnet",
+              "owner": {
+                "step": 285,
+                "order": 12281,
+                "agent": "blue_agent_3",
+                "from_subnet": "restricted_zone_b_subnet",
+                "to_subnet": "operational_zone_b_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 287,
+          "phase": 1,
+          "host": "operational_zone_b_subnet_user_host_2",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "operational_zone_b_subnet",
+              "to_subnet": "restricted_zone_b_subnet",
+              "owner": {
+                "step": 285,
+                "order": 12281,
+                "agent": "blue_agent_3",
+                "from_subnet": "restricted_zone_b_subnet",
+                "to_subnet": "operational_zone_b_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 290,
+          "phase": 1,
+          "host": "operational_zone_b_subnet_user_host_4",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "operational_zone_b_subnet",
+              "to_subnet": "restricted_zone_b_subnet",
+              "owner": {
+                "step": 285,
+                "order": 12281,
+                "agent": "blue_agent_3",
+                "from_subnet": "restricted_zone_b_subnet",
+                "to_subnet": "operational_zone_b_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 291,
+          "phase": 1,
+          "host": "restricted_zone_b_subnet_user_host_0",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "operational_zone_b_subnet",
+              "to_subnet": "restricted_zone_b_subnet",
+              "owner": {
+                "step": 285,
+                "order": 12281,
+                "agent": "blue_agent_3",
+                "from_subnet": "restricted_zone_b_subnet",
+                "to_subnet": "operational_zone_b_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 292,
+          "phase": 1,
+          "host": "restricted_zone_b_subnet_user_host_1",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "operational_zone_b_subnet",
+              "to_subnet": "restricted_zone_b_subnet",
+              "owner": {
+                "step": 285,
+                "order": 12281,
+                "agent": "blue_agent_3",
+                "from_subnet": "restricted_zone_b_subnet",
+                "to_subnet": "operational_zone_b_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 293,
+          "phase": 1,
+          "host": "restricted_zone_b_subnet_user_host_0",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "operational_zone_b_subnet",
+              "to_subnet": "restricted_zone_b_subnet",
+              "owner": {
+                "step": 285,
+                "order": 12281,
+                "agent": "blue_agent_3",
+                "from_subnet": "restricted_zone_b_subnet",
+                "to_subnet": "operational_zone_b_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 294,
+          "phase": 1,
+          "host": "restricted_zone_b_subnet_user_host_0",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "operational_zone_b_subnet",
+              "to_subnet": "restricted_zone_b_subnet",
+              "owner": {
+                "step": 285,
+                "order": 12281,
+                "agent": "blue_agent_3",
+                "from_subnet": "restricted_zone_b_subnet",
+                "to_subnet": "operational_zone_b_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 296,
+          "phase": 1,
+          "host": "operational_zone_b_subnet_user_host_0",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "operational_zone_b_subnet",
+              "to_subnet": "restricted_zone_b_subnet",
+              "owner": {
+                "step": 285,
+                "order": 12281,
+                "agent": "blue_agent_3",
+                "from_subnet": "restricted_zone_b_subnet",
+                "to_subnet": "operational_zone_b_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 297,
+          "phase": 1,
+          "host": "operational_zone_b_subnet_user_host_1",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "operational_zone_b_subnet",
+              "to_subnet": "restricted_zone_b_subnet",
+              "owner": {
+                "step": 285,
+                "order": 12281,
+                "agent": "blue_agent_3",
+                "from_subnet": "restricted_zone_b_subnet",
+                "to_subnet": "operational_zone_b_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 299,
+          "phase": 1,
+          "host": "operational_zone_b_subnet_user_host_1",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "operational_zone_b_subnet",
+              "to_subnet": "restricted_zone_b_subnet",
+              "owner": {
+                "step": 285,
+                "order": 12281,
+                "agent": "blue_agent_3",
+                "from_subnet": "restricted_zone_b_subnet",
+                "to_subnet": "operational_zone_b_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 300,
+          "phase": 1,
+          "host": "restricted_zone_b_subnet_user_host_1",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "operational_zone_b_subnet",
+              "to_subnet": "restricted_zone_b_subnet",
+              "owner": {
+                "step": 285,
+                "order": 12281,
+                "agent": "blue_agent_3",
+                "from_subnet": "restricted_zone_b_subnet",
+                "to_subnet": "operational_zone_b_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 300,
+          "phase": 1,
+          "host": "operational_zone_b_subnet_user_host_4",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "operational_zone_b_subnet",
+              "to_subnet": "restricted_zone_b_subnet",
+              "owner": {
+                "step": 285,
+                "order": 12281,
+                "agent": "blue_agent_3",
+                "from_subnet": "restricted_zone_b_subnet",
+                "to_subnet": "operational_zone_b_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 301,
+          "phase": 1,
+          "host": "operational_zone_b_subnet_user_host_1",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "operational_zone_b_subnet",
+              "to_subnet": "restricted_zone_b_subnet",
+              "owner": {
+                "step": 285,
+                "order": 12281,
+                "agent": "blue_agent_3",
+                "from_subnet": "restricted_zone_b_subnet",
+                "to_subnet": "operational_zone_b_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 304,
+          "phase": 1,
+          "host": "operational_zone_b_subnet_user_host_3",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "operational_zone_b_subnet",
+              "to_subnet": "restricted_zone_b_subnet",
+              "owner": {
+                "step": 285,
+                "order": 12281,
+                "agent": "blue_agent_3",
+                "from_subnet": "restricted_zone_b_subnet",
+                "to_subnet": "operational_zone_b_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 325,
+          "phase": 1,
+          "host": "restricted_zone_b_subnet_user_host_2",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "operational_zone_b_subnet",
+              "to_subnet": "restricted_zone_b_subnet",
+              "owner": {
+                "step": 325,
+                "order": 14030,
+                "agent": "blue_agent_3",
+                "from_subnet": "restricted_zone_b_subnet",
+                "to_subnet": "operational_zone_b_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 326,
+          "phase": 1,
+          "host": "operational_zone_b_subnet_user_host_1",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "operational_zone_b_subnet",
+              "to_subnet": "restricted_zone_b_subnet",
+              "owner": {
+                "step": 325,
+                "order": 14030,
+                "agent": "blue_agent_3",
+                "from_subnet": "restricted_zone_b_subnet",
+                "to_subnet": "operational_zone_b_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 326,
+          "phase": 1,
+          "host": "operational_zone_b_subnet_user_host_4",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "operational_zone_b_subnet",
+              "to_subnet": "restricted_zone_b_subnet",
+              "owner": {
+                "step": 325,
+                "order": 14030,
+                "agent": "blue_agent_3",
+                "from_subnet": "restricted_zone_b_subnet",
+                "to_subnet": "operational_zone_b_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 328,
+          "phase": 1,
+          "host": "restricted_zone_b_subnet_user_host_3",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "operational_zone_b_subnet",
+              "to_subnet": "restricted_zone_b_subnet",
+              "owner": {
+                "step": 325,
+                "order": 14030,
+                "agent": "blue_agent_3",
+                "from_subnet": "restricted_zone_b_subnet",
+                "to_subnet": "operational_zone_b_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 331,
+          "phase": 1,
+          "host": "restricted_zone_b_subnet_user_host_0",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "operational_zone_b_subnet",
+              "to_subnet": "restricted_zone_b_subnet",
+              "owner": {
+                "step": 325,
+                "order": 14030,
+                "agent": "blue_agent_3",
+                "from_subnet": "restricted_zone_b_subnet",
+                "to_subnet": "operational_zone_b_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 331,
+          "phase": 1,
+          "host": "operational_zone_b_subnet_user_host_4",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "operational_zone_b_subnet",
+              "to_subnet": "restricted_zone_b_subnet",
+              "owner": {
+                "step": 325,
+                "order": 14030,
+                "agent": "blue_agent_3",
+                "from_subnet": "restricted_zone_b_subnet",
+                "to_subnet": "operational_zone_b_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 332,
+          "phase": 1,
+          "host": "restricted_zone_b_subnet_user_host_0",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "operational_zone_b_subnet",
+              "to_subnet": "restricted_zone_b_subnet",
+              "owner": {
+                "step": 325,
+                "order": 14030,
+                "agent": "blue_agent_3",
+                "from_subnet": "restricted_zone_b_subnet",
+                "to_subnet": "operational_zone_b_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 332,
+          "phase": 1,
+          "host": "operational_zone_b_subnet_user_host_2",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "operational_zone_b_subnet",
+              "to_subnet": "restricted_zone_b_subnet",
+              "owner": {
+                "step": 325,
+                "order": 14030,
+                "agent": "blue_agent_3",
+                "from_subnet": "restricted_zone_b_subnet",
+                "to_subnet": "operational_zone_b_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 332,
+          "phase": 1,
+          "host": "operational_zone_b_subnet_user_host_3",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "operational_zone_b_subnet",
+              "to_subnet": "restricted_zone_b_subnet",
+              "owner": {
+                "step": 325,
+                "order": 14030,
+                "agent": "blue_agent_3",
+                "from_subnet": "restricted_zone_b_subnet",
+                "to_subnet": "operational_zone_b_subnet"
+              }
+            }
+          ]
+        },
+        {
+          "step": 333,
+          "phase": 1,
+          "host": "restricted_zone_b_subnet_user_host_1",
+          "reward": -1,
+          "edges": [
+            {
+              "from_subnet": "operational_zone_b_subnet",
+              "to_subnet": "restricted_zone_b_subnet",
+              "owner": {
+                "step": 325,
+                "order": 14030,
+                "agent": "blue_agent_3",
+                "from_subnet": "restricted_zone_b_subnet",
+                "to_subnet": "operational_zone_b_subnet"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "native_storage_rule": "state.blocks[to_subnet].append(from_subnet)",
+  "native_source_sha256": "ebe79afe53385da7b4720b6d11c22cb0d9f8aa50296b710ae5f9e77dfa82cf6a",
+  "multi_edge_rewards_counted_once": true,
+  "scope": "Executed firewall failure branch; not a full-policy causal effect."
+}

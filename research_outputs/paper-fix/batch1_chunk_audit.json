@@ -1,0 +1,52 @@
+{
+  "training_seeds": [
+    100,
+    101
+  ],
+  "skills": {
+    "HostInvestigation": {
+      "trajectories": 2,
+      "active_world_rows": 337,
+      "valid_policy_decisions": 227,
+      "semantic_chunks": 16
+    },
+    "DeceptionDeployment": {
+      "trajectories": 2,
+      "active_world_rows": 61,
+      "valid_policy_decisions": 45,
+      "semantic_chunks": 3
+    },
+    "WaitVerification": {
+      "trajectories": 2,
+      "active_world_rows": 198,
+      "valid_policy_decisions": 162,
+      "semantic_chunks": 8
+    },
+    "NetworkContainment": {
+      "trajectories": 2,
+      "active_world_rows": 19,
+      "valid_policy_decisions": 17,
+      "semantic_chunks": 2
+    },
+    "ThreatRemoval": {
+      "trajectories": 2,
+      "active_world_rows": 114,
+      "valid_policy_decisions": 38,
+      "semantic_chunks": 5
+    },
+    "TrafficRecovery": {
+      "trajectories": 2,
+      "active_world_rows": 41,
+      "valid_policy_decisions": 30,
+      "semantic_chunks": 3
+    },
+    "HostRecovery": {
+      "trajectories": 2,
+      "active_world_rows": 25,
+      "valid_policy_decisions": 5,
+      "semantic_chunks": 2
+    }
+  },
+  "total_semantic_chunks": 39,
+  "truncation": false
+}

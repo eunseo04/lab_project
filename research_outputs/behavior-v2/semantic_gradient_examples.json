@@ -1,0 +1,81 @@
+{
+  "source": "research_outputs/behavior-v2/E3-hybrid-finite/train/pool-iteration-0001.json",
+  "scope": "Selected qualitative examples, not an automated error rate or a causal attribution of total return",
+  "input_execution_contract_source": "research/evolution.py:execution_contract.behavior_diagnostics",
+  "examples": [
+    {
+      "parent": "RapidProcessResponse",
+      "example": {
+        "skill": "RapidProcessResponse",
+        "steps": [
+          47,
+          48,
+          49,
+          52,
+          53,
+          54
+        ],
+        "gradient": {
+          "initiation": "The skill should not have initiated a removal action on the same host without first analyzing the flagged PID to confirm the threat. Initiation should be contingent on confirming the flagged evidence is indeed a threat.",
+          "execution": "The policy missed a critical step by not incorporating an analysis phase before removal. It also repeated the same removal action on the same host despite the removal already being completed, leading to redundant actions and wasted resources.",
+          "termination": "The skill should have terminated after the first successful removal and analysis, but it continued to attempt removals on the same host, indicating an incomplete or improper termination condition."
+        },
+        "related": true
+      }
+    },
+    {
+      "parent": "SelectiveDeception",
+      "example": {
+        "skill": "SelectiveDeception",
+        "steps": [
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          22,
+          23,
+          24,
+          25,
+          26,
+          29,
+          30,
+          31
+        ],
+        "gradient": {
+          "initiation": "The initiation condition was not properly evaluated. The agent should have identified a suitable host with no current decoy deployment and no outstanding local threat cases before initiating a decoy deployment. However, it didn't prioritize or assess hosts for potential decoy deployment.",
+          "execution": "The policy did not follow the correct sequence. The agent failed to deploy a decoy on any host because it didn't trigger 'DeployDecoy' when it should have. Instead, it kept analyzing and sleeping, leading to a loop without any actionable result.",
+          "termination": "The termination was premature. The agent's skill was not properly terminated after a decoy was successfully deployed or failed to meet its criteria. Instead, it continued performing 'Sleep' and 'Analyse' actions without fulfilling the termination condition of either completing or failing a deployment."
+        },
+        "related": true
+      }
+    },
+    {
+      "parent": "NetworkContainment",
+      "example": {
+        "skill": "NetworkContainment",
+        "steps": [
+          3,
+          8,
+          20,
+          21,
+          35,
+          36,
+          37,
+          38,
+          39,
+          129,
+          130,
+          131
+        ],
+        "gradient": {
+          "initiation": "Add a check to detect flagged PIDs, user/admin file indicators, and peer busy bits more rigorously. Only initiate when there is concrete evidence of threat or compromise.",
+          "execution": "Implement validation steps before applying actions to ensure they are justified and target-specific. Avoid repetitive actions without new evidence. Refine the logic for blocking traffic to be more precise and avoid broad, unnecessary blocks.",
+          "termination": "Ensure termination occurs only after reviewing the targeted block results or when the containment trigger no longer applies. Avoid premature termination that may leave threats unaddressed."
+        },
+        "related": true
+      }
+    }
+  ]
+}

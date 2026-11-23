@@ -1,0 +1,392 @@
+"""Resumable, paired CC4 experiments; only completed real episodes become results."""
+from collections import Counter, defaultdict
+from copy import deepcopy
+from dataclasses import asdict
+import fcntl
+import hashlib
+import json
+import os
+from pathlib import Path
+import random
+import time
+
+from acd.runner import seed_everything, load_agents
+from CybORG.Simulator.Actions import Sleep
+from .adapter import (BLUE_AGENTS, DefensePolicy, make_state, make_environment,
+                      executed_actions, plain)
+from .client import ModelClient, TextModel
+from .config import digest, compatible_digest
+from .metrics import JointRewardLedger, aggregate_episodes
+from .skills import SecuritySkillPool
+from .upstream import configure_encoder, Experience
+from .evolution import Evolution
+from .gate import returns_to_go
+from . import ROOT
+
+
+def atomic_json(path, value):
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name+".tmp")
+    temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False)+"\n")
+    os.replace(temporary, path)
+
+
+def policy_roles(composition):
+    if composition == "no_blue": return {a: "sleep" for a in BLUE_AGENTS}
+    if composition == "all_rl": return {a: "rl" for a in BLUE_AGENTS}
+    return {a: "llm" if composition == "all_llm" or a == "blue_agent_4" else "rl" for a in BLUE_AGENTS}
+
+
+def experiences_from_rows(rows, config, total, steps):
+    grouped = defaultdict(list)
+    for row in rows:
+        if row.get("policy") == "llm" and row.get("skill_id"):
+            grouped[(row["agent"],row["skill_id"])].append(row)
+    return [Experience(reward=total,skill=name,trajectory=json.dumps(transitions,ensure_ascii=False),
+        transitions=transitions,env_name=f"{config['composition']}:{config['red']}",step_count=steps)
+        for (agent,name),transitions in sorted(grouped.items(),key=lambda item:BLUE_AGENTS.index(item[0][0]))]
+
+
+def recover_episode(result, config, client, text_model, directory):
+    expected = "mock_test" if getattr(client,"is_mock",False) else "real_cage4"
+    if result.get("kind") != expected: raise ValueError("Cannot mix mock and real training records")
+    rows=[json.loads(line) for line in Path(result["trace"]).open()]
+    if len(rows) != len(BLUE_AGENTS)*result["joint_transitions"] or any(r["seed"] != result["seed"] for r in rows):
+        raise ValueError("Incomplete or misaligned archived training trace")
+    seed_everything(result["seed"],config["threads"])
+    state=result.get("text_model_state",{})
+    text_model.seed=state.get("seed",result["seed"])
+    text_model.counter=state.get("counter",sum(c.get("purpose") in ("skill_selection","termination") for c in result.get("calls",[])))
+    if result.get("python_random_state"):
+        s=result["python_random_state"]
+        random.setstate((s[0],tuple(s[1]),s[2]))
+    atomic_json(directory/"interrupted"/f"recovered-episode-{result['episode_id']:04d}.json",
+        {"source":"completed_episode_and_full_trace","episode_id":result["episode_id"],
+         "behavior_samples_unchanged":True,"legacy_evolution_rng_reseeded":not bool(result.get("python_random_state")),
+         "text_model_counter":text_model.counter})
+    return experiences_from_rows(rows,config,result["joint_return"],result["joint_transitions"])
+
+
+def run_episode(config, seed, episode_id, client, pool, text_model, directory):
+    started = time.perf_counter()
+    seed_everything(seed, config["threads"])
+    text_model.seed, text_model.counter = seed, 0
+    env = make_environment(config, seed)
+    observations, _ = env.reset(seed=seed)
+    role_map = policy_roles(config["composition"])
+    old_config = {**config, "team": "mixed" if config["composition"] == "hybrid" else
+        ("all_rl" if config["composition"] == "all_rl" else "all_llm"),
+        "communication": "keep", "deterministic_rl": False}
+    rl_agents, weights = load_agents(old_config, 192)
+    policies = {a: DefensePolicy(a, client, text_model, config, pool if config["arm"] != "E0" else None)
+                for a, role in role_map.items() if role == "llm"}
+    ledger = JointRewardLedger()
+    rows, step_rewards = [], []
+    requested, executed, automatic = Counter(), Counter(), Counter()
+    previous_rows = {a: [] for a in BLUE_AGENTS}
+    progress = directory / f"episode-{episode_id:04d}.partial.jsonl"
+    if progress.exists():
+        archive = directory/"interrupted"
+        archive.mkdir(exist_ok=True)
+        os.replace(progress, archive/f"{progress.stem}.{time.time_ns()}.jsonl")
+    with progress.open("w") as partial:
+        for step in range(config["steps"]):
+            raw = env.raw_observations()
+            actions, details = {}, {}
+            outgoing = env.paper_messages() if config["communication"] == "paper_projected_keep" else deepcopy(env.msg)
+            for agent, role in role_map.items():
+                if role == "llm":
+                    state = make_state(env, agent, raw[agent], policies[agent].base)
+                    busy = "IN_PROGRESS" in str(raw[agent].get("success"))
+                    if busy and config["skip_busy_policy"]:
+                        active = policies[agent].controller.active if policies[agent].controller else None
+                        actions[agent], details[agent] = Sleep(), {"policy_invoked": False,
+                            "skill_id": active.name if active else None, "skill_version": active.version if active else None}
+                    else:
+                        policy_seed = int(hashlib.sha256(f"{seed}:{step}:{agent}:policy".encode()).hexdigest()[:8], 16)
+                        actions[agent], details[agent] = policies[agent].decide(state, episode=episode_id, step=step, seed=policy_seed)
+                        for event in (details[agent].get("skill_controller") or {}).get("events", []):
+                            if event.get("terminated"):
+                                for row in reversed(previous_rows[agent]):
+                                    if row.get("skill_id") == event["terminated"]:
+                                        row["skill_terminated"] = True
+                                        break
+                elif role == "rl":
+                    actions[agent], details[agent] = rl_agents[agent].get_action(observations[agent]), {}
+                else:
+                    actions[agent], details[agent] = Sleep(), {}
+            observations, rewards, terminated, truncated, _ = env.step(actions, messages=outgoing)
+            terminal = env.env.environment_controller.determine_done()
+            joint, included = ledger.add(rewards, terminal)
+            if config["scoring"] == "terminal_inclusive" and terminal:
+                ledger.rewards.append(joint); included = True
+            step_rewards.append(joint if included else 0.0)
+            after = env.raw_observations()
+            for agent, role in role_map.items():
+                action = env.action_translator(agent, actions[agent])
+                chosen = str(action) if actions[agent] is not None else None
+                actual = executed_actions(env, agent)
+                if chosen is not None: requested[type(action).__name__] += 1
+                for item in actual: executed[item["name"]] += 1
+                automatic["Monitor"] += 1
+                evidence = {str(k): v for k, v in plain(raw[agent]).items() if k not in ("action", "phase", "message")}
+                row = {"type": "action", "episode_id": episode_id, "step": step, "seed": seed,
+                    "agent": agent, "policy": role, "mission_phase": raw[agent]["phase"],
+                    "comm_vector": plain(raw[agent].get("message", [])),
+                    "observation_before": plain(raw[agent]), "observation_after": plain(after[agent]),
+                    "requested_action": chosen, "executed_actions": plain(actual),
+                    "request_applied": "IN_PROGRESS" not in str(raw[agent].get("success")),
+                    "action_status": str(after[agent].get("success", "UNKNOWN")),
+                    "joint_reward": joint, "score_included": included, "terminal": terminal,
+                    "skill_terminated": False, "automatic_monitor": True,
+                    "evidence_hash": hashlib.sha256(json.dumps(evidence, sort_keys=True).encode()).hexdigest(), **details[agent]}
+                rows.append(row); previous_rows[agent].append(row)
+                if role == "llm" and policies[agent].controller:
+                    policies[agent].controller.history.append(row)
+                partial.write(json.dumps(row, ensure_ascii=False)+"\n")
+            if step % 25 == 0:
+                partial.flush()
+                print(f"{config['arm']} {config['red']} seed={seed} step={step+1}/{config['steps']-1} R={ledger.total:.1f}", flush=True)
+            if terminal: break
+    if len(step_rewards) != config["steps"]-1:
+        raise RuntimeError("Native CAGE4 episode terminated at an unexpected step")
+    for agent, policy in policies.items():
+        if policy.controller and policy.controller.active:
+            for row in reversed(previous_rows[agent]):
+                if row.get("skill_id") == policy.controller.active.name:
+                    row["skill_terminated"] = True
+                    break
+    rtgs = returns_to_go(step_rewards, config["evolution"]["gamma"])
+    for row in rows: row["return_to_go"] = rtgs[row["step"]]
+    trace = directory/f"episode-{episode_id:04d}.jsonl"
+    with trace.open("w") as stream:
+        for row in rows: stream.write(json.dumps(row, ensure_ascii=False)+"\n")
+    progress.unlink()
+    experiences = experiences_from_rows(rows,config,ledger.total,len(step_rewards))
+    result = {"status": "completed", "episode_id": episode_id, "seed": seed,
+        "steps_requested": config["steps"], "joint_transitions": len(step_rewards), "scored_transitions": len(ledger.rewards),
+        "joint_return": ledger.total, "raw_joint_return": sum(ledger.raw_rewards), "execution_time_s": time.perf_counter()-started,
+        "raw_joint_rewards": ledger.raw_rewards, "scored_step_rewards": step_rewards,
+        "text_model_state":{"seed":text_model.seed,"counter":text_model.counter},
+        "python_random_state":random.getstate(),
+        "requested_action_counts": dict(requested), "executed_action_counts": dict(executed),
+        "automatic_action_counts": dict(automatic), "invalid_json": sum(bool(r.get("parse_error")) for r in rows),
+        "model_identity": client.identity if client else None,
+        "kind": "mock_test" if getattr(client, "is_mock", False) else "real_cage4",
+        "weights": weights, "trace": str(trace), "calls": deepcopy(client.calls) if client else []}
+    atomic_json(directory/f"episode-{episode_id:04d}.json", result)
+    return result, experiences
+
+
+def run(config, stage="eval", output=None, resume=False, limit=None, client=None):
+    if stage not in ("train","eval"): raise ValueError("Stage must be train or eval")
+    if stage == "train" and (config["arm"] not in ("E2","E3") or config["composition"] not in ("hybrid","all_llm")):
+        raise ValueError("Skill learning requires E2/E3 with hybrid/all_llm defenders")
+    output = Path(output or Path(config["output"])/f"{config['arm']}-{config['composition']}-{config['red']}"/stage)
+    output.mkdir(parents=True, exist_ok=True)
+    lock_stream = (output/".lock").open("w")
+    try: fcntl.flock(lock_stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError: raise RuntimeError("Another process is writing this experiment")
+    try:
+        identity_path = output/"manifest.json"
+        fingerprint = digest(config)
+        code_paths = sorted((ROOT/"research").glob("*.py")) + [ROOT/"research.sh"]
+        implementation = {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in code_paths}
+        if identity_path.exists():
+            previous = json.loads(identity_path.read_text())
+            if not resume: raise FileExistsError(f"Existing experiment {output}; use --resume")
+            if previous["config_digest"] != fingerprint and compatible_digest(previous["config"]) != compatible_digest(config):
+                raise ValueError("Resume config does not match this experiment")
+        else:
+            atomic_json(identity_path, {"config": config, "config_digest": fingerprint, "stage": stage,
+                "sources": json.loads((ROOT/"research_sources.lock.json").read_text()),
+                "implementation_sha256": implementation})
+        invocation_id = time.time_ns()
+        atomic_json(output/"invocations"/f"{invocation_id}.json", {"config_digest": fingerprint,
+            "resume": resume, "limit": limit, "implementation_sha256": implementation})
+        if resume and (output/"failure.json").exists():
+            archive = output/"interrupted"; archive.mkdir(exist_ok=True)
+            os.replace(output/"failure.json", archive/f"failure-{invocation_id}.json")
+        needs_llm = config["composition"] in ("hybrid", "all_llm")
+        if client is None and needs_llm: client = ModelClient(config["model"])
+        if client is not None: configure_encoder(client.embed)
+        text_model = TextModel(client)
+        pool = SecuritySkillPool(config["pool_size"]) if config["arm"] != "E0" and needs_llm else None
+        evolution = Evolution(text_model, config["evolution"]) if pool and config["arm"] in ("E2", "E3") else None
+        checkpoint_path = output/"checkpoint.json"
+        checkpoint = json.loads(checkpoint_path.read_text()) if checkpoint_path.exists() else None
+        training_provenance = None
+        inherited = None
+        inherited_seeds = list((checkpoint or {}).get("inherited_training_seeds", []))
+        inherited_episodes = (checkpoint or {}).get("inherited_training_episodes", 0)
+        if stage == "train" and config.get("pool") and checkpoint is None:
+            initial_path = Path(config["pool"])
+            inherited = json.loads(initial_path.read_text())
+            if inherited.get("stage") != "train" or inherited.get("pending_experiences"):
+                raise ValueError("Warm-start requires a committed training snapshot")
+            if any(inherited["model_identity"].get(k) != client.identity.get(k) for k in ("model","revision")):
+                raise ValueError("Warm-start policy model differs")
+            inherited_seeds = inherited.get("training_seeds", [])
+            if set(inherited_seeds) & set(range(config["eval_seed"],config["eval_seed"]+config["episodes"])):
+                raise ValueError("Warm-start training/evaluation seeds overlap")
+            if set(inherited_seeds) & set(range(config["validation_seed"],config["validation_seed"]+config["validation_episodes"])):
+                raise ValueError("Warm-start training/validation seeds overlap")
+            inherited_episodes = inherited.get("total_training_episodes",inherited["episodes_completed"])
+            pool.restore(inherited["pool"])
+            if evolution: evolution.restore(inherited.get("experience",{}))
+            training_provenance = {"path":str(initial_path.resolve()),
+                "sha256":hashlib.sha256(initial_path.read_bytes()).hexdigest(),"total_training_episodes":inherited_episodes}
+            atomic_json(output/"initial_pool.json",{"pool":pool.snapshot(),"training_provenance":training_provenance})
+        if checkpoint and checkpoint.get("pool") is not None:
+            pool.restore(checkpoint["pool"])
+            if evolution: evolution.restore(checkpoint.get("experience", {}))
+        elif stage == "eval" and (output/"frozen_pool.json").is_file() and pool:
+            pool.restore(json.loads((output/"frozen_pool.json").read_text())["pool"])
+        elif stage == "eval" and config["arm"] in ("E2", "E3"):
+            pool_path = Path(config.get("pool") or output.parent/"train/checkpoint.json")
+            if not pool_path.is_file(): raise FileNotFoundError(f"Train this arm first or specify --pool: {pool_path}")
+            trained = json.loads(pool_path.read_text())
+            if trained.get("stage") != "train": raise ValueError("Evaluation requires a training snapshot")
+            if trained.get("pending_experiences"):
+                raise ValueError("Training has an uncommitted evolution batch; resume training before frozen evaluation")
+            if any(trained["model_identity"].get(k) != client.identity.get(k) for k in ("model","revision")):
+                raise ValueError("Skill pool was trained with another policy model")
+            if set(trained.get("training_seeds", [])) & set(range(config["eval_seed"], config["eval_seed"]+config["episodes"])):
+                raise ValueError("Training/evaluation seeds overlap with the loaded pool")
+            pool.restore(trained["pool"])
+            training_provenance = {"path": str(pool_path.resolve()),
+                "sha256": hashlib.sha256(pool_path.read_bytes()).hexdigest(),
+                "episodes_completed": trained["episodes_completed"],
+                "total_training_episodes": trained.get("total_training_episodes",trained["episodes_completed"]),
+                "training_seeds": trained.get("training_seeds", []), "algorithm": trained.get("algorithm")}
+        if stage == "eval" and pool and not (output/"frozen_pool.json").exists():
+            atomic_json(output/"frozen_pool.json", {"pool": pool.snapshot(), "model_identity": client.identity,
+                "training_provenance": training_provenance})
+        if stage == "eval" and pool:
+            training_provenance = json.loads((output/"frozen_pool.json").read_text()).get("training_provenance")
+        pool_before = pool.snapshot() if pool else None
+        completed, counter = [], 0
+        planned = config["train_episodes"] if stage == "train" else config["episodes"]
+        start_seed = config["train_seed"] if stage == "train" else config["eval_seed"]
+        boundaries = {(i*planned+config["iterations"]-1)//config["iterations"]
+                      for i in range(1,config["iterations"]+1)} if stage == "train" else {planned}
+        pending_experiences = [Experience(**e) for e in checkpoint.get("pending_experiences", [])] if checkpoint else []
+        pending_results = checkpoint.get("pending_results", []) if checkpoint else []
+        history = deepcopy((checkpoint or inherited or {}).get("history", []))
+        baselines = deepcopy((checkpoint or inherited or {}).get("baselines", {}))
+        committed = checkpoint.get("episodes_completed", 0) if checkpoint else 0
+        for episode in range(planned):
+            result_path = output/f"episode-{episode:04d}.json"
+            if result_path.is_file() and (stage == "eval" or episode < committed):
+                result = json.loads(result_path.read_text())
+                if result.get("status") == "completed":
+                    completed.append(result)
+                    continue
+            if limit is not None and counter >= limit: break
+            if client: client.calls = []
+            recovered = stage == "train" and result_path.is_file() and episode >= committed
+            if recovered:
+                result=json.loads(result_path.read_text())
+                if result.get("status") != "completed": raise ValueError("Cannot recover an incomplete episode result")
+                experiences=recover_episode(result,config,client,text_model,output)
+            else:
+                result, experiences = run_episode(config, start_seed+episode, episode, client, pool, text_model, output)
+            completed.append(result); pending_results.append(result); pending_experiences.extend(experiences)
+            counter += int(not recovered)
+            if stage == "train" and episode+1 in boundaries:
+                task = f"{config['composition']}:{config['red']}"
+                average = sum(r["joint_return"] for r in pending_results)/len(pending_results)
+                previous_baseline = baselines.get(task, 0.0)
+                if pool:
+                    by_name = {s.name: s for s in pool.skills}
+                    def invocation_count(exp):
+                        return sum(1 for t in exp.transitions for event in (t.get("skill_controller") or {}).get("events", [])
+                                   if event.get("activated") == exp.skill)
+                    def trajectory_key(exp):
+                        first = exp.transitions[0] if exp.transitions else {}
+                        return first.get("seed"), first.get("agent")
+                    total_calls = Counter()
+                    for exp in pending_experiences:
+                        total_calls[trajectory_key(exp)] += invocation_count(exp)
+                    if config['evolution'].get('maintenance_mode','official_code')=='paper_score':
+                        from .paper_algorithm import update_online_scores
+                        update_online_scores(pool,pending_experiences,baselines.get(task+':step',0.0))
+                    else:
+                        for exp in pending_experiences:
+                            if exp.skill in by_name:
+                                by_name[exp.skill].update_stats(exp.reward, previous_baseline,
+                                    max(total_calls[trajectory_key(exp)], 1), invocation_count(exp))
+                    pool.update_pool_status()
+                alpha = config["evolution"]["ema_alpha"]
+                if config['evolution']['gate_mode']=='paper_rtg':
+                    from .paper_algorithm import update_running_baselines
+                    update_running_baselines(pending_results, baselines, task, config['evolution'])
+                else:
+                    baselines[task] = average if task not in baselines else (1-alpha)*previous_baseline+alpha*average
+                ev = {"evolution": [], "maintenance": [], "seconds": 0.0}
+                if evolution and config["evolution"].get("enabled", True):
+                    text_model.purpose = "evolution"
+                    call_offset = len(client.calls) if client else 0
+                    ev = evolution.update(pool, pending_experiences, baselines, len(history)+1)
+                    ev["model_calls"] = deepcopy(client.calls[call_offset:]) if client else []
+                    text_model.purpose = "skill_selection"
+                validation=[]
+                if config.get("validation_episodes",0):
+                    validation_dir=output/f"validation-iteration-{len(history)+1:04d}"
+                    validation_dir.mkdir(exist_ok=True)
+                    before_validation=pool.snapshot() if pool else None
+                    for v in range(config["validation_episodes"]):
+                        if client: client.calls=[]
+                        measured,_=run_episode(config,config["validation_seed"]+v,v,client,pool,text_model,validation_dir)
+                        validation.append(measured)
+                    if pool and pool.snapshot()!=before_validation: raise RuntimeError("Validation updated the skill pool")
+                    ev["validation_reward_mean"]=aggregate_episodes(validation)["mean_joint_reward"]
+                    ev["validation_episodes"]=validation
+                history.append({"iteration": len(history)+1, "episodes": episode+1,
+                    "reward_mean": average, "baseline": baselines[task], **ev, "pool_snapshot": pool.snapshot() if pool else None})
+                snapshot = {"stage": "train", "pool": pool.snapshot() if pool else None,
+                    "episodes_completed": episode+1,
+                    "total_training_episodes": inherited_episodes+episode+1,
+                    "inherited_training_seeds": inherited_seeds, "inherited_training_episodes": inherited_episodes,
+                    "training_seeds": sorted(set(inherited_seeds)|set(range(start_seed, start_seed+episode+1))),
+                    "model_identity": client.identity if client else None, "baselines": baselines,
+                    "experience": evolution.snapshot() if evolution else {}, "history": history,
+                    "config_digest": fingerprint, "algorithm": config["evolution"]}
+                atomic_json(output/f"pool-iteration-{len(history):04d}.json", snapshot)
+                atomic_json(checkpoint_path, snapshot)
+                pending_experiences, pending_results = [], []
+            elif stage == "train":
+                # Persist the pending batch too, so a one-episode batch invocation
+                # resumes without rerunning or overwriting completed experience.
+                atomic_json(checkpoint_path, {"stage":"train", "pool":pool.snapshot() if pool else None,
+                    "episodes_completed":episode+1,
+                    "total_training_episodes":inherited_episodes+episode+1,
+                    "inherited_training_seeds":inherited_seeds,"inherited_training_episodes":inherited_episodes,
+                    "training_seeds":sorted(set(inherited_seeds)|set(range(start_seed,start_seed+episode+1))),
+                    "model_identity":client.identity if client else None, "baselines":baselines,
+                    "experience":evolution.snapshot() if evolution else {}, "history":history,
+                    "pending_experiences":[e.__dict__ for e in pending_experiences],
+                    "pending_results":pending_results, "algorithm":config["evolution"]})
+            atomic_json(output/"summary.json", {"status": "partial", "stage": stage, "config": config,
+                "episodes": completed, "metrics": aggregate_episodes(completed),
+                "result_kind": "mock_test" if getattr(client, "is_mock", False) else "real_cage4", "history": history, "planned_episodes": planned})
+        if stage == "eval" and pool and pool.snapshot() != pool_before:
+            raise RuntimeError("Evaluation modified the frozen skill pool")
+        summary = {"status": "completed" if len(completed) == planned else "partial", "stage": stage,
+            "config": config, "episodes": completed, "metrics": aggregate_episodes(completed),
+            "result_kind": "mock_test" if getattr(client, "is_mock", False) else "real_cage4",
+            "history": history, "planned_episodes": planned, "pool_frozen": stage == "eval",
+            "model_identity": client.identity if client else None,
+            "training_provenance": training_provenance,
+            "pool_sha256": hashlib.sha256(json.dumps(pool.snapshot() if pool else None, sort_keys=True).encode()).hexdigest(),
+            "initial_pool_sha256": hashlib.sha256(json.dumps(pool_before, sort_keys=True).encode()).hexdigest()}
+        atomic_json(output/"summary.json", summary)
+        print(json.dumps({"output": str(output), "status": summary["status"], "metrics": summary["metrics"]}), flush=True)
+        return summary
+    except BaseException as exc:
+        atomic_json(output/"failure.json", {"status": "failed", "error": f"{type(exc).__name__}: {exc}",
+            "model": config["model"], "no_fallback_model": True})
+        raise
+    finally:
+        fcntl.flock(lock_stream, fcntl.LOCK_UN); lock_stream.close()

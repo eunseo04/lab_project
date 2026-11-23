@@ -1,0 +1,22 @@
+{
+  "acd/runner.py": "a86dbc80f8059ef125be00711930677b3e878839b85573689328a05852d3e9e8",
+  "acd/__init__.py": "0b97cd0e5b8c33f9c345bb65b5f0013319499c36085da1d8d13956a7a3b2ed78",
+  "acd/config.py": "35865133f3be126a47fbf218f69447cb30d85c2e6cfcc6c9c86f8376624d9ba3",
+  "acd/communication.py": "ac174a5e6ab72d72b41b2602e6bee95c8eeef501524d2d9d02e64736db445509",
+  "acd/__main__.py": "c8a9ddcda99e34ddf95bfe263687d9e43937b9e1ca47614010198071f916b2d7",
+  "acd/llm_agent.py": "8cc161f8a0ea51f7f0f7b68e6bf77d220a3b35ee2ea1a777e7167ccf1a021d1c",
+  "acd/training.py": "796d9cd32e8d17db784ece71f697a6e7d02b25f7a1d5d190acfae60a4dee01f4",
+  "acd/analysis.py": "46c270bbd51a7b708c3c93f007770514304b2b0be5ac76e2be53eeb1fd16d046",
+  "acd/backends.py": "a3ebe0f058e25a143c7b2c792ebe4e7a1958ebc09e480e6d00eb3729d3b7023c",
+  "acd/environment.py": "5c1f6d76b93a1e5b53346400d0914087b8157f655daa4edd5f8ba612d8c06854",
+  "configs/train_keep.yaml": "5b5d5cf582f77159d35d3cf766deb8bd78bf913b75971524b5c6b214b435ad23",
+  "configs/smoke.yaml": "6ee998e097e34e281585d75ec6cd72cafcd94e8992261474e2c2dfa16b2d0e69",
+  "configs/train_paper_smoke.yaml": "d4c1545e5a4282c0daca40d81479a37dc500e4f0d4d9d1c65f2605128e567ea7",
+  "configs/train_paper.yaml": "f3d241efaed2f48d71999089b6fed39a96785e4d4a6616af7ad0765cfaad43ed",
+  "configs/paper.yaml": "0c0032cf4b83c68052dc007d14fc1cf5bd97fc84ac4adcd2041df3102a13e20d",
+  "configs/keep.yaml": "dcf972848946e1f71bbfcd99b4e60962abf37b3bb87d61a47c46d7efce534b7e",
+  "scripts/prepare_sources.py": "892180c0bd06fd879cb4397835ac1bd3f7f40dcd8190c2f6d68216ef2dbba27b",
+  "scripts/write_verification_report.py": "af22d104be78de3be49d22794019c7689476f5db42df02798b077f003e137a4d",
+  "scripts/fetch_sources.py": "85824a07dcf38bfb051244a97b4ef2db4eda30444c1ffdc94a3c760b8c379a38",
+  "tests/test_experiments.py": "f6fa66111bed19b0a45b53bb3247c0a13e8df5dde110bced782e901d82b8cd85"
+}

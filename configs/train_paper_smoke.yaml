@@ -1,0 +1,15 @@
+# Only verify actual optimization, persistence and inference. Not a trained baseline.
+name: paper-training-smoke
+communication: paper
+red: finite
+steps: 12
+seed: 1337
+threads: 1
+weights: checkpoints/paper-smoke
+training:
+  episodes: 2
+  rollout_episodes: 2
+  batch_size: 16
+  epochs: 1
+  hidden: 32
+  embedding: 16

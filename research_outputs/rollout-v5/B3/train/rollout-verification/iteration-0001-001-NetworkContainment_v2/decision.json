@@ -1,0 +1,44 @@
+{
+  "accepted": false,
+  "reason": "validation_error",
+  "error": "RuntimeError: Validation worker failed: /home/jeonges/proposed/research_outputs/rollout-v5/B3/train/rollout-verification/iteration-0001-001-NetworkContainment_v2/previous-seed-62000",
+  "previous_pool_sha256": "9617d1ec6f4cc6fb0ed39516a9a98fb81a2bf8b4b57bc18e0aff5ed6e53cc9b6",
+  "candidate_pool_sha256": "e672941e77d94ae96dccf957a7916e498e3285f42d38f0d77b7d8c9545b3dbe5",
+  "live_pool_unchanged_during_validation": true,
+  "maintenance_before_validation": [],
+  "support": {
+    "parent": "NetworkContainment",
+    "iteration": 1,
+    "valid_behavior_decisions": 63,
+    "evidence_trajectories": 2
+  },
+  "support_threshold_sensitivity": [
+    {
+      "minimum_decisions": 0,
+      "candidate_eligible": true,
+      "would_accept_this_candidate": false
+    },
+    {
+      "minimum_decisions": 4,
+      "candidate_eligible": true,
+      "would_accept_this_candidate": false
+    },
+    {
+      "minimum_decisions": 8,
+      "candidate_eligible": true,
+      "would_accept_this_candidate": false
+    },
+    {
+      "minimum_decisions": 16,
+      "candidate_eligible": true,
+      "would_accept_this_candidate": false
+    },
+    {
+      "minimum_decisions": 32,
+      "candidate_eligible": true,
+      "would_accept_this_candidate": false
+    }
+  ],
+  "support_threshold_identified": false,
+  "support_note": "This one-candidate comparison cannot identify the best rare-skill threshold. Other parents remain deferred under the registered rollout budget."
+}

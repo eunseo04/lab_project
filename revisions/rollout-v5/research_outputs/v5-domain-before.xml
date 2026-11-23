@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="2" time="0.047" timestamp="2026-11-21T04:31:46.822976" hostname="devbox"><testcase classname="revisions.rollout-v5.research_tests.test_rollout_verification" name="test_confirmed_admin_recovery_takes_priority_over_followup_analysis" time="0.000"><failure message="TypeError: initiation_matches() got an unexpected keyword argument 'revision'">def test_confirmed_admin_recovery_takes_priority_over_followup_analysis():
+        context={'open_cases':[case(observed_level=3,verification_due=True)]}
+&gt;       assert not initiation_matches('EscalationDiagnosis',context,revision='v5')
+E       TypeError: initiation_matches() got an unexpected keyword argument 'revision'
+
+research_tests/test_rollout_verification.py:13: TypeError</failure></testcase><testcase classname="revisions.rollout-v5.research_tests.test_rollout_verification" name="test_new_flagged_pid_receives_response_before_redundant_diagnosis" time="0.000"><failure message="TypeError: initiation_matches() got an unexpected keyword argument 'revision'">def test_new_flagged_pid_receives_response_before_redundant_diagnosis():
+        context={'open_cases':[case()]}
+&gt;       assert initiation_matches('RapidProcessResponse',context,revision='v5')
+E       TypeError: initiation_matches() got an unexpected keyword argument 'revision'
+
+research_tests/test_rollout_verification.py:19: TypeError</failure></testcase></testsuite></testsuites>

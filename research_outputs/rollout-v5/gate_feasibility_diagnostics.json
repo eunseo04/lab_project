@@ -1,0 +1,52 @@
+{
+  "baselines": {
+    "hybrid:finite": -32.3399530094035,
+    "hybrid:finite:step": -0.4457831325301205
+  },
+  "records": [
+    {
+      "skill": "RiskBasedInvestigation",
+      "trajectories": 2,
+      "valid_decisions": 81,
+      "parent_r1_surrogate": -4.991764328400314,
+      "mathematical_upper_bound_for_any_candidate": -1.7160141105490845
+    },
+    {
+      "skill": "SelectiveDeception",
+      "trajectories": 2,
+      "valid_decisions": 34,
+      "parent_r1_surrogate": -13.604120336211102,
+      "mathematical_upper_bound_for_any_candidate": -9.570512934854127
+    },
+    {
+      "skill": "RapidProcessResponse",
+      "trajectories": 2,
+      "valid_decisions": 76,
+      "parent_r1_surrogate": 3.5056059168913856,
+      "mathematical_upper_bound_for_any_candidate": 5.712174102350655
+    },
+    {
+      "skill": "EscalationDiagnosis",
+      "trajectories": 2,
+      "valid_decisions": 200,
+      "parent_r1_surrogate": 4.947864538540577,
+      "mathematical_upper_bound_for_any_candidate": 7.495357478701128
+    },
+    {
+      "skill": "PrivilegedRecovery",
+      "trajectories": 2,
+      "valid_decisions": 3,
+      "parent_r1_surrogate": 2.5776353675366392,
+      "mathematical_upper_bound_for_any_candidate": 4.392942432729784
+    },
+    {
+      "skill": "NetworkContainment",
+      "trajectories": 2,
+      "valid_decisions": 25,
+      "parent_r1_surrogate": -1.2246940759516018,
+      "mathematical_upper_bound_for_any_candidate": 2.8335066868964667
+    }
+  ],
+  "no_algorithm_or_admission_changes": true,
+  "derivation": "For A>=0 the clipped term <=(1+epsilon)*A; for A<0 <=(1-epsilon)*A. Diagnostic only, no candidates skipped on this basis."
+}

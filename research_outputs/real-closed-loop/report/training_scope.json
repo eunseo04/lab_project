@@ -1,0 +1,36 @@
+{
+  "scope": {
+    "algorithm": {
+      "enabled": true,
+      "gate_mode": "official_code",
+      "maintenance_mode": "official_code",
+      "ppo_gate": true,
+      "score_maintenance": true,
+      "semantic_gradient": true
+    },
+    "communication": "paper_projected_keep",
+    "composition": "hybrid",
+    "model": {
+      "max_tokens": 192,
+      "model": "Qwen/Qwen3-8B",
+      "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+      "temperature": 1.0
+    },
+    "profile": "controlled-comparison",
+    "red": "finite",
+    "scoring": "official",
+    "selector": {
+      "epsilon": 0.1,
+      "max_skill_age": 8
+    },
+    "skip_busy_policy": true,
+    "steps": 12,
+    "validation_seeds": [
+      5000
+    ]
+  },
+  "summaries": [
+    "research_outputs/real-closed-loop/E2-hybrid-finite/train/summary.json"
+  ],
+  "directory": "research_outputs/real-closed-loop/report"
+}

@@ -1,0 +1,162 @@
+[
+  {
+    "id": "finite-E0-seed-29000",
+    "red": "finite",
+    "arm": "E0",
+    "seed": 29000,
+    "status": "completed",
+    "port": 8018,
+    "pid": 4000588,
+    "started_unix": 1795198218.2240307,
+    "completed_unix": 1795198910.8386781,
+    "summary": "/home/jeonges/proposed/research_outputs/behavior-v4-prospective/finite-E0-seed-29000/summary.json"
+  },
+  {
+    "id": "finite-E3-seed-29000",
+    "red": "finite",
+    "arm": "E3",
+    "seed": 29000,
+    "status": "completed",
+    "port": 8120,
+    "pid": 4000590,
+    "started_unix": 1795198218.2259011,
+    "completed_unix": 1795198868.6256368,
+    "summary": "/home/jeonges/proposed/research_outputs/behavior-v4-prospective/finite-E3-seed-29000/summary.json"
+  },
+  {
+    "id": "finite-E0-seed-29001",
+    "red": "finite",
+    "arm": "E0",
+    "seed": 29001,
+    "status": "completed",
+    "port": 8121,
+    "pid": 4000591,
+    "started_unix": 1795198218.2376935,
+    "completed_unix": 1795198890.6687171,
+    "summary": "/home/jeonges/proposed/research_outputs/behavior-v4-prospective/finite-E0-seed-29001/summary.json"
+  },
+  {
+    "id": "finite-E3-seed-29001",
+    "red": "finite",
+    "arm": "E3",
+    "seed": 29001,
+    "status": "completed",
+    "port": 8119,
+    "pid": 4000589,
+    "started_unix": 1795198218.38491,
+    "completed_unix": 1795199059.1753948,
+    "summary": "/home/jeonges/proposed/research_outputs/behavior-v4-prospective/finite-E3-seed-29001/summary.json"
+  },
+  {
+    "id": "finite-E0-seed-29002",
+    "red": "finite",
+    "arm": "E0",
+    "seed": 29002,
+    "status": "completed",
+    "port": 8120,
+    "pid": 4000590,
+    "started_unix": 1795198868.6260512,
+    "completed_unix": 1795199557.2539275,
+    "summary": "/home/jeonges/proposed/research_outputs/behavior-v4-prospective/finite-E0-seed-29002/summary.json"
+  },
+  {
+    "id": "finite-E3-seed-29002",
+    "red": "finite",
+    "arm": "E3",
+    "seed": 29002,
+    "status": "completed",
+    "port": 8121,
+    "pid": 4000591,
+    "started_unix": 1795198890.6691074,
+    "completed_unix": 1795199682.7960734,
+    "summary": "/home/jeonges/proposed/research_outputs/behavior-v4-prospective/finite-E3-seed-29002/summary.json"
+  },
+  {
+    "id": "finite-E0-seed-29003",
+    "red": "finite",
+    "arm": "E0",
+    "seed": 29003,
+    "status": "completed",
+    "port": 8018,
+    "pid": 4000588,
+    "started_unix": 1795198910.8390708,
+    "completed_unix": 1795199608.9697106,
+    "summary": "/home/jeonges/proposed/research_outputs/behavior-v4-prospective/finite-E0-seed-29003/summary.json"
+  },
+  {
+    "id": "finite-E3-seed-29003",
+    "red": "finite",
+    "arm": "E3",
+    "seed": 29003,
+    "status": "completed",
+    "port": 8119,
+    "pid": 4000589,
+    "started_unix": 1795199059.1758447,
+    "completed_unix": 1795199777.2729084,
+    "summary": "/home/jeonges/proposed/research_outputs/behavior-v4-prospective/finite-E3-seed-29003/summary.json"
+  },
+  {
+    "id": "aggressive-E0-seed-30000",
+    "red": "aggressive",
+    "arm": "E0",
+    "seed": 30000,
+    "status": "skipped_by_prespecified_rule",
+    "reason": "FiniteState criterion failed"
+  },
+  {
+    "id": "aggressive-E3-seed-30000",
+    "red": "aggressive",
+    "arm": "E3",
+    "seed": 30000,
+    "status": "skipped_by_prespecified_rule",
+    "reason": "FiniteState criterion failed"
+  },
+  {
+    "id": "aggressive-E0-seed-30001",
+    "red": "aggressive",
+    "arm": "E0",
+    "seed": 30001,
+    "status": "skipped_by_prespecified_rule",
+    "reason": "FiniteState criterion failed"
+  },
+  {
+    "id": "aggressive-E3-seed-30001",
+    "red": "aggressive",
+    "arm": "E3",
+    "seed": 30001,
+    "status": "skipped_by_prespecified_rule",
+    "reason": "FiniteState criterion failed"
+  },
+  {
+    "id": "aggressive-E0-seed-30002",
+    "red": "aggressive",
+    "arm": "E0",
+    "seed": 30002,
+    "status": "skipped_by_prespecified_rule",
+    "reason": "FiniteState criterion failed"
+  },
+  {
+    "id": "aggressive-E3-seed-30002",
+    "red": "aggressive",
+    "arm": "E3",
+    "seed": 30002,
+    "status": "skipped_by_prespecified_rule",
+    "reason": "FiniteState criterion failed"
+  },
+  {
+    "id": "aggressive-E0-seed-30003",
+    "red": "aggressive",
+    "arm": "E0",
+    "seed": 30003,
+    "status": "skipped_by_prespecified_rule",
+    "reason": "FiniteState criterion failed"
+  },
+  {
+    "id": "aggressive-E3-seed-30003",
+    "red": "aggressive",
+    "arm": "E3",
+    "seed": 30003,
+    "status": "skipped_by_prespecified_rule",
+    "reason": "FiniteState criterion failed"
+  }
+]

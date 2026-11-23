@@ -1,0 +1,18 @@
+# Original schedule and network sizes. Runs sequential rollouts to bound host load.
+name: paper-training
+communication: paper
+red: finite
+steps: 500
+seed: 1337
+threads: 2
+weights: checkpoints/paper-trained
+training:
+  episodes: 50000
+  rollout_episodes: 25
+  batch_size: 2500
+  epochs: 4
+  hidden: 256
+  embedding: 128
+  actor_lr: 0.0003
+  critic_lr: 0.001
+  clip: 0.2

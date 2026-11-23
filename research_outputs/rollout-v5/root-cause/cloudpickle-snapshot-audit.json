@@ -1,0 +1,21 @@
+{
+  "passed": true,
+  "snapshot": "cloudpickle full environment/controller/state/Red-Green agents",
+  "identical_five_step_branches": true,
+  "tested_seed": 22001,
+  "snapshot_after_steps": 8,
+  "size_bytes": 1349923,
+  "external_rng_restored": [
+    "random",
+    "numpy",
+    "torch CPU"
+  ],
+  "compared": [
+    "raw Blue observations",
+    "joint rewards",
+    "full serialized simulator State",
+    "internal RNG state"
+  ],
+  "new_model_performance_sample": false,
+  "limitation": "One tested state and five steps; future policy effects still require matched intervention replay."
+}

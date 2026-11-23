@@ -1,0 +1,6782 @@
+{
+  "passed": true,
+  "source": "research_outputs/behavior-v2/validation/validation_loop2-seed-23000/summary.json",
+  "seed": 23000,
+  "joint_return": -80.0,
+  "replay_source_root": "/home/jeonges/proposed",
+  "source_summary_sha256": "e48d99b5d591fcc767c6b15af9061e5fe3776f116d42e63fd4eded604f805260",
+  "source_trace_sha256": "f12f3771eb1cbf0bdd504a76b4bc5fcdcbaf99de76c3fc93384ac8c61649e549",
+  "components": {
+    "action_cost": -36,
+    "RIA": -22,
+    "LWF": -22
+  },
+  "by_zone": {
+    "contractor_network_subnet": {
+      "RIA": -20,
+      "LWF": 0
+    },
+    "operational_zone_b_subnet": {
+      "RIA": -1
+    },
+    "public_access_zone_subnet": {
+      "LWF": -22
+    },
+    "operational_zone_a_subnet": {
+      "RIA": -1
+    }
+  },
+  "by_reward_phase": {
+    "0": {
+      "RIA": -21,
+      "LWF": -4
+    },
+    "1": {
+      "RIA": 0,
+      "LWF": -14
+    },
+    "2": {
+      "LWF": -4,
+      "RIA": -1
+    }
+  },
+  "timeline": [
+    {
+      "step": 0,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 1,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 2,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": -1
+      },
+      "events": []
+    },
+    {
+      "step": 3,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 4,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 5,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 6,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 7,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 8,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 9,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 10,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 11,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 12,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 13,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 14,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 15,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 16,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 17,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 18,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 19,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 20,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 21,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 22,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 23,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 24,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 25,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 26,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 27,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 28,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 29,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 30,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 31,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 32,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 33,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 34,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 35,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": -1
+      },
+      "events": []
+    },
+    {
+      "step": 36,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": -1
+      },
+      "events": []
+    },
+    {
+      "step": 37,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 38,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 39,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 40,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": -1
+      },
+      "events": []
+    },
+    {
+      "step": 41,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 42,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 43,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 44,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 45,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 46,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 47,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 48,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 49,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 50,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 51,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 52,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 53,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 54,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 55,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 56,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 57,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 58,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 59,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 60,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 61,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 62,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 63,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 64,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": -1
+      },
+      "events": []
+    },
+    {
+      "step": 65,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 66,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 67,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 68,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 69,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 70,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 71,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 72,
+      "components": {
+        "BlueRewardMachine": -5,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_4",
+          "agent": "red_agent_0",
+          "phase": 0,
+          "reward": -5
+        }
+      ]
+    },
+    {
+      "step": 73,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 74,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 75,
+      "components": {
+        "BlueRewardMachine": -1,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "RIA",
+          "zone": "operational_zone_b_subnet",
+          "host": "operational_zone_b_subnet_user_host_2",
+          "agent": "red_agent_4",
+          "phase": 0,
+          "reward": -1
+        }
+      ]
+    },
+    {
+      "step": 76,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 77,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": -1
+      },
+      "events": []
+    },
+    {
+      "step": 78,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 79,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 80,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": -1
+      },
+      "events": []
+    },
+    {
+      "step": 81,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 82,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 83,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 84,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 85,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 86,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 87,
+      "components": {
+        "BlueRewardMachine": -5,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "red_agent_0",
+          "phase": 0,
+          "reward": -5
+        }
+      ]
+    },
+    {
+      "step": 88,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 89,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 90,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 91,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 92,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 93,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 94,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 95,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 96,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 97,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 98,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 99,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": -1
+      },
+      "events": []
+    },
+    {
+      "step": 100,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 101,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 102,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 103,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 104,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": -1
+      },
+      "events": []
+    },
+    {
+      "step": 105,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 106,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": -1
+      },
+      "events": []
+    },
+    {
+      "step": 107,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 108,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 109,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": -1
+      },
+      "events": []
+    },
+    {
+      "step": 110,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 111,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 112,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 113,
+      "components": {
+        "BlueRewardMachine": -5,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "red_agent_0",
+          "phase": 0,
+          "reward": -5
+        }
+      ]
+    },
+    {
+      "step": 114,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 115,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 116,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 117,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 118,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 119,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 120,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 121,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": -1
+      },
+      "events": []
+    },
+    {
+      "step": 122,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 123,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 124,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 125,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 126,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 127,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 128,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 129,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 130,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 131,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 132,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 133,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 134,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": -1
+      },
+      "events": []
+    },
+    {
+      "step": 135,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 136,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": -1
+      },
+      "events": []
+    },
+    {
+      "step": 137,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 138,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": -1
+      },
+      "events": []
+    },
+    {
+      "step": 139,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 140,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 141,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 142,
+      "components": {
+        "BlueRewardMachine": -1,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "public_access_zone_subnet",
+          "host": "public_access_zone_subnet_user_host_1",
+          "agent": "green_agent_28",
+          "phase": 0,
+          "reward": -1
+        }
+      ]
+    },
+    {
+      "step": 143,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 144,
+      "components": {
+        "BlueRewardMachine": -5,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_4",
+          "agent": "red_agent_0",
+          "phase": 0,
+          "reward": -5
+        }
+      ]
+    },
+    {
+      "step": 145,
+      "components": {
+        "BlueRewardMachine": -1,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "public_access_zone_subnet",
+          "host": "public_access_zone_subnet_user_host_1",
+          "agent": "green_agent_28",
+          "phase": 0,
+          "reward": -1
+        }
+      ]
+    },
+    {
+      "step": 146,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 147,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": -1
+      },
+      "events": []
+    },
+    {
+      "step": 148,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": -1
+      },
+      "events": []
+    },
+    {
+      "step": 149,
+      "components": {
+        "BlueRewardMachine": -1,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "public_access_zone_subnet",
+          "host": "public_access_zone_subnet_user_host_1",
+          "agent": "green_agent_28",
+          "phase": 0,
+          "reward": -1
+        }
+      ]
+    },
+    {
+      "step": 150,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 151,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 152,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 153,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 154,
+      "components": {
+        "BlueRewardMachine": -1,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "public_access_zone_subnet",
+          "host": "public_access_zone_subnet_user_host_1",
+          "agent": "green_agent_28",
+          "phase": 0,
+          "reward": -1
+        }
+      ]
+    },
+    {
+      "step": 155,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 156,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 157,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 158,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 159,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": -1
+      },
+      "events": []
+    },
+    {
+      "step": 160,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 161,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 162,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 163,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 164,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 165,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 166,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 167,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 168,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 169,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 170,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": -1
+      },
+      "events": []
+    },
+    {
+      "step": 171,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": -1
+      },
+      "events": []
+    },
+    {
+      "step": 172,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_4",
+          "agent": "red_agent_0",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 173,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 174,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 175,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 176,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 177,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 178,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 179,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 180,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "red_agent_0",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 181,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 182,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 183,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 184,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 185,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 186,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 187,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 1,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 188,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 189,
+      "components": {
+        "BlueRewardMachine": -1,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "public_access_zone_subnet",
+          "host": "public_access_zone_subnet_user_host_1",
+          "agent": "green_agent_28",
+          "phase": 1,
+          "reward": -1
+        }
+      ]
+    },
+    {
+      "step": 190,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 191,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 192,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 193,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 194,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "red_agent_0",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 195,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 196,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 197,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": -1
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 198,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 199,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 200,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 201,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 202,
+      "components": {
+        "BlueRewardMachine": -1,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "public_access_zone_subnet",
+          "host": "public_access_zone_subnet_user_host_1",
+          "agent": "green_agent_28",
+          "phase": 1,
+          "reward": -1
+        }
+      ]
+    },
+    {
+      "step": 203,
+      "components": {
+        "BlueRewardMachine": -1,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "public_access_zone_subnet",
+          "host": "public_access_zone_subnet_user_host_1",
+          "agent": "green_agent_28",
+          "phase": 1,
+          "reward": -1
+        }
+      ]
+    },
+    {
+      "step": 204,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "red_agent_0",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 205,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 206,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 207,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 208,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 209,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 210,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 211,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 1,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 212,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 213,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 214,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 215,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 216,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 217,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": -1
+      },
+      "events": []
+    },
+    {
+      "step": 218,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_4",
+          "agent": "red_agent_0",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 219,
+      "components": {
+        "BlueRewardMachine": -1,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "public_access_zone_subnet",
+          "host": "public_access_zone_subnet_user_host_1",
+          "agent": "green_agent_28",
+          "phase": 1,
+          "reward": -1
+        }
+      ]
+    },
+    {
+      "step": 220,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 221,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 222,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": -1
+      },
+      "events": []
+    },
+    {
+      "step": 223,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 224,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": -1
+      },
+      "events": []
+    },
+    {
+      "step": 225,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 226,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": -1
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 227,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 228,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 229,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 230,
+      "components": {
+        "BlueRewardMachine": -1,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 1,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "public_access_zone_subnet",
+          "host": "public_access_zone_subnet_user_host_1",
+          "agent": "green_agent_28",
+          "phase": 1,
+          "reward": -1
+        }
+      ]
+    },
+    {
+      "step": 231,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 232,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 233,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 234,
+      "components": {
+        "BlueRewardMachine": -1,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "public_access_zone_subnet",
+          "host": "public_access_zone_subnet_user_host_1",
+          "agent": "green_agent_28",
+          "phase": 1,
+          "reward": -1
+        }
+      ]
+    },
+    {
+      "step": 235,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 236,
+      "components": {
+        "BlueRewardMachine": -1,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "public_access_zone_subnet",
+          "host": "public_access_zone_subnet_user_host_1",
+          "agent": "green_agent_28",
+          "phase": 1,
+          "reward": -1
+        }
+      ]
+    },
+    {
+      "step": 237,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 238,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 239,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 240,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 241,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 242,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 243,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 244,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 1,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 245,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 246,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 247,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 248,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 249,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 250,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 251,
+      "components": {
+        "BlueRewardMachine": -1,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "public_access_zone_subnet",
+          "host": "public_access_zone_subnet_user_host_1",
+          "agent": "green_agent_28",
+          "phase": 1,
+          "reward": -1
+        }
+      ]
+    },
+    {
+      "step": 252,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 253,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 254,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 255,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 256,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 257,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 258,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 259,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 260,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 261,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 262,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 263,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": -1
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 264,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 265,
+      "components": {
+        "BlueRewardMachine": -1,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 1,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "public_access_zone_subnet",
+          "host": "public_access_zone_subnet_user_host_1",
+          "agent": "green_agent_28",
+          "phase": 1,
+          "reward": -1
+        }
+      ]
+    },
+    {
+      "step": 266,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 267,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 268,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 269,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 270,
+      "components": {
+        "BlueRewardMachine": -1,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 1,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "public_access_zone_subnet",
+          "host": "public_access_zone_subnet_user_host_1",
+          "agent": "green_agent_28",
+          "phase": 1,
+          "reward": -1
+        }
+      ]
+    },
+    {
+      "step": 271,
+      "components": {
+        "BlueRewardMachine": -1,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 1,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "public_access_zone_subnet",
+          "host": "public_access_zone_subnet_user_host_1",
+          "agent": "green_agent_28",
+          "phase": 1,
+          "reward": -1
+        }
+      ]
+    },
+    {
+      "step": 272,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": -1
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 1,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 273,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 274,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 275,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 1,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 276,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 277,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 278,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 279,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 280,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 281,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 282,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 1,
+          "reward": 0
+        },
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_server_host_2",
+          "agent": "red_agent_0",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 283,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 284,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 285,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 1,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 286,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 287,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 288,
+      "components": {
+        "BlueRewardMachine": -1,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "public_access_zone_subnet",
+          "host": "public_access_zone_subnet_user_host_1",
+          "agent": "green_agent_28",
+          "phase": 1,
+          "reward": -1
+        }
+      ]
+    },
+    {
+      "step": 289,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 290,
+      "components": {
+        "BlueRewardMachine": -1,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "public_access_zone_subnet",
+          "host": "public_access_zone_subnet_user_host_1",
+          "agent": "green_agent_28",
+          "phase": 1,
+          "reward": -1
+        }
+      ]
+    },
+    {
+      "step": 291,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 292,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 1,
+          "reward": 0
+        },
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "red_agent_0",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 293,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 294,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 295,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 296,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 1,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 297,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 298,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 299,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 300,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 1,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 301,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 302,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 303,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 1,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 304,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 305,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 306,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 307,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 308,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 309,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 310,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 1,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 311,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_4",
+          "agent": "red_agent_0",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 312,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 313,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "red_agent_0",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 314,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_9",
+          "agent": "green_agent_26",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 315,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": -1
+      },
+      "events": [
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "red_agent_0",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 316,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 317,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 318,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 319,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_9",
+          "agent": "green_agent_26",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 320,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 321,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 1,
+          "reward": 0
+        },
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_server_host_0",
+          "agent": "red_agent_0",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 322,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_9",
+          "agent": "green_agent_26",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 323,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 324,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 325,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 326,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 327,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 1,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 328,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 329,
+      "components": {
+        "BlueRewardMachine": -1,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 1,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 1,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "public_access_zone_subnet",
+          "host": "public_access_zone_subnet_user_host_1",
+          "agent": "green_agent_28",
+          "phase": 1,
+          "reward": -1
+        }
+      ]
+    },
+    {
+      "step": 330,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_2",
+          "agent": "red_agent_0",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 331,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 1,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 332,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 1,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 1,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 333,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 334,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 335,
+      "components": {
+        "BlueRewardMachine": -1,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_9",
+          "agent": "green_agent_26",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "public_access_zone_subnet",
+          "host": "public_access_zone_subnet_user_host_1",
+          "agent": "green_agent_28",
+          "phase": 2,
+          "reward": -1
+        }
+      ]
+    },
+    {
+      "step": 336,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 337,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_server_host_0",
+          "agent": "red_agent_0",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 338,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 339,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 340,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 341,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 342,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 343,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_server_host_5",
+          "agent": "red_agent_0",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 344,
+      "components": {
+        "BlueRewardMachine": -1,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "public_access_zone_subnet",
+          "host": "public_access_zone_subnet_user_host_1",
+          "agent": "green_agent_28",
+          "phase": 2,
+          "reward": -1
+        }
+      ]
+    },
+    {
+      "step": 345,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 346,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 347,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_server_host_0",
+          "agent": "red_agent_0",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 348,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_9",
+          "agent": "green_agent_26",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 349,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 350,
+      "components": {
+        "BlueRewardMachine": -1,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "public_access_zone_subnet",
+          "host": "public_access_zone_subnet_user_host_1",
+          "agent": "green_agent_28",
+          "phase": 2,
+          "reward": -1
+        }
+      ]
+    },
+    {
+      "step": 351,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "red_agent_0",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 352,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 353,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_9",
+          "agent": "green_agent_26",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 354,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_9",
+          "agent": "green_agent_26",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 355,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_9",
+          "agent": "green_agent_26",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 356,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_server_host_0",
+          "agent": "red_agent_0",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 357,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 358,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_4",
+          "agent": "green_agent_21",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 359,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 360,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 361,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 362,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 363,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 364,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 365,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 366,
+      "components": {
+        "BlueRewardMachine": -1,
+        "action_cost": -1
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "public_access_zone_subnet",
+          "host": "public_access_zone_subnet_user_host_1",
+          "agent": "green_agent_28",
+          "phase": 2,
+          "reward": -1
+        }
+      ]
+    },
+    {
+      "step": 367,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_2",
+          "agent": "red_agent_0",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 368,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 369,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_4",
+          "agent": "green_agent_21",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_server_host_5",
+          "agent": "red_agent_0",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 370,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 371,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_9",
+          "agent": "green_agent_26",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 372,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 373,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": -1
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 374,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_9",
+          "agent": "green_agent_26",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 375,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "red_agent_0",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 376,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 377,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 378,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 379,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 380,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 381,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_server_host_4",
+          "agent": "red_agent_0",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 382,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 383,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_9",
+          "agent": "green_agent_26",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 384,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 385,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 386,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 387,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 388,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 389,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 390,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 391,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 392,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 393,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_9",
+          "agent": "green_agent_26",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 394,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 395,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 396,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_9",
+          "agent": "green_agent_26",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 397,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 398,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 399,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 400,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 401,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": -1
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 402,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_server_host_0",
+          "agent": "red_agent_0",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 403,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 404,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_9",
+          "agent": "green_agent_26",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 405,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_4",
+          "agent": "green_agent_21",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 406,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 407,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_9",
+          "agent": "green_agent_26",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 408,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 409,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": -1
+      },
+      "events": []
+    },
+    {
+      "step": 410,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_4",
+          "agent": "green_agent_21",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 411,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 412,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 413,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_4",
+          "agent": "green_agent_21",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 414,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 415,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 416,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 417,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 418,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_4",
+          "agent": "green_agent_21",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 419,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 420,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_4",
+          "agent": "green_agent_21",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_9",
+          "agent": "green_agent_26",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 421,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_4",
+          "agent": "green_agent_21",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 422,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_server_host_4",
+          "agent": "red_agent_0",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 423,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 424,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 425,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 426,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_server_host_0",
+          "agent": "red_agent_0",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 427,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 428,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_2",
+          "agent": "red_agent_0",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 429,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 430,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 431,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_4",
+          "agent": "green_agent_21",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_server_host_3",
+          "agent": "red_agent_0",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 432,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 433,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_9",
+          "agent": "red_agent_0",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 434,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_4",
+          "agent": "green_agent_21",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 435,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 436,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_4",
+          "agent": "green_agent_21",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 437,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 438,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_4",
+          "agent": "green_agent_21",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 439,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_4",
+          "agent": "green_agent_21",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 440,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_4",
+          "agent": "green_agent_21",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 441,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 442,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 443,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 444,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_4",
+          "agent": "green_agent_21",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_9",
+          "agent": "green_agent_26",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 445,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_4",
+          "agent": "green_agent_21",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 446,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_4",
+          "agent": "green_agent_21",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_9",
+          "agent": "green_agent_26",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 447,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 448,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_9",
+          "agent": "green_agent_26",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 449,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 450,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 451,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_4",
+          "agent": "green_agent_21",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_9",
+          "agent": "green_agent_26",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 452,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 453,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 454,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 455,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_4",
+          "agent": "green_agent_21",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_9",
+          "agent": "green_agent_26",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_server_host_2",
+          "agent": "red_agent_0",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 456,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_4",
+          "agent": "green_agent_21",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_9",
+          "agent": "green_agent_26",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 457,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 458,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_4",
+          "agent": "green_agent_21",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 459,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 460,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_4",
+          "agent": "green_agent_21",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 461,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 462,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 463,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 464,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 465,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_4",
+          "agent": "green_agent_21",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 466,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 467,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_4",
+          "agent": "green_agent_21",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_9",
+          "agent": "green_agent_26",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_server_host_0",
+          "agent": "red_agent_0",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 468,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_4",
+          "agent": "green_agent_21",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 469,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": -2
+      },
+      "events": [
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "red_agent_0",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 470,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 471,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 472,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 473,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": -1
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_9",
+          "agent": "green_agent_26",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 474,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": -1
+      },
+      "events": []
+    },
+    {
+      "step": 475,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_server_host_5",
+          "agent": "red_agent_0",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 476,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_4",
+          "agent": "green_agent_21",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 477,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 478,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 479,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_4",
+          "agent": "green_agent_21",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 480,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_9",
+          "agent": "green_agent_26",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 481,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 482,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 483,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 484,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_4",
+          "agent": "green_agent_21",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 485,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_4",
+          "agent": "green_agent_21",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "red_agent_0",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 486,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 487,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 488,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 489,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_server_host_5",
+          "agent": "red_agent_0",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 490,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 491,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 492,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": []
+    },
+    {
+      "step": 493,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "RIA",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "red_agent_0",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 494,
+      "components": {
+        "BlueRewardMachine": -1,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_4",
+          "agent": "green_agent_21",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "RIA",
+          "zone": "operational_zone_a_subnet",
+          "host": "operational_zone_a_subnet_user_host_0",
+          "agent": "red_agent_2",
+          "phase": 2,
+          "reward": -1
+        }
+      ]
+    },
+    {
+      "step": 495,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_2",
+          "agent": "green_agent_19",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 496,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_9",
+          "agent": "green_agent_26",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 497,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_3",
+          "agent": "green_agent_20",
+          "phase": 2,
+          "reward": 0
+        },
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_8",
+          "agent": "green_agent_25",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    },
+    {
+      "step": 498,
+      "components": {
+        "BlueRewardMachine": 0,
+        "action_cost": 0
+      },
+      "events": [
+        {
+          "kind": "LWF",
+          "zone": "contractor_network_subnet",
+          "host": "contractor_network_subnet_user_host_6",
+          "agent": "green_agent_23",
+          "phase": 2,
+          "reward": 0
+        }
+      ]
+    }
+  ],
+  "all_blue_observations_actions_rewards_matched": true,
+  "recorded_llm_outputs_replayed": true,
+  "new_performance_sample": false,
+  "decomposition_supplied_to_actor_or_optimizer": false
+}

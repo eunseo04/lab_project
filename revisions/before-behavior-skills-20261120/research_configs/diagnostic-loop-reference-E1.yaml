@@ -1,0 +1,43 @@
+arm: E1
+communication: paper_projected_keep
+composition: hybrid
+episodes: 1
+eval_seed: 5000
+evolution:
+  acceptance_margin: 0.0
+  best_of_n: 2
+  clip: 0.2
+  ema_alpha: 0.1
+  enabled: true
+  gamma: 0.99
+  gate_mode: official_code
+  max_evolutions: 1
+  ppo_gate: true
+  score_maintenance: true
+  semantic_chunk_steps: 4
+  semantic_gradient: true
+  threshold: 1
+iterations: 1
+model:
+  endpoint: http://127.0.0.1:8018
+  max_tokens: 192
+  model: Qwen/Qwen3-8B
+  revision: b968826d9c46dd6066d109eabc6255188de91218
+  temperature: 1.0
+  timeout_seconds: 240
+output: analysis_outputs/qwen_comparison/reference
+pool_size: 10
+profile: controlled-comparison
+red: finite
+scoring: official
+selector:
+  epsilon: 0.1
+  max_skill_age: 8
+skip_busy_policy: true
+steps: 12
+threads: 1
+train_episodes: 2
+train_seed: 100
+validation_episodes: 0
+validation_seed: 5000
+weights: third_party/cage-4-submission/weights

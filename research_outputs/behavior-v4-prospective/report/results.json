@@ -1,0 +1,1104 @@
+{
+  "status": "completed",
+  "manual_initialization_not_learning": true,
+  "metrics": [
+    {
+      "red": "finite",
+      "arm": "E0",
+      "n": 4,
+      "mean": -194.5,
+      "sample_std": 127.20718009085283,
+      "returns_by_seed": {
+        "29000": -155.0,
+        "29001": -168.0,
+        "29002": -79.0,
+        "29003": -376.0
+      },
+      "behavior": {
+        "all_tick_requests": {
+          "Analyse": 259,
+          "Sleep": 1677,
+          "Restore": 15,
+          "Remove": 44,
+          "DeployDecoy": 1
+        },
+        "environment_last_action_ticks": {
+          "Sleep": 1678,
+          "Analyse": 258,
+          "Restore": 15,
+          "Remove": 44,
+          "DeployDecoy": 1
+        },
+        "free_choice_actions": {
+          "Analyse": 259,
+          "Sleep": 1270,
+          "Restore": 15,
+          "Remove": 44,
+          "DeployDecoy": 1
+        },
+        "generated_choice_actions": {
+          "Analyse": 259,
+          "Sleep": 1270,
+          "Restore": 15,
+          "Remove": 44,
+          "DeployDecoy": 1
+        },
+        "valid_generated_choice_actions": {
+          "Analyse": 259,
+          "Sleep": 1270,
+          "Restore": 15,
+          "Remove": 44,
+          "DeployDecoy": 1
+        },
+        "invalid_policy_fallback_actions": {},
+        "skill_usage": {
+          "NONE": 1589
+        },
+        "world_ticks": 1996,
+        "free_opportunities": 1589,
+        "busy_ticks": 407,
+        "policy_generations": 1589,
+        "automatic_monitor_ticks": 1996,
+        "parse_errors": 0,
+        "learned_skill_decisions": 0,
+        "learned_skill_fraction": 0.0,
+        "free_choice_percent": {
+          "Analyse": 16.29955947136564,
+          "Sleep": 79.92448080553807,
+          "Restore": 0.9439899307740718,
+          "Remove": 2.7690371302706103,
+          "DeployDecoy": 0.06293266205160478
+        },
+        "explicit_passive_choices": 1270,
+        "explicit_passive_fraction": 0.7992448080553808,
+        "observable_diagnostics": {
+          "free_policy_decision": 1589,
+          "automatic_busy_wait": 407,
+          "sleep_with_open_case": 1033,
+          "repeated_analysis_same_evidence": 112,
+          "analysis_before_unhandled_flagged_pid": 33,
+          "open_case_opportunities": 1287,
+          "observed_admin_opportunities": 6,
+          "targeted_restore_with_admin_evidence": 6,
+          "restore_requests": 15,
+          "restore_without_retained_admin_evidence": 9,
+          "unhandled_flagged_pid_opportunities": 82,
+          "targeted_response_to_flagged_pid": 32,
+          "waiting_for_action_while_already_free": 46,
+          "decoy_with_open_case": 1
+        },
+        "decoy_deployment_diagnostics": {
+          "successful_deployments": 1
+        },
+        "repeated_analysis_fraction": 0.43243243243243246,
+        "sleep_with_open_case_fraction": 0.8026418026418026,
+        "duplicate_decoy_fraction": 0.0,
+        "noncanonical_response_opcode": 0,
+        "rule_based_reason_categories": {
+          "investigation": 242,
+          "quiet_observation": 1143,
+          "privilege_or_admin": 4,
+          "other": 15,
+          "compromise_response": 59,
+          "waiting": 126
+        }
+      }
+    },
+    {
+      "red": "finite",
+      "arm": "E3",
+      "n": 4,
+      "mean": -159.0,
+      "sample_std": 34.009802508492555,
+      "returns_by_seed": {
+        "29000": -175.0,
+        "29001": -176.0,
+        "29002": -108.0,
+        "29003": -177.0
+      },
+      "behavior": {
+        "all_tick_requests": {
+          "Analyse": 388,
+          "Sleep": 1441,
+          "Restore": 31,
+          "Remove": 109,
+          "DeployDecoy": 27
+        },
+        "environment_last_action_ticks": {
+          "Sleep": 1444,
+          "Analyse": 387,
+          "Restore": 31,
+          "Remove": 108,
+          "DeployDecoy": 26
+        },
+        "free_choice_actions": {
+          "Analyse": 388,
+          "Sleep": 687,
+          "Restore": 31,
+          "Remove": 109,
+          "DeployDecoy": 27
+        },
+        "generated_choice_actions": {
+          "Analyse": 388,
+          "Sleep": 687,
+          "Restore": 31,
+          "Remove": 109,
+          "DeployDecoy": 27
+        },
+        "valid_generated_choice_actions": {
+          "Analyse": 388,
+          "Sleep": 687,
+          "Restore": 31,
+          "Remove": 109,
+          "DeployDecoy": 27
+        },
+        "invalid_policy_fallback_actions": {},
+        "skill_usage": {
+          "NONE": 500,
+          "SelectiveDeception": 117,
+          "RiskBasedInvestigation": 245,
+          "NetworkContainment": 90,
+          "PrivilegedRecovery": 6,
+          "RapidProcessResponse": 54,
+          "EscalationDiagnosis": 230
+        },
+        "world_ticks": 1996,
+        "free_opportunities": 1242,
+        "busy_ticks": 754,
+        "policy_generations": 1242,
+        "automatic_monitor_ticks": 1996,
+        "parse_errors": 0,
+        "learned_skill_decisions": 0,
+        "learned_skill_fraction": 0.0,
+        "free_choice_percent": {
+          "Analyse": 31.239935587761675,
+          "Sleep": 55.31400966183575,
+          "Restore": 2.49597423510467,
+          "Remove": 8.776167471819646,
+          "DeployDecoy": 2.1739130434782608
+        },
+        "explicit_passive_choices": 687,
+        "explicit_passive_fraction": 0.5531400966183575,
+        "observable_diagnostics": {
+          "free_policy_decision": 1242,
+          "automatic_busy_wait": 754,
+          "sleep_with_open_case": 88,
+          "repeated_analysis_same_evidence": 238,
+          "analysis_before_unhandled_flagged_pid": 34,
+          "open_case_opportunities": 336,
+          "observed_admin_opportunities": 8,
+          "targeted_restore_with_admin_evidence": 8,
+          "restore_requests": 31,
+          "restore_without_retained_admin_evidence": 23,
+          "unhandled_flagged_pid_opportunities": 97,
+          "targeted_response_to_flagged_pid": 29,
+          "waiting_for_action_while_already_free": 5,
+          "duplicate_successful_decoy": 13,
+          "decoy_with_open_case": 5
+        },
+        "decoy_deployment_diagnostics": {
+          "successful_deployments": 26,
+          "same_host_successful_redeployments": 12,
+          "same_host_new_observed_service": 8,
+          "same_host_service_already_recorded_since_restore": 4
+        },
+        "repeated_analysis_fraction": 0.6134020618556701,
+        "sleep_with_open_case_fraction": 0.2619047619047619,
+        "duplicate_decoy_fraction": 0.48148148148148145,
+        "noncanonical_response_opcode": 0,
+        "rule_based_reason_categories": {
+          "investigation": 176,
+          "quiet_observation": 643,
+          "other": 254,
+          "privilege_or_admin": 11,
+          "compromise_response": 135,
+          "waiting": 23
+        }
+      }
+    }
+  ],
+  "paired_differences": [
+    {
+      "red": "finite",
+      "n": 4,
+      "seeds": [
+        29000,
+        29001,
+        29002,
+        29003
+      ],
+      "differences": [
+        -20.0,
+        -8.0,
+        -29.0,
+        199.0
+      ],
+      "mean_difference": 35.5,
+      "wins": 1,
+      "criterion_passed": false
+    }
+  ],
+  "episodes": [
+    {
+      "arm": "E0",
+      "red": "finite",
+      "seed": 29000,
+      "return": -155.0,
+      "behavior": {
+        "role": "llm",
+        "world_ticks": 499,
+        "free_opportunities": 405,
+        "busy_ticks": 94,
+        "policy_generations": 405,
+        "all_tick_requests": {
+          "Analyse": 62,
+          "Sleep": 422,
+          "Restore": 2,
+          "Remove": 12,
+          "DeployDecoy": 1
+        },
+        "free_choice_actions": {
+          "Analyse": 62,
+          "Sleep": 328,
+          "Restore": 2,
+          "Remove": 12,
+          "DeployDecoy": 1
+        },
+        "environment_last_action_ticks": {
+          "Sleep": 423,
+          "Analyse": 61,
+          "Restore": 2,
+          "Remove": 12,
+          "DeployDecoy": 1
+        },
+        "generated_choice_actions": {
+          "Analyse": 62,
+          "Sleep": 328,
+          "Restore": 2,
+          "Remove": 12,
+          "DeployDecoy": 1
+        },
+        "valid_generated_choice_actions": {
+          "Analyse": 62,
+          "Sleep": 328,
+          "Restore": 2,
+          "Remove": 12,
+          "DeployDecoy": 1
+        },
+        "invalid_policy_fallback_actions": {},
+        "automatic_monitor_ticks": 499,
+        "parse_errors": 0,
+        "learned_skill_decisions": 0,
+        "skill_usage": {
+          "NONE": 405
+        },
+        "observable_diagnostics": {
+          "free_policy_decision": 405,
+          "automatic_busy_wait": 94,
+          "sleep_with_open_case": 243,
+          "repeated_analysis_same_evidence": 31,
+          "analysis_before_unhandled_flagged_pid": 7,
+          "duplicate_successful_decoy": 0,
+          "open_case_opportunities": 299,
+          "observed_admin_opportunities": 1,
+          "targeted_restore_with_admin_evidence": 1,
+          "restore_requests": 2,
+          "restore_without_retained_admin_evidence": 1,
+          "unhandled_flagged_pid_opportunities": 14,
+          "targeted_response_to_flagged_pid": 7,
+          "waiting_for_action_while_already_free": 15,
+          "decoy_with_open_case": 1
+        },
+        "completed_own_operations": {
+          "Analyse:TRUE": 61,
+          "Restore:TRUE": 2,
+          "Remove:TRUE": 12,
+          "DeployDecoy:TRUE": 1
+        },
+        "decoy_deployment_diagnostics": {
+          "successful_deployments": 1
+        },
+        "rule_based_reason_categories": {
+          "investigation": 54,
+          "quiet_observation": 290,
+          "privilege_or_admin": 1,
+          "other": 5,
+          "compromise_response": 17,
+          "waiting": 38
+        },
+        "mean_observed_evidence_age_at_response": 0,
+        "response_age_samples": 8,
+        "noncanonical_response_opcode": 0,
+        "stored_context_replay_verified": true
+      },
+      "meta": {
+        "selection_xml_errors": 0,
+        "termination_xml_errors": 0,
+        "unknown_selection_names": 0
+      },
+      "due_lead_opportunities": 249,
+      "targeted_lead_investigations": 48,
+      "source": "research_outputs/behavior-v4-prospective/finite-E0-seed-29000/summary.json"
+    },
+    {
+      "arm": "E3",
+      "red": "finite",
+      "seed": 29000,
+      "return": -175.0,
+      "behavior": {
+        "role": "llm",
+        "world_ticks": 499,
+        "free_opportunities": 255,
+        "busy_ticks": 244,
+        "policy_generations": 255,
+        "all_tick_requests": {
+          "Analyse": 106,
+          "Sleep": 330,
+          "Restore": 8,
+          "Remove": 52,
+          "DeployDecoy": 3
+        },
+        "free_choice_actions": {
+          "Analyse": 106,
+          "Sleep": 86,
+          "Restore": 8,
+          "Remove": 52,
+          "DeployDecoy": 3
+        },
+        "environment_last_action_ticks": {
+          "Sleep": 331,
+          "Analyse": 106,
+          "Restore": 8,
+          "Remove": 51,
+          "DeployDecoy": 3
+        },
+        "generated_choice_actions": {
+          "Analyse": 106,
+          "Sleep": 86,
+          "Restore": 8,
+          "Remove": 52,
+          "DeployDecoy": 3
+        },
+        "valid_generated_choice_actions": {
+          "Analyse": 106,
+          "Sleep": 86,
+          "Restore": 8,
+          "Remove": 52,
+          "DeployDecoy": 3
+        },
+        "invalid_policy_fallback_actions": {},
+        "automatic_monitor_ticks": 499,
+        "parse_errors": 0,
+        "learned_skill_decisions": 0,
+        "skill_usage": {
+          "NONE": 55,
+          "SelectiveDeception": 7,
+          "RiskBasedInvestigation": 66,
+          "NetworkContainment": 18,
+          "PrivilegedRecovery": 2,
+          "RapidProcessResponse": 12,
+          "EscalationDiagnosis": 95
+        },
+        "observable_diagnostics": {
+          "free_policy_decision": 255,
+          "automatic_busy_wait": 244,
+          "sleep_with_open_case": 31,
+          "repeated_analysis_same_evidence": 69,
+          "analysis_before_unhandled_flagged_pid": 14,
+          "duplicate_successful_decoy": 0,
+          "open_case_opportunities": 124,
+          "observed_admin_opportunities": 3,
+          "targeted_restore_with_admin_evidence": 3,
+          "restore_requests": 8,
+          "restore_without_retained_admin_evidence": 5,
+          "unhandled_flagged_pid_opportunities": 27,
+          "targeted_response_to_flagged_pid": 10,
+          "waiting_for_action_while_already_free": 1
+        },
+        "completed_own_operations": {
+          "Analyse:TRUE": 106,
+          "Restore:TRUE": 8,
+          "Remove:TRUE": 51,
+          "DeployDecoy:TRUE": 3
+        },
+        "decoy_deployment_diagnostics": {
+          "successful_deployments": 3
+        },
+        "rule_based_reason_categories": {
+          "investigation": 36,
+          "quiet_observation": 81,
+          "other": 70,
+          "privilege_or_admin": 4,
+          "compromise_response": 60,
+          "waiting": 4
+        },
+        "mean_observed_evidence_age_at_response": 0.7692307692307693,
+        "response_age_samples": 13,
+        "noncanonical_response_opcode": 0,
+        "stored_context_replay_verified": true
+      },
+      "meta": {
+        "selection_xml_errors": 0,
+        "termination_xml_errors": 0,
+        "unknown_selection_names": 0
+      },
+      "due_lead_opportunities": 186,
+      "targeted_lead_investigations": 47,
+      "source": "research_outputs/behavior-v4-prospective/finite-E3-seed-29000/summary.json"
+    },
+    {
+      "arm": "E0",
+      "red": "finite",
+      "seed": 29001,
+      "return": -168.0,
+      "behavior": {
+        "role": "llm",
+        "world_ticks": 499,
+        "free_opportunities": 377,
+        "busy_ticks": 122,
+        "policy_generations": 377,
+        "all_tick_requests": {
+          "Analyse": 72,
+          "Sleep": 407,
+          "Remove": 15,
+          "Restore": 5
+        },
+        "free_choice_actions": {
+          "Analyse": 72,
+          "Sleep": 285,
+          "Remove": 15,
+          "Restore": 5
+        },
+        "environment_last_action_ticks": {
+          "Sleep": 407,
+          "Analyse": 72,
+          "Remove": 15,
+          "Restore": 5
+        },
+        "generated_choice_actions": {
+          "Analyse": 72,
+          "Sleep": 285,
+          "Remove": 15,
+          "Restore": 5
+        },
+        "valid_generated_choice_actions": {
+          "Analyse": 72,
+          "Sleep": 285,
+          "Remove": 15,
+          "Restore": 5
+        },
+        "invalid_policy_fallback_actions": {},
+        "automatic_monitor_ticks": 499,
+        "parse_errors": 0,
+        "learned_skill_decisions": 0,
+        "skill_usage": {
+          "NONE": 377
+        },
+        "observable_diagnostics": {
+          "free_policy_decision": 377,
+          "automatic_busy_wait": 122,
+          "sleep_with_open_case": 167,
+          "repeated_analysis_same_evidence": 25,
+          "analysis_before_unhandled_flagged_pid": 11,
+          "duplicate_successful_decoy": 0,
+          "open_case_opportunities": 229,
+          "unhandled_flagged_pid_opportunities": 34,
+          "targeted_response_to_flagged_pid": 11,
+          "waiting_for_action_while_already_free": 15,
+          "restore_requests": 5,
+          "restore_without_retained_admin_evidence": 4,
+          "observed_admin_opportunities": 1,
+          "targeted_restore_with_admin_evidence": 1
+        },
+        "completed_own_operations": {
+          "Analyse:TRUE": 72,
+          "Remove:TRUE": 15,
+          "Restore:TRUE": 5
+        },
+        "decoy_deployment_diagnostics": {},
+        "rule_based_reason_categories": {
+          "investigation": 69,
+          "quiet_observation": 242,
+          "compromise_response": 18,
+          "waiting": 43,
+          "privilege_or_admin": 1,
+          "other": 4
+        },
+        "mean_observed_evidence_age_at_response": 1.25,
+        "response_age_samples": 12,
+        "noncanonical_response_opcode": 0,
+        "stored_context_replay_verified": true
+      },
+      "meta": {
+        "selection_xml_errors": 0,
+        "termination_xml_errors": 0,
+        "unknown_selection_names": 0
+      },
+      "due_lead_opportunities": 273,
+      "targeted_lead_investigations": 63,
+      "source": "research_outputs/behavior-v4-prospective/finite-E0-seed-29001/summary.json"
+    },
+    {
+      "arm": "E3",
+      "red": "finite",
+      "seed": 29001,
+      "return": -176.0,
+      "behavior": {
+        "role": "llm",
+        "world_ticks": 499,
+        "free_opportunities": 349,
+        "busy_ticks": 150,
+        "policy_generations": 349,
+        "all_tick_requests": {
+          "Analyse": 91,
+          "Sleep": 383,
+          "DeployDecoy": 6,
+          "Remove": 11,
+          "Restore": 8
+        },
+        "free_choice_actions": {
+          "Analyse": 91,
+          "Sleep": 233,
+          "DeployDecoy": 6,
+          "Remove": 11,
+          "Restore": 8
+        },
+        "environment_last_action_ticks": {
+          "Sleep": 384,
+          "Analyse": 90,
+          "DeployDecoy": 6,
+          "Remove": 11,
+          "Restore": 8
+        },
+        "generated_choice_actions": {
+          "Analyse": 91,
+          "Sleep": 233,
+          "DeployDecoy": 6,
+          "Remove": 11,
+          "Restore": 8
+        },
+        "valid_generated_choice_actions": {
+          "Analyse": 91,
+          "Sleep": 233,
+          "DeployDecoy": 6,
+          "Remove": 11,
+          "Restore": 8
+        },
+        "invalid_policy_fallback_actions": {},
+        "automatic_monitor_ticks": 499,
+        "parse_errors": 0,
+        "learned_skill_decisions": 0,
+        "skill_usage": {
+          "NONE": 153,
+          "NetworkContainment": 24,
+          "SelectiveDeception": 47,
+          "RiskBasedInvestigation": 59,
+          "RapidProcessResponse": 8,
+          "EscalationDiagnosis": 57,
+          "PrivilegedRecovery": 1
+        },
+        "observable_diagnostics": {
+          "free_policy_decision": 349,
+          "automatic_busy_wait": 150,
+          "sleep_with_open_case": 30,
+          "repeated_analysis_same_evidence": 48,
+          "analysis_before_unhandled_flagged_pid": 7,
+          "duplicate_successful_decoy": 1,
+          "open_case_opportunities": 75,
+          "unhandled_flagged_pid_opportunities": 15,
+          "targeted_response_to_flagged_pid": 7,
+          "restore_requests": 8,
+          "restore_without_retained_admin_evidence": 7,
+          "waiting_for_action_while_already_free": 2,
+          "observed_admin_opportunities": 1,
+          "targeted_restore_with_admin_evidence": 1
+        },
+        "completed_own_operations": {
+          "Analyse:TRUE": 90,
+          "DeployDecoy:TRUE": 6,
+          "Remove:TRUE": 11,
+          "Restore:TRUE": 8
+        },
+        "decoy_deployment_diagnostics": {
+          "successful_deployments": 6,
+          "same_host_successful_redeployments": 1,
+          "same_host_new_observed_service": 1
+        },
+        "rule_based_reason_categories": {
+          "investigation": 43,
+          "quiet_observation": 212,
+          "other": 60,
+          "compromise_response": 21,
+          "waiting": 11,
+          "privilege_or_admin": 2
+        },
+        "mean_observed_evidence_age_at_response": 0,
+        "response_age_samples": 8,
+        "noncanonical_response_opcode": 0,
+        "stored_context_replay_verified": true
+      },
+      "meta": {
+        "selection_xml_errors": 0,
+        "termination_xml_errors": 0,
+        "unknown_selection_names": 1
+      },
+      "due_lead_opportunities": 131,
+      "targeted_lead_investigations": 66,
+      "source": "research_outputs/behavior-v4-prospective/finite-E3-seed-29001/summary.json"
+    },
+    {
+      "arm": "E0",
+      "red": "finite",
+      "seed": 29002,
+      "return": -79.0,
+      "behavior": {
+        "role": "llm",
+        "world_ticks": 499,
+        "free_opportunities": 408,
+        "busy_ticks": 91,
+        "policy_generations": 408,
+        "all_tick_requests": {
+          "Analyse": 61,
+          "Sleep": 426,
+          "Restore": 3,
+          "Remove": 9
+        },
+        "free_choice_actions": {
+          "Analyse": 61,
+          "Sleep": 335,
+          "Restore": 3,
+          "Remove": 9
+        },
+        "environment_last_action_ticks": {
+          "Sleep": 426,
+          "Analyse": 61,
+          "Restore": 3,
+          "Remove": 9
+        },
+        "generated_choice_actions": {
+          "Analyse": 61,
+          "Sleep": 335,
+          "Restore": 3,
+          "Remove": 9
+        },
+        "valid_generated_choice_actions": {
+          "Analyse": 61,
+          "Sleep": 335,
+          "Restore": 3,
+          "Remove": 9
+        },
+        "invalid_policy_fallback_actions": {},
+        "automatic_monitor_ticks": 499,
+        "parse_errors": 0,
+        "learned_skill_decisions": 0,
+        "skill_usage": {
+          "NONE": 408
+        },
+        "observable_diagnostics": {
+          "free_policy_decision": 408,
+          "automatic_busy_wait": 91,
+          "sleep_with_open_case": 314,
+          "repeated_analysis_same_evidence": 29,
+          "analysis_before_unhandled_flagged_pid": 6,
+          "duplicate_successful_decoy": 0,
+          "open_case_opportunities": 378,
+          "unhandled_flagged_pid_opportunities": 15,
+          "targeted_response_to_flagged_pid": 6,
+          "observed_admin_opportunities": 2,
+          "targeted_restore_with_admin_evidence": 2,
+          "restore_requests": 3,
+          "restore_without_retained_admin_evidence": 1,
+          "waiting_for_action_while_already_free": 7
+        },
+        "completed_own_operations": {
+          "Analyse:TRUE": 61,
+          "Restore:TRUE": 3,
+          "Remove:TRUE": 9
+        },
+        "decoy_deployment_diagnostics": {},
+        "rule_based_reason_categories": {
+          "investigation": 61,
+          "quiet_observation": 316,
+          "privilege_or_admin": 1,
+          "compromise_response": 9,
+          "waiting": 18,
+          "other": 3
+        },
+        "mean_observed_evidence_age_at_response": 0.25,
+        "response_age_samples": 8,
+        "noncanonical_response_opcode": 0,
+        "stored_context_replay_verified": true
+      },
+      "meta": {
+        "selection_xml_errors": 0,
+        "termination_xml_errors": 0,
+        "unknown_selection_names": 0
+      },
+      "due_lead_opportunities": 213,
+      "targeted_lead_investigations": 52,
+      "source": "research_outputs/behavior-v4-prospective/finite-E0-seed-29002/summary.json"
+    },
+    {
+      "arm": "E3",
+      "red": "finite",
+      "seed": 29002,
+      "return": -108.0,
+      "behavior": {
+        "role": "llm",
+        "world_ticks": 499,
+        "free_opportunities": 349,
+        "busy_ticks": 150,
+        "policy_generations": 349,
+        "all_tick_requests": {
+          "Analyse": 84,
+          "Sleep": 383,
+          "Restore": 6,
+          "Remove": 16,
+          "DeployDecoy": 10
+        },
+        "free_choice_actions": {
+          "Analyse": 84,
+          "Sleep": 233,
+          "Restore": 6,
+          "Remove": 16,
+          "DeployDecoy": 10
+        },
+        "environment_last_action_ticks": {
+          "Sleep": 383,
+          "Analyse": 84,
+          "Restore": 6,
+          "Remove": 16,
+          "DeployDecoy": 10
+        },
+        "generated_choice_actions": {
+          "Analyse": 84,
+          "Sleep": 233,
+          "Restore": 6,
+          "Remove": 16,
+          "DeployDecoy": 10
+        },
+        "valid_generated_choice_actions": {
+          "Analyse": 84,
+          "Sleep": 233,
+          "Restore": 6,
+          "Remove": 16,
+          "DeployDecoy": 10
+        },
+        "invalid_policy_fallback_actions": {},
+        "automatic_monitor_ticks": 499,
+        "parse_errors": 0,
+        "learned_skill_decisions": 0,
+        "skill_usage": {
+          "NONE": 177,
+          "RiskBasedInvestigation": 61,
+          "NetworkContainment": 21,
+          "PrivilegedRecovery": 2,
+          "EscalationDiagnosis": 26,
+          "RapidProcessResponse": 7,
+          "SelectiveDeception": 55
+        },
+        "observable_diagnostics": {
+          "free_policy_decision": 349,
+          "automatic_busy_wait": 150,
+          "sleep_with_open_case": 5,
+          "repeated_analysis_same_evidence": 54,
+          "analysis_before_unhandled_flagged_pid": 4,
+          "duplicate_successful_decoy": 6,
+          "open_case_opportunities": 39,
+          "unhandled_flagged_pid_opportunities": 12,
+          "targeted_response_to_flagged_pid": 5,
+          "observed_admin_opportunities": 2,
+          "targeted_restore_with_admin_evidence": 2,
+          "restore_requests": 6,
+          "restore_without_retained_admin_evidence": 4,
+          "waiting_for_action_while_already_free": 2
+        },
+        "completed_own_operations": {
+          "Analyse:TRUE": 84,
+          "Restore:TRUE": 6,
+          "Remove:TRUE": 16,
+          "DeployDecoy:TRUE": 10
+        },
+        "decoy_deployment_diagnostics": {
+          "successful_deployments": 10,
+          "same_host_successful_redeployments": 6,
+          "same_host_new_observed_service": 2,
+          "same_host_service_already_recorded_since_restore": 4
+        },
+        "rule_based_reason_categories": {
+          "investigation": 45,
+          "quiet_observation": 219,
+          "other": 56,
+          "privilege_or_admin": 3,
+          "compromise_response": 20,
+          "waiting": 6
+        },
+        "mean_observed_evidence_age_at_response": 0,
+        "response_age_samples": 7,
+        "noncanonical_response_opcode": 0,
+        "stored_context_replay_verified": true
+      },
+      "meta": {
+        "selection_xml_errors": 0,
+        "termination_xml_errors": 1,
+        "unknown_selection_names": 0
+      },
+      "due_lead_opportunities": 98,
+      "targeted_lead_investigations": 57,
+      "source": "research_outputs/behavior-v4-prospective/finite-E3-seed-29002/summary.json"
+    },
+    {
+      "arm": "E0",
+      "red": "finite",
+      "seed": 29003,
+      "return": -376.0,
+      "behavior": {
+        "role": "llm",
+        "world_ticks": 499,
+        "free_opportunities": 399,
+        "busy_ticks": 100,
+        "policy_generations": 399,
+        "all_tick_requests": {
+          "Analyse": 64,
+          "Sleep": 422,
+          "Restore": 5,
+          "Remove": 8
+        },
+        "free_choice_actions": {
+          "Analyse": 64,
+          "Sleep": 322,
+          "Restore": 5,
+          "Remove": 8
+        },
+        "environment_last_action_ticks": {
+          "Sleep": 422,
+          "Analyse": 64,
+          "Restore": 5,
+          "Remove": 8
+        },
+        "generated_choice_actions": {
+          "Analyse": 64,
+          "Sleep": 322,
+          "Restore": 5,
+          "Remove": 8
+        },
+        "valid_generated_choice_actions": {
+          "Analyse": 64,
+          "Sleep": 322,
+          "Restore": 5,
+          "Remove": 8
+        },
+        "invalid_policy_fallback_actions": {},
+        "automatic_monitor_ticks": 499,
+        "parse_errors": 0,
+        "learned_skill_decisions": 0,
+        "skill_usage": {
+          "NONE": 399
+        },
+        "observable_diagnostics": {
+          "free_policy_decision": 399,
+          "automatic_busy_wait": 100,
+          "sleep_with_open_case": 309,
+          "repeated_analysis_same_evidence": 27,
+          "analysis_before_unhandled_flagged_pid": 9,
+          "duplicate_successful_decoy": 0,
+          "open_case_opportunities": 381,
+          "unhandled_flagged_pid_opportunities": 19,
+          "targeted_response_to_flagged_pid": 8,
+          "restore_requests": 5,
+          "restore_without_retained_admin_evidence": 3,
+          "observed_admin_opportunities": 2,
+          "targeted_restore_with_admin_evidence": 2,
+          "waiting_for_action_while_already_free": 9
+        },
+        "completed_own_operations": {
+          "Analyse:TRUE": 64,
+          "Restore:TRUE": 5,
+          "Remove:TRUE": 8
+        },
+        "decoy_deployment_diagnostics": {},
+        "rule_based_reason_categories": {
+          "investigation": 58,
+          "quiet_observation": 295,
+          "compromise_response": 15,
+          "privilege_or_admin": 1,
+          "waiting": 27,
+          "other": 3
+        },
+        "mean_observed_evidence_age_at_response": 0.4,
+        "response_age_samples": 10,
+        "noncanonical_response_opcode": 0,
+        "stored_context_replay_verified": true
+      },
+      "meta": {
+        "selection_xml_errors": 0,
+        "termination_xml_errors": 0,
+        "unknown_selection_names": 0
+      },
+      "due_lead_opportunities": 235,
+      "targeted_lead_investigations": 49,
+      "source": "research_outputs/behavior-v4-prospective/finite-E0-seed-29003/summary.json"
+    },
+    {
+      "arm": "E3",
+      "red": "finite",
+      "seed": 29003,
+      "return": -177.0,
+      "behavior": {
+        "role": "llm",
+        "world_ticks": 499,
+        "free_opportunities": 289,
+        "busy_ticks": 210,
+        "policy_generations": 289,
+        "all_tick_requests": {
+          "Analyse": 107,
+          "Sleep": 345,
+          "Remove": 30,
+          "Restore": 9,
+          "DeployDecoy": 8
+        },
+        "free_choice_actions": {
+          "Analyse": 107,
+          "Sleep": 135,
+          "Remove": 30,
+          "Restore": 9,
+          "DeployDecoy": 8
+        },
+        "environment_last_action_ticks": {
+          "Sleep": 346,
+          "Analyse": 107,
+          "Remove": 30,
+          "Restore": 9,
+          "DeployDecoy": 7
+        },
+        "generated_choice_actions": {
+          "Analyse": 107,
+          "Sleep": 135,
+          "Remove": 30,
+          "Restore": 9,
+          "DeployDecoy": 8
+        },
+        "valid_generated_choice_actions": {
+          "Analyse": 107,
+          "Sleep": 135,
+          "Remove": 30,
+          "Restore": 9,
+          "DeployDecoy": 8
+        },
+        "invalid_policy_fallback_actions": {},
+        "automatic_monitor_ticks": 499,
+        "parse_errors": 0,
+        "learned_skill_decisions": 0,
+        "skill_usage": {
+          "NONE": 115,
+          "NetworkContainment": 27,
+          "RiskBasedInvestigation": 59,
+          "RapidProcessResponse": 27,
+          "EscalationDiagnosis": 52,
+          "PrivilegedRecovery": 1,
+          "SelectiveDeception": 8
+        },
+        "observable_diagnostics": {
+          "free_policy_decision": 289,
+          "automatic_busy_wait": 210,
+          "sleep_with_open_case": 22,
+          "repeated_analysis_same_evidence": 67,
+          "analysis_before_unhandled_flagged_pid": 9,
+          "duplicate_successful_decoy": 6,
+          "open_case_opportunities": 98,
+          "unhandled_flagged_pid_opportunities": 43,
+          "targeted_response_to_flagged_pid": 7,
+          "restore_requests": 9,
+          "restore_without_retained_admin_evidence": 7,
+          "observed_admin_opportunities": 2,
+          "targeted_restore_with_admin_evidence": 2,
+          "decoy_with_open_case": 5
+        },
+        "completed_own_operations": {
+          "Analyse:TRUE": 107,
+          "Remove:TRUE": 30,
+          "Restore:TRUE": 9,
+          "DeployDecoy:TRUE": 7
+        },
+        "decoy_deployment_diagnostics": {
+          "successful_deployments": 7,
+          "same_host_successful_redeployments": 5,
+          "same_host_new_observed_service": 5
+        },
+        "rule_based_reason_categories": {
+          "investigation": 52,
+          "quiet_observation": 131,
+          "other": 68,
+          "compromise_response": 34,
+          "privilege_or_admin": 2,
+          "waiting": 2
+        },
+        "mean_observed_evidence_age_at_response": 0,
+        "response_age_samples": 9,
+        "noncanonical_response_opcode": 0,
+        "stored_context_replay_verified": true
+      },
+      "meta": {
+        "selection_xml_errors": 0,
+        "termination_xml_errors": 0,
+        "unknown_selection_names": 0
+      },
+      "due_lead_opportunities": 147,
+      "targeted_lead_investigations": 57,
+      "source": "research_outputs/behavior-v4-prospective/finite-E3-seed-29003/summary.json"
+    }
+  ],
+  "missing": [],
+  "skipped_by_prespecified_rule": [
+    "aggressive-E0-seed-30000",
+    "aggressive-E3-seed-30000",
+    "aggressive-E0-seed-30001",
+    "aggressive-E3-seed-30001",
+    "aggressive-E0-seed-30002",
+    "aggressive-E3-seed-30002",
+    "aggressive-E0-seed-30003",
+    "aggressive-E3-seed-30003"
+  ],
+  "transfer_status": "not_run_finite_criterion_failed",
+  "audit": {
+    "passed": true,
+    "worlds_audited": 8,
+    "common_initial_actor_prompt_pairs": 4,
+    "weights_frozen": true,
+    "pool_frozen": true,
+    "learned_skill_decisions": 0,
+    "source_unchanged": true,
+    "test_seeds_disjoint_from_development_and_training": true,
+    "config_template_equal_except_declared_case_fields": true
+  },
+  "reward_replays": {
+    "status": "completed",
+    "metrics": [
+      {
+        "red": "finite",
+        "arm": "E0",
+        "n": 4,
+        "action_cost": -61,
+        "RIA": -72.5,
+        "LWF": -26.5,
+        "ASF": -34.5,
+        "joint_return": -194.5
+      },
+      {
+        "red": "finite",
+        "arm": "E3",
+        "n": 4,
+        "action_cost": -68,
+        "RIA": -78,
+        "LWF": -13,
+        "ASF": 0,
+        "joint_return": -159.0
+      }
+    ],
+    "exact_replays": 8,
+    "missing": [],
+    "new_performance_samples": 0,
+    "limitation": "Exact recorded-trajectory attribution, not a causal action ablation; never supplied to actor or optimizer."
+  },
+  "limitation": "N=4 per policy, descriptive paired results; no learned Skill-Pro or universal superiority claim"
+}

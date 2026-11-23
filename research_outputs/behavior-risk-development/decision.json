@@ -1,0 +1,9 @@
+{
+  "status": "completed",
+  "return": -173.0,
+  "comparison_baseline_context": -41.0,
+  "comparison_six_skills": 52.0,
+  "criterion_passed": false,
+  "decision": "not adopted; validation threshold was not met",
+  "sample_is_development_only": true
+}

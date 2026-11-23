@@ -1,0 +1,6 @@
+red,comparison,paired_seeds,paired_differences,mean_difference
+finite,E1-E0,"[10000, 10001]","[-252.0, 77.0]",-87.5
+finite,E2-E1,"[10000, 10001]","[0.0, 0.0]",0.0
+finite,E3-E2,"[10000, 10001]","[191.0, -20.0]",85.5
+finite,E3-E0,"[10000, 10001]","[-61.0, 57.0]",-2.0
+aggressive,E3-E0,"[10000, 10001]","[-173.0, -213.0]",-193.0

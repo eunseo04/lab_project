@@ -1,0 +1,157 @@
+{
+  "comparison_key": [
+    "hybrid",
+    "controlled-comparison",
+    "official",
+    "paper_projected_keep",
+    500,
+    "Qwen/Qwen3-8B",
+    "b968826d9c46dd6066d109eabc6255188de91218",
+    1.0,
+    192,
+    "official_code",
+    "official_code",
+    true,
+    0.1,
+    8
+  ],
+  "paired_seeds": {
+    "finite": [
+      10000,
+      10001
+    ],
+    "aggressive": [],
+    "stealthy": [],
+    "impact": [],
+    "degrade": []
+  },
+  "table2_available_arm_paired_seeds": {
+    "finite": [
+      10000,
+      10001
+    ],
+    "aggressive": [],
+    "stealthy": [],
+    "impact": [],
+    "degrade": []
+  },
+  "action_red_scope": [
+    "finite"
+  ],
+  "overall_requires_all_five_reds": true,
+  "complete_red_coverage": false,
+  "metrics": {
+    "E0": {
+      "n": 0,
+      "mean_joint_reward": null,
+      "reward_std": null,
+      "execution_time_s": null
+    },
+    "E1": {
+      "n": 0,
+      "mean_joint_reward": null,
+      "reward_std": null,
+      "execution_time_s": null
+    },
+    "E2": {
+      "n": 0,
+      "mean_joint_reward": null,
+      "reward_std": null,
+      "execution_time_s": null
+    },
+    "E3": {
+      "n": 0,
+      "mean_joint_reward": null,
+      "reward_std": null,
+      "execution_time_s": null
+    }
+  },
+  "paired_available_policy_metrics": {
+    "E0": {
+      "n": 2,
+      "mean_joint_reward": -267.5,
+      "reward_std": 75.66042558696059,
+      "execution_time_s": 1102.0755744480994,
+      "mean_episode_time_s": 551.0377872240497
+    },
+    "E1": {
+      "n": 2,
+      "mean_joint_reward": -355.0,
+      "reward_std": 156.97770542341354,
+      "execution_time_s": 1733.9564006251749,
+      "mean_episode_time_s": 866.9782003125874
+    },
+    "E2": {
+      "n": 2,
+      "mean_joint_reward": -355.0,
+      "reward_std": 156.97770542341354,
+      "execution_time_s": 1719.1608543021139,
+      "mean_episode_time_s": 859.5804271510569
+    },
+    "E3": {
+      "n": 2,
+      "mean_joint_reward": -269.5,
+      "reward_std": 7.7781745930520225,
+      "execution_time_s": 1408.709137108177,
+      "mean_episode_time_s": 704.3545685540885
+    }
+  },
+  "aggregation": "Sample statistics over pooled paired episode returns; overall requires all five policies.",
+  "training_budgets": {
+    "E0:finite": null,
+    "E1:finite": null,
+    "E2:finite": {
+      "path": "/home/jeonges/proposed/research_outputs/real-500/E2-hybrid-finite/train/checkpoint.json",
+      "sha256": "86ad35d96540495d58755995c21a907ab603de2434ff294c91b12d77b415be59",
+      "episodes_completed": 2,
+      "total_training_episodes": 2,
+      "training_seeds": [
+        100,
+        101
+      ],
+      "algorithm": {
+        "enabled": true,
+        "gate_mode": "official_code",
+        "ppo_gate": true,
+        "semantic_gradient": true,
+        "score_maintenance": true,
+        "threshold": 2,
+        "best_of_n": 2,
+        "max_evolutions": 1,
+        "semantic_chunk_steps": 8,
+        "clip": 0.2,
+        "gamma": 0.99,
+        "ema_alpha": 0.1,
+        "acceptance_margin": 0.0,
+        "maintenance_mode": "official_code"
+      }
+    },
+    "E3:finite": {
+      "path": "/home/jeonges/proposed/research_outputs/real-500/E3-hybrid-finite/train/checkpoint.json",
+      "sha256": "f5d2b154ab6bea1bc4b4b917267c2b541b038e6b9a3ebb085f8a655d52df9000",
+      "episodes_completed": 2,
+      "total_training_episodes": 2,
+      "training_seeds": [
+        100,
+        101
+      ],
+      "algorithm": {
+        "enabled": true,
+        "gate_mode": "official_code",
+        "ppo_gate": true,
+        "semantic_gradient": true,
+        "score_maintenance": true,
+        "threshold": 2,
+        "best_of_n": 2,
+        "max_evolutions": 1,
+        "semantic_chunk_steps": 8,
+        "clip": 0.2,
+        "gamma": 0.99,
+        "ema_alpha": 0.1,
+        "acceptance_margin": 0.0,
+        "maintenance_mode": "official_code"
+      }
+    }
+  },
+  "paper_reference_aggregation": "Exact cross-red weighting and standard-deviation convention are not fully specified by the paper"
+}

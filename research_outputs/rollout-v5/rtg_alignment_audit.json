@@ -1,0 +1,55 @@
+{
+  "historical_v2": {
+    "passed": true,
+    "source": "/home/jeonges/proposed/research_outputs/behavior-v2/E3-hybrid-finite/train",
+    "loops": [
+      {
+        "iteration": 1,
+        "baseline": -49.74734795296443,
+        "gate_advantages_checked": 842
+      },
+      {
+        "iteration": 2,
+        "baseline": -47.65342240700452,
+        "gate_advantages_checked": 1242
+      }
+    ],
+    "gate_advantages_checked": 2084,
+    "max_trace_rtg_difference": 0.0,
+    "official_joint_rewards_counted_once_per_tick": true,
+    "causal_individual_credit_claimed": false
+  },
+  "B2": {
+    "passed": true,
+    "source": "/home/jeonges/proposed/research_outputs/rollout-v5/B2/train",
+    "loops": [
+      {
+        "iteration": 1,
+        "baseline": -28.94436489268751,
+        "gate_advantages_checked": 1326
+      }
+    ],
+    "gate_advantages_checked": 1326,
+    "max_trace_rtg_difference": 0.0,
+    "official_joint_rewards_counted_once_per_tick": true,
+    "causal_individual_credit_claimed": false
+  },
+  "B3": {
+    "status": "no_committed_iteration"
+  },
+  "B4": {
+    "passed": true,
+    "source": "/home/jeonges/proposed/research_outputs/rollout-v5/B4/train",
+    "loops": [
+      {
+        "iteration": 1,
+        "baseline": -32.33995300940352,
+        "gate_advantages_checked": 400
+      }
+    ],
+    "gate_advantages_checked": 400,
+    "max_trace_rtg_difference": 0.0,
+    "official_joint_rewards_counted_once_per_tick": true,
+    "causal_individual_credit_claimed": false
+  }
+}

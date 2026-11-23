@@ -1,0 +1,197 @@
+{
+  "status": "completed",
+  "audit_passed": true,
+  "seed": 23000,
+  "development_only": true,
+  "manual_initialization_not_learning": true,
+  "same_initial_actor_state": true,
+  "same_frozen_model": true,
+  "arms": {
+    "E0": {
+      "return": -130.0,
+      "behavior": {
+        "role": "llm",
+        "world_ticks": 499,
+        "free_opportunities": 405,
+        "busy_ticks": 94,
+        "policy_generations": 405,
+        "all_tick_requests": {
+          "Analyse": 49,
+          "Sleep": 432,
+          "Restore": 5,
+          "Remove": 12,
+          "DeployDecoy": 1
+        },
+        "free_choice_actions": {
+          "Analyse": 49,
+          "Sleep": 338,
+          "Restore": 5,
+          "Remove": 12,
+          "DeployDecoy": 1
+        },
+        "environment_last_action_ticks": {
+          "Sleep": 432,
+          "Analyse": 49,
+          "Restore": 5,
+          "Remove": 12,
+          "DeployDecoy": 1
+        },
+        "generated_choice_actions": {
+          "Analyse": 49,
+          "Sleep": 338,
+          "Restore": 5,
+          "Remove": 12,
+          "DeployDecoy": 1
+        },
+        "valid_generated_choice_actions": {
+          "Analyse": 49,
+          "Sleep": 338,
+          "Restore": 5,
+          "Remove": 12,
+          "DeployDecoy": 1
+        },
+        "invalid_policy_fallback_actions": {},
+        "automatic_monitor_ticks": 499,
+        "parse_errors": 0,
+        "learned_skill_decisions": 0,
+        "skill_usage": {
+          "NONE": 405
+        },
+        "observable_diagnostics": {
+          "free_policy_decision": 405,
+          "automatic_busy_wait": 94,
+          "sleep_with_open_case": 316,
+          "repeated_analysis_same_evidence": 15,
+          "analysis_before_unhandled_flagged_pid": 16,
+          "duplicate_successful_decoy": 0,
+          "open_case_opportunities": 379,
+          "unhandled_flagged_pid_opportunities": 21,
+          "targeted_response_to_flagged_pid": 9,
+          "restore_requests": 5,
+          "restore_without_retained_admin_evidence": 4,
+          "waiting_for_action_while_already_free": 6,
+          "observed_admin_opportunities": 1,
+          "targeted_restore_with_admin_evidence": 1,
+          "decoy_with_open_case": 1
+        },
+        "completed_own_operations": {
+          "Analyse:TRUE": 49,
+          "Restore:TRUE": 5,
+          "Remove:TRUE": 12,
+          "DeployDecoy:TRUE": 1
+        },
+        "rule_based_reason_categories": {
+          "investigation": 47,
+          "quiet_observation": 317,
+          "compromise_response": 17,
+          "waiting": 20,
+          "other": 4
+        },
+        "mean_observed_evidence_age_at_response": 0.2,
+        "response_age_samples": 10,
+        "noncanonical_response_opcode": 0,
+        "stored_context_replay_verified": true
+      },
+      "due_lead_opportunities": 87,
+      "targeted_lead_investigations": 16,
+      "source": "research_outputs/behavior-v3-development/E0/summary.json"
+    },
+    "E3": {
+      "return": -125.0,
+      "behavior": {
+        "role": "llm",
+        "world_ticks": 499,
+        "free_opportunities": 340,
+        "busy_ticks": 159,
+        "policy_generations": 340,
+        "all_tick_requests": {
+          "Analyse": 70,
+          "Sleep": 389,
+          "Remove": 19,
+          "Restore": 10,
+          "DeployDecoy": 11
+        },
+        "free_choice_actions": {
+          "Analyse": 70,
+          "Sleep": 230,
+          "Remove": 19,
+          "Restore": 10,
+          "DeployDecoy": 11
+        },
+        "environment_last_action_ticks": {
+          "Sleep": 389,
+          "Analyse": 70,
+          "Remove": 19,
+          "Restore": 10,
+          "DeployDecoy": 11
+        },
+        "generated_choice_actions": {
+          "Analyse": 70,
+          "Sleep": 230,
+          "Remove": 19,
+          "Restore": 10,
+          "DeployDecoy": 11
+        },
+        "valid_generated_choice_actions": {
+          "Analyse": 70,
+          "Sleep": 230,
+          "Remove": 19,
+          "Restore": 10,
+          "DeployDecoy": 11
+        },
+        "invalid_policy_fallback_actions": {},
+        "automatic_monitor_ticks": 499,
+        "parse_errors": 0,
+        "learned_skill_decisions": 0,
+        "skill_usage": {
+          "NONE": 149,
+          "NetworkContainment": 20,
+          "RiskBasedInvestigation": 12,
+          "RapidProcessResponse": 23,
+          "EscalationDiagnosis": 59,
+          "SelectiveDeception": 74,
+          "PrivilegedRecovery": 3
+        },
+        "observable_diagnostics": {
+          "free_policy_decision": 340,
+          "automatic_busy_wait": 159,
+          "sleep_with_open_case": 44,
+          "repeated_analysis_same_evidence": 34,
+          "analysis_before_unhandled_flagged_pid": 13,
+          "duplicate_successful_decoy": 7,
+          "open_case_opportunities": 105,
+          "unhandled_flagged_pid_opportunities": 42,
+          "targeted_response_to_flagged_pid": 8,
+          "restore_requests": 10,
+          "restore_without_retained_admin_evidence": 7,
+          "observed_admin_opportunities": 3,
+          "targeted_restore_with_admin_evidence": 3
+        },
+        "completed_own_operations": {
+          "Analyse:TRUE": 70,
+          "Remove:TRUE": 19,
+          "Restore:TRUE": 10,
+          "DeployDecoy:TRUE": 11
+        },
+        "rule_based_reason_categories": {
+          "investigation": 44,
+          "quiet_observation": 219,
+          "other": 37,
+          "compromise_response": 32,
+          "privilege_or_admin": 4,
+          "waiting": 4
+        },
+        "mean_observed_evidence_age_at_response": 0,
+        "response_age_samples": 11,
+        "noncanonical_response_opcode": 0,
+        "stored_context_replay_verified": true
+      },
+      "due_lead_opportunities": 76,
+      "targeted_lead_investigations": 17,
+      "source": "research_outputs/behavior-v3-development/E3/summary.json"
+    }
+  },
+  "E3_minus_E0": 5.0,
+  "criterion_passed": true,
+  "recommendation": "Fresh prospective evaluation needed before any improvement claim"
+}

@@ -1,0 +1,17 @@
+# Published KEEP GCN-PPO weights, original 3-feature message interpretation.
+name: published-keep
+team: all_rl
+red: finite
+communication: keep
+# Preserve upstream done at steps-1; use --horizon fixed for exactly 500 actions.
+horizon: native
+episodes: 100
+steps: 500
+seed: 42
+threads: 1
+deterministic_rl: false
+weights: third_party/cage-4-submission/weights
+output: runs
+model:
+  backend: mock
+  enabled: false

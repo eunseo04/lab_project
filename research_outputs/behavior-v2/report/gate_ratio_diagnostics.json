@@ -1,0 +1,149 @@
+{
+  "scope": "diagnosis of the original recorded paper gate; no change to acceptance",
+  "rows": [
+    {
+      "iteration": 1,
+      "parent": "RapidProcessResponse",
+      "candidate": "RapidProcessResponse_v2",
+      "n": 31,
+      "accepted": false,
+      "J": -28.98243796178889,
+      "positive_advantage_fraction": 0.12903225806451613,
+      "ratio_median": 0.11036177863310426,
+      "ratio_below_0_8": 0.7419354838709677,
+      "ratio_above_1_2": 0.16129032258064516
+    },
+    {
+      "iteration": 1,
+      "parent": "RapidProcessResponse",
+      "candidate": "RapidProcessResponse_v2",
+      "n": 31,
+      "accepted": false,
+      "J": -26.529571532458817,
+      "positive_advantage_fraction": 0.12903225806451613,
+      "ratio_median": 0.12040211899810423,
+      "ratio_below_0_8": 0.8064516129032258,
+      "ratio_above_1_2": 0.06451612903225806
+    },
+    {
+      "iteration": 1,
+      "parent": "EscalationDiagnosis",
+      "candidate": "EscalationDiagnosis_v2",
+      "n": 43,
+      "accepted": false,
+      "J": -26.33229728913891,
+      "positive_advantage_fraction": 0.20930232558139536,
+      "ratio_median": 0.17111009599683524,
+      "ratio_below_0_8": 0.6744186046511628,
+      "ratio_above_1_2": 0.16279069767441862
+    },
+    {
+      "iteration": 1,
+      "parent": "EscalationDiagnosis",
+      "candidate": "EscalationDiagnosis_v2",
+      "n": 43,
+      "accepted": false,
+      "J": -25.976741712669437,
+      "positive_advantage_fraction": 0.20930232558139536,
+      "ratio_median": 0.3630663186232229,
+      "ratio_below_0_8": 0.627906976744186,
+      "ratio_above_1_2": 0.18604651162790697
+    },
+    {
+      "iteration": 1,
+      "parent": "PrivilegedRecovery",
+      "candidate": "PrivilegedRecovery_v2",
+      "n": 2,
+      "accepted": false,
+      "J": -18.76489142444001,
+      "positive_advantage_fraction": 0.0,
+      "ratio_median": 0.33408971136230825,
+      "ratio_below_0_8": 1.0,
+      "ratio_above_1_2": 0.0
+    },
+    {
+      "iteration": 1,
+      "parent": "PrivilegedRecovery",
+      "candidate": "PrivilegedRecovery_v2",
+      "n": 2,
+      "accepted": false,
+      "J": -18.76489142444001,
+      "positive_advantage_fraction": 0.0,
+      "ratio_median": 0.17595906470636233,
+      "ratio_below_0_8": 1.0,
+      "ratio_above_1_2": 0.0
+    },
+    {
+      "iteration": 1,
+      "parent": "SelectiveDeception",
+      "candidate": "SelectiveDeception_v2",
+      "n": 277,
+      "accepted": true,
+      "J": 2.711081116493573,
+      "positive_advantage_fraction": 0.8339350180505415,
+      "ratio_median": 0.693405712085269,
+      "ratio_below_0_8": 0.6787003610108303,
+      "ratio_above_1_2": 0.07220216606498195
+    },
+    {
+      "iteration": 1,
+      "parent": "SelectiveDeception",
+      "candidate": "SelectiveDeception_v2",
+      "n": 277,
+      "accepted": false,
+      "J": 1.738152545315188,
+      "positive_advantage_fraction": 0.8339350180505415,
+      "ratio_median": 0.40055132983495384,
+      "ratio_below_0_8": 0.7075812274368231,
+      "ratio_above_1_2": 0.09386281588447654
+    },
+    {
+      "iteration": 1,
+      "parent": "NetworkContainment",
+      "candidate": "NetworkContainment_v2",
+      "n": 66,
+      "accepted": false,
+      "J": -14.715592473656876,
+      "positive_advantage_fraction": 0.48484848484848486,
+      "ratio_median": 0.37471233092457557,
+      "ratio_below_0_8": 0.6515151515151515,
+      "ratio_above_1_2": 0.18181818181818182
+    },
+    {
+      "iteration": 1,
+      "parent": "NetworkContainment",
+      "candidate": "NetworkContainment_v2",
+      "n": 66,
+      "accepted": false,
+      "J": -18.341303626592353,
+      "positive_advantage_fraction": 0.48484848484848486,
+      "ratio_median": 0.4407851825783031,
+      "ratio_below_0_8": 0.696969696969697,
+      "ratio_above_1_2": 0.16666666666666666
+    },
+    {
+      "iteration": 1,
+      "parent": "TrafficRecovery",
+      "candidate": "TrafficRecovery_v2",
+      "n": 2,
+      "accepted": false,
+      "J": 7.405044309066307,
+      "positive_advantage_fraction": 1.0,
+      "ratio_median": 2.2647178184487395,
+      "ratio_below_0_8": 0.5,
+      "ratio_above_1_2": 0.5
+    },
+    {
+      "iteration": 1,
+      "parent": "TrafficRecovery",
+      "candidate": "TrafficRecovery_v2",
+      "n": 2,
+      "accepted": true,
+      "J": 7.405064360751034,
+      "positive_advantage_fraction": 1.0,
+      "ratio_median": 2.0281994450692604,
+      "ratio_below_0_8": 0.5,
+      "ratio_above_1_2": 0.5
+    }
+  ]
+}

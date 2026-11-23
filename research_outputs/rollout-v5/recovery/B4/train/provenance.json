@@ -1,0 +1,9 @@
+{
+  "original_snapshot": "/home/jeonges/proposed/research_outputs/rollout-v5/B4/train/pool-iteration-0001.json",
+  "original_snapshot_sha256": "56f4676e8f789b4fd73859fa07f13353515aee944a8e6c9e4e49cfffeb3331da",
+  "original_candidate_pool_sha256": "a3839c0481794fa4b186824ed562a2e96f4c310f2cfece784c279be2be268bff",
+  "original_previous_pool_sha256": "354c2e68740ff3ffc2aeb0c6cef0339c936551d230d8ef50d6b9a1070ee761bc",
+  "candidate_regenerated": false,
+  "same_seeds_criteria_budget": true,
+  "started_unix": 1795209379.0515432
+}

@@ -1,0 +1,23 @@
+{
+  "started_unix": 1795203761.9776363,
+  "model_deadline_unix": 1795232561.9776363,
+  "validation_deadline_unix": 1795222661.9776363,
+  "no_new_episode_after_unix": 1795232381.9776363,
+  "limit_hours": 8,
+  "basis": "Total model campaign elapsed wall time with up to four GPUs; user approved eight-hour option.",
+  "primary_health": {
+    "model": "Qwen/Qwen3-8B",
+    "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+    "backend": "transformers",
+    "transformers": "4.51.3",
+    "torch": "2.6.0+cu124",
+    "dtype": "bfloat16",
+    "weights_frozen": true,
+    "trainable_parameters": 0,
+    "temperature_scoring": true,
+    "scoring_mode": "incremental_teacher_forcing",
+    "chat_template_sha256": "a55ee1b1660128b7098723e0abcd92caa0788061051c62d51cbe87d9cf1974d8"
+  },
+  "primary_port": 8018,
+  "primary_pid": 3761356
+}

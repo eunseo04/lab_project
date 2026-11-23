@@ -1,0 +1,15 @@
+protocol,skill,frequency,historical_trajectories,ready,last_evolved_before_iteration,priority,chosen
+main_500_E2,HostInvestigation,19,2,True,0,-0.01,False
+main_500_E2,ThreatRemoval,5,1,False,0,0.0,False
+main_500_E2,HostRecovery,1,1,False,0,0.0,False
+main_500_E2,DeceptionDeployment,16,2,True,0,-0.01,False
+main_500_E2,NetworkContainment,61,2,True,0,-0.01,False
+main_500_E2,TrafficRecovery,4,2,True,0,0.0,True
+main_500_E2,WaitVerification,5,2,True,0,0.0,False
+main_500_E3,HostInvestigation,84,2,True,0,-0.01,False
+main_500_E3,ThreatRemoval,34,2,True,0,-0.01,False
+main_500_E3,HostRecovery,4,2,True,0,0.0,True
+main_500_E3,DeceptionDeployment,11,2,True,0,0.0,False
+main_500_E3,NetworkContainment,16,2,True,0,-0.01,False
+main_500_E3,TrafficRecovery,6,2,True,0,0.0,False
+main_500_E3,WaitVerification,51,2,True,0,-0.01,False

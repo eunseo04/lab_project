@@ -1,0 +1,9 @@
+# Registered source and experiment hashes require byte-for-byte preservation.
+* -text
+*.png binary
+# Keep archived CSV/XML evidence byte-for-byte, including captured whitespace.
+# Source code retains normal whitespace checks.
+analysis_outputs/** -whitespace
+research_outputs/** -whitespace
+verification/** -whitespace
+revisions/**/research_outputs/** -whitespace

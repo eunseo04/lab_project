@@ -1,0 +1,3937 @@
+{
+  "status": "running",
+  "episodes": [],
+  "metrics": [
+    {
+      "red": "finite",
+      "label": "B0",
+      "n": 0,
+      "mean": null,
+      "std": null,
+      "execution_time_s": null,
+      "action_cost": null,
+      "RIA": null,
+      "LWF": null,
+      "ASF": null
+    },
+    {
+      "red": "finite",
+      "label": "B1",
+      "n": 0,
+      "mean": null,
+      "std": null,
+      "execution_time_s": null,
+      "action_cost": null,
+      "RIA": null,
+      "LWF": null,
+      "ASF": null
+    },
+    {
+      "red": "finite",
+      "label": "B2",
+      "n": 0,
+      "mean": null,
+      "std": null,
+      "execution_time_s": null,
+      "action_cost": null,
+      "RIA": null,
+      "LWF": null,
+      "ASF": null
+    },
+    {
+      "red": "finite",
+      "label": "B3",
+      "n": 0,
+      "mean": null,
+      "std": null,
+      "execution_time_s": null,
+      "action_cost": null,
+      "RIA": null,
+      "LWF": null,
+      "ASF": null
+    },
+    {
+      "red": "finite",
+      "label": "B4",
+      "n": 0,
+      "mean": null,
+      "std": null,
+      "execution_time_s": null,
+      "action_cost": null,
+      "RIA": null,
+      "LWF": null,
+      "ASF": null
+    },
+    {
+      "red": "aggressive",
+      "label": "B0",
+      "n": 0,
+      "mean": null,
+      "std": null,
+      "execution_time_s": null,
+      "action_cost": null,
+      "RIA": null,
+      "LWF": null,
+      "ASF": null
+    },
+    {
+      "red": "aggressive",
+      "label": "B1",
+      "n": 0,
+      "mean": null,
+      "std": null,
+      "execution_time_s": null,
+      "action_cost": null,
+      "RIA": null,
+      "LWF": null,
+      "ASF": null
+    },
+    {
+      "red": "aggressive",
+      "label": "B2",
+      "n": 0,
+      "mean": null,
+      "std": null,
+      "execution_time_s": null,
+      "action_cost": null,
+      "RIA": null,
+      "LWF": null,
+      "ASF": null
+    },
+    {
+      "red": "aggressive",
+      "label": "B3",
+      "n": 0,
+      "mean": null,
+      "std": null,
+      "execution_time_s": null,
+      "action_cost": null,
+      "RIA": null,
+      "LWF": null,
+      "ASF": null
+    },
+    {
+      "red": "aggressive",
+      "label": "B4",
+      "n": 0,
+      "mean": null,
+      "std": null,
+      "execution_time_s": null,
+      "action_cost": null,
+      "RIA": null,
+      "LWF": null,
+      "ASF": null
+    },
+    {
+      "red": "stealthy",
+      "label": "B0",
+      "n": 0,
+      "mean": null,
+      "std": null,
+      "execution_time_s": null,
+      "action_cost": null,
+      "RIA": null,
+      "LWF": null,
+      "ASF": null
+    },
+    {
+      "red": "stealthy",
+      "label": "B1",
+      "n": 0,
+      "mean": null,
+      "std": null,
+      "execution_time_s": null,
+      "action_cost": null,
+      "RIA": null,
+      "LWF": null,
+      "ASF": null
+    },
+    {
+      "red": "stealthy",
+      "label": "B2",
+      "n": 0,
+      "mean": null,
+      "std": null,
+      "execution_time_s": null,
+      "action_cost": null,
+      "RIA": null,
+      "LWF": null,
+      "ASF": null
+    },
+    {
+      "red": "stealthy",
+      "label": "B3",
+      "n": 0,
+      "mean": null,
+      "std": null,
+      "execution_time_s": null,
+      "action_cost": null,
+      "RIA": null,
+      "LWF": null,
+      "ASF": null
+    },
+    {
+      "red": "stealthy",
+      "label": "B4",
+      "n": 0,
+      "mean": null,
+      "std": null,
+      "execution_time_s": null,
+      "action_cost": null,
+      "RIA": null,
+      "LWF": null,
+      "ASF": null
+    },
+    {
+      "red": "impact",
+      "label": "B0",
+      "n": 0,
+      "mean": null,
+      "std": null,
+      "execution_time_s": null,
+      "action_cost": null,
+      "RIA": null,
+      "LWF": null,
+      "ASF": null
+    },
+    {
+      "red": "impact",
+      "label": "B1",
+      "n": 0,
+      "mean": null,
+      "std": null,
+      "execution_time_s": null,
+      "action_cost": null,
+      "RIA": null,
+      "LWF": null,
+      "ASF": null
+    },
+    {
+      "red": "impact",
+      "label": "B2",
+      "n": 0,
+      "mean": null,
+      "std": null,
+      "execution_time_s": null,
+      "action_cost": null,
+      "RIA": null,
+      "LWF": null,
+      "ASF": null
+    },
+    {
+      "red": "impact",
+      "label": "B3",
+      "n": 0,
+      "mean": null,
+      "std": null,
+      "execution_time_s": null,
+      "action_cost": null,
+      "RIA": null,
+      "LWF": null,
+      "ASF": null
+    },
+    {
+      "red": "impact",
+      "label": "B4",
+      "n": 0,
+      "mean": null,
+      "std": null,
+      "execution_time_s": null,
+      "action_cost": null,
+      "RIA": null,
+      "LWF": null,
+      "ASF": null
+    },
+    {
+      "red": "degrade",
+      "label": "B0",
+      "n": 0,
+      "mean": null,
+      "std": null,
+      "execution_time_s": null,
+      "action_cost": null,
+      "RIA": null,
+      "LWF": null,
+      "ASF": null
+    },
+    {
+      "red": "degrade",
+      "label": "B1",
+      "n": 0,
+      "mean": null,
+      "std": null,
+      "execution_time_s": null,
+      "action_cost": null,
+      "RIA": null,
+      "LWF": null,
+      "ASF": null
+    },
+    {
+      "red": "degrade",
+      "label": "B2",
+      "n": 0,
+      "mean": null,
+      "std": null,
+      "execution_time_s": null,
+      "action_cost": null,
+      "RIA": null,
+      "LWF": null,
+      "ASF": null
+    },
+    {
+      "red": "degrade",
+      "label": "B3",
+      "n": 0,
+      "mean": null,
+      "std": null,
+      "execution_time_s": null,
+      "action_cost": null,
+      "RIA": null,
+      "LWF": null,
+      "ASF": null
+    },
+    {
+      "red": "degrade",
+      "label": "B4",
+      "n": 0,
+      "mean": null,
+      "std": null,
+      "execution_time_s": null,
+      "action_cost": null,
+      "RIA": null,
+      "LWF": null,
+      "ASF": null
+    }
+  ],
+  "paired": [
+    {
+      "red": "finite",
+      "label": "B1",
+      "n": 0,
+      "seeds": [],
+      "differences": [],
+      "mean": null,
+      "median": null,
+      "wins": 0,
+      "ties": 0,
+      "win_rate": null,
+      "difference_95ci": null,
+      "ci_method": "paired-seed percentile bootstrap, 10000 resamples; N<2 undefined; small-N inference limited"
+    },
+    {
+      "red": "finite",
+      "label": "B2",
+      "n": 0,
+      "seeds": [],
+      "differences": [],
+      "mean": null,
+      "median": null,
+      "wins": 0,
+      "ties": 0,
+      "win_rate": null,
+      "difference_95ci": null,
+      "ci_method": "paired-seed percentile bootstrap, 10000 resamples; N<2 undefined; small-N inference limited"
+    },
+    {
+      "red": "finite",
+      "label": "B3",
+      "n": 0,
+      "seeds": [],
+      "differences": [],
+      "mean": null,
+      "median": null,
+      "wins": 0,
+      "ties": 0,
+      "win_rate": null,
+      "difference_95ci": null,
+      "ci_method": "paired-seed percentile bootstrap, 10000 resamples; N<2 undefined; small-N inference limited"
+    },
+    {
+      "red": "finite",
+      "label": "B4",
+      "n": 0,
+      "seeds": [],
+      "differences": [],
+      "mean": null,
+      "median": null,
+      "wins": 0,
+      "ties": 0,
+      "win_rate": null,
+      "difference_95ci": null,
+      "ci_method": "paired-seed percentile bootstrap, 10000 resamples; N<2 undefined; small-N inference limited"
+    },
+    {
+      "red": "aggressive",
+      "label": "B1",
+      "n": 0,
+      "seeds": [],
+      "differences": [],
+      "mean": null,
+      "median": null,
+      "wins": 0,
+      "ties": 0,
+      "win_rate": null,
+      "difference_95ci": null,
+      "ci_method": "paired-seed percentile bootstrap, 10000 resamples; N<2 undefined; small-N inference limited"
+    },
+    {
+      "red": "aggressive",
+      "label": "B2",
+      "n": 0,
+      "seeds": [],
+      "differences": [],
+      "mean": null,
+      "median": null,
+      "wins": 0,
+      "ties": 0,
+      "win_rate": null,
+      "difference_95ci": null,
+      "ci_method": "paired-seed percentile bootstrap, 10000 resamples; N<2 undefined; small-N inference limited"
+    },
+    {
+      "red": "aggressive",
+      "label": "B3",
+      "n": 0,
+      "seeds": [],
+      "differences": [],
+      "mean": null,
+      "median": null,
+      "wins": 0,
+      "ties": 0,
+      "win_rate": null,
+      "difference_95ci": null,
+      "ci_method": "paired-seed percentile bootstrap, 10000 resamples; N<2 undefined; small-N inference limited"
+    },
+    {
+      "red": "aggressive",
+      "label": "B4",
+      "n": 0,
+      "seeds": [],
+      "differences": [],
+      "mean": null,
+      "median": null,
+      "wins": 0,
+      "ties": 0,
+      "win_rate": null,
+      "difference_95ci": null,
+      "ci_method": "paired-seed percentile bootstrap, 10000 resamples; N<2 undefined; small-N inference limited"
+    },
+    {
+      "red": "stealthy",
+      "label": "B1",
+      "n": 0,
+      "seeds": [],
+      "differences": [],
+      "mean": null,
+      "median": null,
+      "wins": 0,
+      "ties": 0,
+      "win_rate": null,
+      "difference_95ci": null,
+      "ci_method": "paired-seed percentile bootstrap, 10000 resamples; N<2 undefined; small-N inference limited"
+    },
+    {
+      "red": "stealthy",
+      "label": "B2",
+      "n": 0,
+      "seeds": [],
+      "differences": [],
+      "mean": null,
+      "median": null,
+      "wins": 0,
+      "ties": 0,
+      "win_rate": null,
+      "difference_95ci": null,
+      "ci_method": "paired-seed percentile bootstrap, 10000 resamples; N<2 undefined; small-N inference limited"
+    },
+    {
+      "red": "stealthy",
+      "label": "B3",
+      "n": 0,
+      "seeds": [],
+      "differences": [],
+      "mean": null,
+      "median": null,
+      "wins": 0,
+      "ties": 0,
+      "win_rate": null,
+      "difference_95ci": null,
+      "ci_method": "paired-seed percentile bootstrap, 10000 resamples; N<2 undefined; small-N inference limited"
+    },
+    {
+      "red": "stealthy",
+      "label": "B4",
+      "n": 0,
+      "seeds": [],
+      "differences": [],
+      "mean": null,
+      "median": null,
+      "wins": 0,
+      "ties": 0,
+      "win_rate": null,
+      "difference_95ci": null,
+      "ci_method": "paired-seed percentile bootstrap, 10000 resamples; N<2 undefined; small-N inference limited"
+    },
+    {
+      "red": "impact",
+      "label": "B1",
+      "n": 0,
+      "seeds": [],
+      "differences": [],
+      "mean": null,
+      "median": null,
+      "wins": 0,
+      "ties": 0,
+      "win_rate": null,
+      "difference_95ci": null,
+      "ci_method": "paired-seed percentile bootstrap, 10000 resamples; N<2 undefined; small-N inference limited"
+    },
+    {
+      "red": "impact",
+      "label": "B2",
+      "n": 0,
+      "seeds": [],
+      "differences": [],
+      "mean": null,
+      "median": null,
+      "wins": 0,
+      "ties": 0,
+      "win_rate": null,
+      "difference_95ci": null,
+      "ci_method": "paired-seed percentile bootstrap, 10000 resamples; N<2 undefined; small-N inference limited"
+    },
+    {
+      "red": "impact",
+      "label": "B3",
+      "n": 0,
+      "seeds": [],
+      "differences": [],
+      "mean": null,
+      "median": null,
+      "wins": 0,
+      "ties": 0,
+      "win_rate": null,
+      "difference_95ci": null,
+      "ci_method": "paired-seed percentile bootstrap, 10000 resamples; N<2 undefined; small-N inference limited"
+    },
+    {
+      "red": "impact",
+      "label": "B4",
+      "n": 0,
+      "seeds": [],
+      "differences": [],
+      "mean": null,
+      "median": null,
+      "wins": 0,
+      "ties": 0,
+      "win_rate": null,
+      "difference_95ci": null,
+      "ci_method": "paired-seed percentile bootstrap, 10000 resamples; N<2 undefined; small-N inference limited"
+    },
+    {
+      "red": "degrade",
+      "label": "B1",
+      "n": 0,
+      "seeds": [],
+      "differences": [],
+      "mean": null,
+      "median": null,
+      "wins": 0,
+      "ties": 0,
+      "win_rate": null,
+      "difference_95ci": null,
+      "ci_method": "paired-seed percentile bootstrap, 10000 resamples; N<2 undefined; small-N inference limited"
+    },
+    {
+      "red": "degrade",
+      "label": "B2",
+      "n": 0,
+      "seeds": [],
+      "differences": [],
+      "mean": null,
+      "median": null,
+      "wins": 0,
+      "ties": 0,
+      "win_rate": null,
+      "difference_95ci": null,
+      "ci_method": "paired-seed percentile bootstrap, 10000 resamples; N<2 undefined; small-N inference limited"
+    },
+    {
+      "red": "degrade",
+      "label": "B3",
+      "n": 0,
+      "seeds": [],
+      "differences": [],
+      "mean": null,
+      "median": null,
+      "wins": 0,
+      "ties": 0,
+      "win_rate": null,
+      "difference_95ci": null,
+      "ci_method": "paired-seed percentile bootstrap, 10000 resamples; N<2 undefined; small-N inference limited"
+    },
+    {
+      "red": "degrade",
+      "label": "B4",
+      "n": 0,
+      "seeds": [],
+      "differences": [],
+      "mean": null,
+      "median": null,
+      "wins": 0,
+      "ties": 0,
+      "win_rate": null,
+      "difference_95ci": null,
+      "ci_method": "paired-seed percentile bootstrap, 10000 resamples; N<2 undefined; small-N inference limited"
+    }
+  ],
+  "evolution": [
+    {
+      "label": "B2",
+      "loop": 1,
+      "parent": "RapidProcessResponse",
+      "candidate": "RapidProcessResponse_v2",
+      "score": -1.5258138283468825,
+      "accepted": false,
+      "ppo_selected": false,
+      "semantic_support_passed": null,
+      "valid_decisions": 42,
+      "error": null,
+      "rollout_reason": null,
+      "validation_mean_difference": null,
+      "validation_n": 0,
+      "validation_win_rate": null,
+      "validation_checks": null,
+      "validation_component_changes": null,
+      "deferred": false
+    },
+    {
+      "label": "B2",
+      "loop": 1,
+      "parent": "RapidProcessResponse",
+      "candidate": "RapidProcessResponse_v2",
+      "score": -0.814751916679096,
+      "accepted": false,
+      "ppo_selected": false,
+      "semantic_support_passed": null,
+      "valid_decisions": 42,
+      "error": null,
+      "rollout_reason": null,
+      "validation_mean_difference": null,
+      "validation_n": 0,
+      "validation_win_rate": null,
+      "validation_checks": null,
+      "validation_component_changes": null,
+      "deferred": false
+    },
+    {
+      "label": "B2",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "candidate": "EscalationDiagnosis_v2",
+      "score": 1.6517467354998245,
+      "accepted": true,
+      "ppo_selected": true,
+      "semantic_support_passed": null,
+      "valid_decisions": 5,
+      "error": null,
+      "rollout_reason": null,
+      "validation_mean_difference": null,
+      "validation_n": 0,
+      "validation_win_rate": null,
+      "validation_checks": null,
+      "validation_component_changes": null,
+      "deferred": false
+    },
+    {
+      "label": "B2",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "candidate": "EscalationDiagnosis_v2",
+      "score": 0.18217310554693644,
+      "accepted": false,
+      "ppo_selected": false,
+      "semantic_support_passed": null,
+      "valid_decisions": 5,
+      "error": null,
+      "rollout_reason": null,
+      "validation_mean_difference": null,
+      "validation_n": 0,
+      "validation_win_rate": null,
+      "validation_checks": null,
+      "validation_component_changes": null,
+      "deferred": false
+    },
+    {
+      "label": "B2",
+      "loop": 1,
+      "parent": "PrivilegedRecovery",
+      "candidate": "PrivilegedRecovery_v2",
+      "score": 0.26993387309954997,
+      "accepted": false,
+      "ppo_selected": false,
+      "semantic_support_passed": null,
+      "valid_decisions": 30,
+      "error": null,
+      "rollout_reason": null,
+      "validation_mean_difference": null,
+      "validation_n": 0,
+      "validation_win_rate": null,
+      "validation_checks": null,
+      "validation_component_changes": null,
+      "deferred": false
+    },
+    {
+      "label": "B2",
+      "loop": 1,
+      "parent": "PrivilegedRecovery",
+      "candidate": "PrivilegedRecovery_v2",
+      "score": 0.7142108496009913,
+      "accepted": true,
+      "ppo_selected": true,
+      "semantic_support_passed": null,
+      "valid_decisions": 30,
+      "error": null,
+      "rollout_reason": null,
+      "validation_mean_difference": null,
+      "validation_n": 0,
+      "validation_win_rate": null,
+      "validation_checks": null,
+      "validation_component_changes": null,
+      "deferred": false
+    },
+    {
+      "label": "B2",
+      "loop": 1,
+      "parent": "SelectiveDeception",
+      "candidate": "SelectiveDeception_v2",
+      "score": 7.442726109990326,
+      "accepted": true,
+      "ppo_selected": true,
+      "semantic_support_passed": null,
+      "valid_decisions": 11,
+      "error": null,
+      "rollout_reason": null,
+      "validation_mean_difference": null,
+      "validation_n": 0,
+      "validation_win_rate": null,
+      "validation_checks": null,
+      "validation_component_changes": null,
+      "deferred": false
+    },
+    {
+      "label": "B2",
+      "loop": 1,
+      "parent": "SelectiveDeception",
+      "candidate": "SelectiveDeception_v2",
+      "score": 4.429145748210239,
+      "accepted": false,
+      "ppo_selected": false,
+      "semantic_support_passed": null,
+      "valid_decisions": 11,
+      "error": null,
+      "rollout_reason": null,
+      "validation_mean_difference": null,
+      "validation_n": 0,
+      "validation_win_rate": null,
+      "validation_checks": null,
+      "validation_component_changes": null,
+      "deferred": false
+    },
+    {
+      "label": "B2",
+      "loop": 1,
+      "parent": "NetworkContainment",
+      "candidate": "NetworkContainment_v2",
+      "score": 3.63379018146401,
+      "accepted": false,
+      "ppo_selected": false,
+      "semantic_support_passed": null,
+      "valid_decisions": 63,
+      "error": null,
+      "rollout_reason": null,
+      "validation_mean_difference": null,
+      "validation_n": 0,
+      "validation_win_rate": null,
+      "validation_checks": null,
+      "validation_component_changes": null,
+      "deferred": false
+    },
+    {
+      "label": "B2",
+      "loop": 1,
+      "parent": "NetworkContainment",
+      "candidate": "NetworkContainment_v2",
+      "score": 3.8683820945088865,
+      "accepted": true,
+      "ppo_selected": true,
+      "semantic_support_passed": null,
+      "valid_decisions": 63,
+      "error": null,
+      "rollout_reason": null,
+      "validation_mean_difference": null,
+      "validation_n": 0,
+      "validation_win_rate": null,
+      "validation_checks": null,
+      "validation_component_changes": null,
+      "deferred": false
+    },
+    {
+      "label": "B2",
+      "loop": 1,
+      "parent": "RiskBasedInvestigation",
+      "candidate": "RiskBasedInvestigation_v2",
+      "score": -7.945432391117991,
+      "accepted": false,
+      "ppo_selected": false,
+      "semantic_support_passed": null,
+      "valid_decisions": 512,
+      "error": null,
+      "rollout_reason": null,
+      "validation_mean_difference": null,
+      "validation_n": 0,
+      "validation_win_rate": null,
+      "validation_checks": null,
+      "validation_component_changes": null,
+      "deferred": false
+    },
+    {
+      "label": "B2",
+      "loop": 1,
+      "parent": "RiskBasedInvestigation",
+      "candidate": "RiskBasedInvestigation_v2",
+      "score": -6.085916571986149,
+      "accepted": false,
+      "ppo_selected": false,
+      "semantic_support_passed": null,
+      "valid_decisions": 512,
+      "error": null,
+      "rollout_reason": null,
+      "validation_mean_difference": null,
+      "validation_n": 0,
+      "validation_win_rate": null,
+      "validation_checks": null,
+      "validation_component_changes": null,
+      "deferred": false
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "candidate": "EscalationDiagnosis_v2",
+      "score": 1.9057909397553505,
+      "accepted": false,
+      "ppo_selected": true,
+      "semantic_support_passed": true,
+      "valid_decisions": 200,
+      "error": null,
+      "rollout_reason": "validation_error",
+      "validation_mean_difference": null,
+      "validation_n": 0,
+      "validation_win_rate": null,
+      "validation_checks": null,
+      "validation_component_changes": null,
+      "deferred": false
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "candidate": "EscalationDiagnosis_v2",
+      "score": -0.41499271753707667,
+      "accepted": false,
+      "ppo_selected": false,
+      "semantic_support_passed": true,
+      "valid_decisions": 200,
+      "error": null,
+      "rollout_reason": null,
+      "validation_mean_difference": null,
+      "validation_n": 0,
+      "validation_win_rate": null,
+      "validation_checks": null,
+      "validation_component_changes": null,
+      "deferred": false
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "RiskBasedInvestigation",
+      "candidate": null,
+      "score": null,
+      "accepted": false,
+      "valid_decisions": 81,
+      "error": null,
+      "rollout_reason": "registered_rollout_budget_exhausted; keep previous skill including rare skills",
+      "validation_mean_difference": null,
+      "validation_n": 0,
+      "validation_win_rate": null,
+      "deferred": true
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "RapidProcessResponse",
+      "candidate": null,
+      "score": null,
+      "accepted": false,
+      "valid_decisions": 76,
+      "error": null,
+      "rollout_reason": "registered_rollout_budget_exhausted; keep previous skill including rare skills",
+      "validation_mean_difference": null,
+      "validation_n": 0,
+      "validation_win_rate": null,
+      "deferred": true
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "SelectiveDeception",
+      "candidate": null,
+      "score": null,
+      "accepted": false,
+      "valid_decisions": 34,
+      "error": null,
+      "rollout_reason": "registered_rollout_budget_exhausted; keep previous skill including rare skills",
+      "validation_mean_difference": null,
+      "validation_n": 0,
+      "validation_win_rate": null,
+      "deferred": true
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "NetworkContainment",
+      "candidate": null,
+      "score": null,
+      "accepted": false,
+      "valid_decisions": 25,
+      "error": null,
+      "rollout_reason": "registered_rollout_budget_exhausted; keep previous skill including rare skills",
+      "validation_mean_difference": null,
+      "validation_n": 0,
+      "validation_win_rate": null,
+      "deferred": true
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "PrivilegedRecovery",
+      "candidate": null,
+      "score": null,
+      "accepted": false,
+      "valid_decisions": 3,
+      "error": null,
+      "rollout_reason": "registered_rollout_budget_exhausted; keep previous skill including rare skills",
+      "validation_mean_difference": null,
+      "validation_n": 0,
+      "validation_win_rate": null,
+      "deferred": true
+    }
+  ],
+  "semantic_evidence_audits": [
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": true,
+      "errors": [],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 49,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse admin_network_subnet_user_host_0",
+          "evidence_id": "E0",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "execution",
+          "step": 54,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse admin_network_subnet_user_host_0",
+          "evidence_id": "E2",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 59,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse admin_network_subnet_user_host_0",
+          "evidence_id": "E4",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": true,
+      "errors": [],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 60,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Sleep",
+          "evidence_id": "E0",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "execution",
+          "step": 64,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse admin_network_subnet_user_host_5",
+          "evidence_id": "E1",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 68,
+          "agent": "blue_agent_4",
+          "field": "action_status",
+          "quote": "IN_PROGRESS",
+          "evidence_id": "E5",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": false,
+      "errors": [
+        "missing_evidence_for_initiation"
+      ],
+      "references": [
+        {
+          "component": "execution",
+          "step": 71,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse public_access_zone_subnet_server_host_0",
+          "evidence_id": "E2",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "execution",
+          "step": 73,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse admin_network_subnet_user_host_0",
+          "evidence_id": "E4",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 74,
+          "agent": "blue_agent_4",
+          "field": "skill_terminated",
+          "quote": "true",
+          "evidence_id": "E5",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": false,
+      "errors": [
+        "unknown_catalog_reference",
+        "missing_evidence_for_initiation",
+        "missing_evidence_for_termination"
+      ],
+      "references": [
+        {
+          "component": "execution",
+          "step": 80,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse admin_network_subnet_user_host_0",
+          "evidence_id": "E1",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "execution",
+          "step": 85,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse admin_network_subnet_user_host_1",
+          "evidence_id": "E3",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "execution",
+          "step": 87,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse office_network_subnet_user_host_4",
+          "evidence_id": "E5",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": false,
+      "errors": [
+        "unknown_catalog_reference",
+        "unknown_catalog_reference",
+        "missing_evidence_for_execution",
+        "missing_evidence_for_termination"
+      ],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 89,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse admin_network_subnet_user_host_2",
+          "evidence_id": "E0",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": true,
+      "errors": [],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 93,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Restore admin_network_subnet_server_host_3",
+          "evidence_id": "E0",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "execution",
+          "step": 93,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Restore admin_network_subnet_server_host_3",
+          "evidence_id": "E0",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 96,
+          "agent": "blue_agent_4",
+          "field": "action_status",
+          "quote": "IN_PROGRESS",
+          "evidence_id": "E3",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": true,
+      "errors": [],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 104,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Sleep",
+          "evidence_id": "E4",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "execution",
+          "step": 105,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse admin_network_subnet_server_host_1",
+          "evidence_id": "E5",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 105,
+          "agent": "blue_agent_4",
+          "field": "action_status",
+          "quote": "IN_PROGRESS",
+          "evidence_id": "E5",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": true,
+      "errors": [],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 117,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Sleep",
+          "evidence_id": "E6",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "execution",
+          "step": 117,
+          "agent": "blue_agent_4",
+          "field": "action_status",
+          "quote": "TRUE",
+          "evidence_id": "E6",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 117,
+          "agent": "blue_agent_4",
+          "field": "skill_terminated",
+          "quote": "true",
+          "evidence_id": "E6",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": false,
+      "errors": [
+        "unknown_catalog_reference",
+        "unknown_catalog_reference",
+        "missing_evidence_for_execution",
+        "missing_evidence_for_termination"
+      ],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 123,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse admin_network_subnet_user_host_0",
+          "evidence_id": "E2",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": false,
+      "errors": [
+        "missing_evidence_for_initiation"
+      ],
+      "references": [
+        {
+          "component": "execution",
+          "step": 153,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse admin_network_subnet_user_host_5",
+          "evidence_id": "E3",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "execution",
+          "step": 158,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse admin_network_subnet_server_host_1",
+          "evidence_id": "E5",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 154,
+          "agent": "blue_agent_4",
+          "field": "action_status",
+          "quote": "TRUE",
+          "evidence_id": "E4",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": true,
+      "errors": [],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 160,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Restore admin_network_subnet_server_host_1",
+          "evidence_id": "E0",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "execution",
+          "step": 165,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse admin_network_subnet_user_host_5",
+          "evidence_id": "E5",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 166,
+          "agent": "blue_agent_4",
+          "field": "action_status",
+          "quote": "TRUE",
+          "evidence_id": "E6",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": true,
+      "errors": [],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 170,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse office_network_subnet_server_host_2",
+          "evidence_id": "E0",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "execution",
+          "step": 172,
+          "agent": "blue_agent_4",
+          "field": "action_status",
+          "quote": "UNKNOWN",
+          "evidence_id": "E2",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 177,
+          "agent": "blue_agent_4",
+          "field": "skill_terminated",
+          "quote": "true",
+          "evidence_id": "E7",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": true,
+      "errors": [],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 178,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Sleep",
+          "evidence_id": "E0",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "execution",
+          "step": 178,
+          "agent": "blue_agent_4",
+          "field": "behavior_outcome",
+          "quote": "{\"free_policy_decision\": true, \"automatic_busy_wait\": false, \"sleep_with_open_case\": true, \"repeated_analysis_same_evidence\": false, \"analysis_before_unhandled_flagged_pid\": false, \"duplicate_successful_decoy\": false, \"completed_action\": null}",
+          "evidence_id": "E0",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 184,
+          "agent": "blue_agent_4",
+          "field": "skill_terminated",
+          "quote": "true",
+          "evidence_id": "E6",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": true,
+      "errors": [],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 196,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse admin_network_subnet_server_host_5",
+          "evidence_id": "E6",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "execution",
+          "step": 196,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse admin_network_subnet_server_host_5",
+          "evidence_id": "E6",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 197,
+          "agent": "blue_agent_4",
+          "field": "skill_terminated",
+          "quote": "true",
+          "evidence_id": "E7",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": false,
+      "errors": [
+        "missing_evidence_for_initiation"
+      ],
+      "references": [
+        {
+          "component": "execution",
+          "step": 200,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Sleep",
+          "evidence_id": "E0",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "execution",
+          "step": 202,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse office_network_subnet_user_host_7",
+          "evidence_id": "E2",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 203,
+          "agent": "blue_agent_4",
+          "field": "skill_terminated",
+          "quote": "true",
+          "evidence_id": "E3",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": false,
+      "errors": [
+        "unknown_catalog_reference",
+        "missing_evidence_for_execution"
+      ],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 229,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse office_network_subnet_user_host_1",
+          "evidence_id": "E0",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 231,
+          "agent": "blue_agent_4",
+          "field": "skill_terminated",
+          "quote": "true",
+          "evidence_id": "E2",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": true,
+      "errors": [],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 249,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse office_network_subnet_server_host_3",
+          "evidence_id": "E3",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "execution",
+          "step": 249,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse office_network_subnet_server_host_3",
+          "evidence_id": "E3",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 254,
+          "agent": "blue_agent_4",
+          "field": "skill_terminated",
+          "quote": "true",
+          "evidence_id": "E8",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": true,
+      "errors": [],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 260,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse office_network_subnet_server_host_2",
+          "evidence_id": "E5",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "execution",
+          "step": 260,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse office_network_subnet_server_host_2",
+          "evidence_id": "E5",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 262,
+          "agent": "blue_agent_4",
+          "field": "action_status",
+          "quote": "IN_PROGRESS",
+          "evidence_id": "E7",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": false,
+      "errors": [
+        "unknown_catalog_reference",
+        "missing_evidence_for_execution"
+      ],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 265,
+          "agent": "blue_agent_4",
+          "field": "skill_terminated",
+          "quote": "true",
+          "evidence_id": "E2",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 280,
+          "agent": "blue_agent_4",
+          "field": "action_status",
+          "quote": "IN_PROGRESS",
+          "evidence_id": "E7",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": true,
+      "errors": [],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 281,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Sleep",
+          "evidence_id": "E0",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "execution",
+          "step": 281,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Sleep",
+          "evidence_id": "E0",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 290,
+          "agent": "blue_agent_4",
+          "field": "skill_terminated",
+          "quote": "true",
+          "evidence_id": "E8",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": true,
+      "errors": [],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 293,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse admin_network_subnet_server_host_0",
+          "evidence_id": "E2",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "execution",
+          "step": 294,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Sleep",
+          "evidence_id": "E3",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 297,
+          "agent": "blue_agent_4",
+          "field": "skill_terminated",
+          "quote": "true",
+          "evidence_id": "E6",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": true,
+      "errors": [],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 315,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse admin_network_subnet_server_host_3",
+          "evidence_id": "E0",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "execution",
+          "step": 315,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse admin_network_subnet_server_host_3",
+          "evidence_id": "E0",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 324,
+          "agent": "blue_agent_4",
+          "field": "skill_terminated",
+          "quote": "true",
+          "evidence_id": "E7",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": false,
+      "errors": [
+        "unknown_catalog_reference",
+        "unknown_catalog_reference",
+        "unknown_catalog_reference",
+        "missing_evidence_for_initiation",
+        "missing_evidence_for_termination"
+      ],
+      "references": [
+        {
+          "component": "execution",
+          "step": 325,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse office_network_subnet_user_host_3",
+          "evidence_id": "E0",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "execution",
+          "step": 327,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse admin_network_subnet_server_host_5",
+          "evidence_id": "E2",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "execution",
+          "step": 330,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse admin_network_subnet_user_host_0",
+          "evidence_id": "E5",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "execution",
+          "step": 340,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse office_network_subnet_user_host_0",
+          "evidence_id": "E7",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": false,
+      "errors": [
+        "unknown_catalog_reference",
+        "unknown_catalog_reference",
+        "missing_evidence_for_execution",
+        "missing_evidence_for_termination"
+      ],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 341,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Sleep",
+          "evidence_id": "E0",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": true,
+      "errors": [],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 351,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Restore office_network_subnet_user_host_0",
+          "evidence_id": "E4",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "execution",
+          "step": 351,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Restore office_network_subnet_user_host_0",
+          "evidence_id": "E4",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 352,
+          "agent": "blue_agent_4",
+          "field": "action_status",
+          "quote": "IN_PROGRESS",
+          "evidence_id": "E5",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": false,
+      "errors": [
+        "unknown_catalog_reference",
+        "missing_evidence_for_execution"
+      ],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 357,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse admin_network_subnet_user_host_5",
+          "evidence_id": "E4",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 355,
+          "agent": "blue_agent_4",
+          "field": "skill_terminated",
+          "quote": "true",
+          "evidence_id": "E2",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": true,
+      "errors": [],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 365,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Sleep",
+          "evidence_id": "E2",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "execution",
+          "step": 371,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse admin_network_subnet_user_host_5",
+          "evidence_id": "E5",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 372,
+          "agent": "blue_agent_4",
+          "field": "skill_terminated",
+          "quote": "true",
+          "evidence_id": "E6",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": false,
+      "errors": [
+        "unknown_catalog_reference",
+        "missing_evidence_for_execution"
+      ],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 376,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse admin_network_subnet_server_host_4",
+          "evidence_id": "E0",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 387,
+          "agent": "blue_agent_4",
+          "field": "skill_terminated",
+          "quote": "true",
+          "evidence_id": "E5",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": true,
+      "errors": [],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 390,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse office_network_subnet_user_host_5",
+          "evidence_id": "E0",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "execution",
+          "step": 409,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Remove office_network_subnet_user_host_6",
+          "evidence_id": "E5",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 410,
+          "agent": "blue_agent_4",
+          "field": "action_status",
+          "quote": "IN_PROGRESS",
+          "evidence_id": "E6",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": true,
+      "errors": [],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 412,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse office_network_subnet_user_host_6",
+          "evidence_id": "E1",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "execution",
+          "step": 412,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse office_network_subnet_user_host_6",
+          "evidence_id": "E1",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 417,
+          "agent": "blue_agent_4",
+          "field": "action_status",
+          "quote": "IN_PROGRESS",
+          "evidence_id": "E6",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": false,
+      "errors": [
+        "unknown_catalog_reference",
+        "missing_evidence_for_termination"
+      ],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 418,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Sleep",
+          "evidence_id": "E0",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "execution",
+          "step": 418,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Sleep",
+          "evidence_id": "E0",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": true,
+      "errors": [],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 433,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "DeployDecoy admin_network_subnet_user_host_5",
+          "evidence_id": "E4",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "execution",
+          "step": 433,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "DeployDecoy admin_network_subnet_user_host_5",
+          "evidence_id": "E4",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 434,
+          "agent": "blue_agent_4",
+          "field": "skill_terminated",
+          "quote": "true",
+          "evidence_id": "E5",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": false,
+      "errors": [
+        "unknown_catalog_reference",
+        "unknown_catalog_reference",
+        "missing_evidence_for_initiation",
+        "missing_evidence_for_execution"
+      ],
+      "references": [
+        {
+          "component": "termination",
+          "step": 448,
+          "agent": "blue_agent_4",
+          "field": "skill_terminated",
+          "quote": "true",
+          "evidence_id": "E6",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": false,
+      "errors": [
+        "unknown_catalog_reference",
+        "unknown_catalog_reference",
+        "missing_evidence_for_execution",
+        "missing_evidence_for_termination"
+      ],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 452,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse admin_network_subnet_user_host_5",
+          "evidence_id": "E0",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": false,
+      "errors": [
+        "unknown_catalog_reference",
+        "missing_evidence_for_execution"
+      ],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 464,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Sleep",
+          "evidence_id": "E0",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 469,
+          "agent": "blue_agent_4",
+          "field": "action_status",
+          "quote": "IN_PROGRESS",
+          "evidence_id": "E5",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": false,
+      "errors": [
+        "unknown_catalog_reference",
+        "missing_evidence_for_termination"
+      ],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 470,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Sleep",
+          "evidence_id": "E0",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "execution",
+          "step": 474,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse admin_network_subnet_user_host_5",
+          "evidence_id": "E1",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": true,
+      "errors": [],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 488,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Restore office_network_subnet_user_host_5",
+          "evidence_id": "E5",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "execution",
+          "step": 488,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Restore office_network_subnet_user_host_5",
+          "evidence_id": "E5",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 489,
+          "agent": "blue_agent_4",
+          "field": "action_status",
+          "quote": "IN_PROGRESS",
+          "evidence_id": "E6",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": false,
+      "errors": [
+        "unknown_catalog_reference",
+        "missing_evidence_for_initiation"
+      ],
+      "references": [
+        {
+          "component": "execution",
+          "step": 496,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse admin_network_subnet_server_host_4",
+          "evidence_id": "E6",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 490,
+          "agent": "blue_agent_4",
+          "field": "skill_terminated",
+          "quote": "false",
+          "evidence_id": "E0",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": true,
+      "errors": [],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 497,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Sleep",
+          "evidence_id": "E0",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "execution",
+          "step": 498,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse office_network_subnet_server_host_3",
+          "evidence_id": "E1",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 498,
+          "agent": "blue_agent_4",
+          "field": "action_status",
+          "quote": "IN_PROGRESS",
+          "evidence_id": "E1",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": false,
+      "errors": [
+        "unknown_catalog_reference",
+        "missing_evidence_for_execution"
+      ],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 61,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse admin_network_subnet_server_host_2",
+          "evidence_id": "E0",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 140,
+          "agent": "blue_agent_4",
+          "field": "action_status",
+          "quote": "UNKNOWN",
+          "evidence_id": "E6",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": true,
+      "errors": [],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 141,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse office_network_subnet_user_host_0",
+          "evidence_id": "E0",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "execution",
+          "step": 143,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse office_network_subnet_user_host_0",
+          "evidence_id": "E2",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 150,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse admin_network_subnet_user_host_0",
+          "evidence_id": "E6",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": false,
+      "errors": [
+        "unknown_catalog_reference",
+        "missing_evidence_for_execution"
+      ],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 151,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Sleep",
+          "evidence_id": "E0",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 157,
+          "agent": "blue_agent_4",
+          "field": "action_status",
+          "quote": "IN_PROGRESS",
+          "evidence_id": "E6",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": true,
+      "errors": [],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 308,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse admin_network_subnet_user_host_0",
+          "evidence_id": "E5",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "execution",
+          "step": 308,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse admin_network_subnet_user_host_0",
+          "evidence_id": "E5",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 309,
+          "agent": "blue_agent_4",
+          "field": "action_status",
+          "quote": "TRUE",
+          "evidence_id": "E6",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": true,
+      "errors": [],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 327,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse office_network_subnet_user_host_0",
+          "evidence_id": "E0",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "execution",
+          "step": 338,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Restore public_access_zone_subnet_server_host_1",
+          "evidence_id": "E4",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 337,
+          "agent": "blue_agent_4",
+          "field": "action_status",
+          "quote": "TRUE",
+          "evidence_id": "E3",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": true,
+      "errors": [],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 345,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse admin_network_subnet_user_host_0",
+          "evidence_id": "E3",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "execution",
+          "step": 350,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse admin_network_subnet_user_host_0",
+          "evidence_id": "E5",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 355,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse admin_network_subnet_user_host_0",
+          "evidence_id": "E7",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": false,
+      "errors": [
+        "unknown_catalog_reference",
+        "missing_evidence_for_execution"
+      ],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 356,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Sleep",
+          "evidence_id": "E0",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 372,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Restore admin_network_subnet_user_host_0",
+          "evidence_id": "E5",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": true,
+      "errors": [],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 378,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Sleep",
+          "evidence_id": "E5",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "execution",
+          "step": 378,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Sleep",
+          "evidence_id": "E5",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 378,
+          "agent": "blue_agent_4",
+          "field": "action_status",
+          "quote": "TRUE",
+          "evidence_id": "E5",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "parent": "EscalationDiagnosis",
+      "passed": true,
+      "errors": [],
+      "references": [
+        {
+          "component": "initiation",
+          "step": 408,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Sleep",
+          "evidence_id": "E0",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "execution",
+          "step": 414,
+          "agent": "blue_agent_4",
+          "field": "requested_action",
+          "quote": "Analyse admin_network_subnet_server_host_0",
+          "evidence_id": "E1",
+          "selected_from_recorded_catalog": true
+        },
+        {
+          "component": "termination",
+          "step": 426,
+          "agent": "blue_agent_4",
+          "field": "skill_terminated",
+          "quote": "true",
+          "evidence_id": "E6",
+          "selected_from_recorded_catalog": true
+        }
+      ]
+    }
+  ],
+  "training_histories": [
+    {
+      "label": "B2",
+      "loop": 1,
+      "training_reward": -197.0,
+      "pool_size": 11,
+      "evolution_seconds_including_rollout": 4378.273011770099,
+      "original_update_seconds": 4378.273011770099,
+      "metadata_retry_validation_seconds": 0.0
+    },
+    {
+      "label": "B4",
+      "loop": 1,
+      "training_reward": -222.0,
+      "pool_size": 7,
+      "evolution_seconds_including_rollout": 2168.5915918550454,
+      "original_update_seconds": 2168.5915918550454,
+      "metadata_retry_validation_seconds": 0.0
+    }
+  ],
+  "actual_validation_episodes": [
+    {
+      "label": "B4",
+      "comparison": "iteration-0001-001-EscalationDiagnosis_v2",
+      "role": "previous",
+      "seed": 62000,
+      "return": -133.0,
+      "action_cost": -71,
+      "RIA": -62,
+      "LWF": 0,
+      "ASF": 0,
+      "execution_time_s": 833.4812408988364,
+      "skill_valid_decisions": {
+        "NONE": 110,
+        "NetworkContainment": 23,
+        "SelectiveDeception": 14,
+        "RiskBasedInvestigation": 19,
+        "PrivilegedRecovery": 2,
+        "RapidProcessResponse": 9,
+        "EscalationDiagnosis": 162
+      },
+      "learned_skill_valid_decisions": 0,
+      "valid_model_action_choices": {
+        "Analyse": 83,
+        "Sleep": 223,
+        "DeployDecoy": 7,
+        "Restore": 9,
+        "Remove": 17
+      },
+      "completed_own_operations": {
+        "Analyse_TRUE": 83,
+        "DeployDecoy_TRUE": 7,
+        "Restore_TRUE": 9,
+        "Remove_TRUE": 17
+      },
+      "source": "/home/jeonges/proposed/research_outputs/rollout-v5/recovery/B4/train/rollout-verification/iteration-0001-001-EscalationDiagnosis_v2/previous-seed-62000/summary.json",
+      "source_sha256": "1ad378a6487f8f33c4513657a611d69415c2f0f0c5caa398cedd300078e4aef8"
+    },
+    {
+      "label": "B4",
+      "comparison": "iteration-0001-001-EscalationDiagnosis_v2",
+      "role": "previous",
+      "seed": 62001,
+      "return": -149.0,
+      "action_cost": -81,
+      "RIA": -46,
+      "LWF": -22,
+      "ASF": 0,
+      "execution_time_s": 1861.7883086579386,
+      "skill_valid_decisions": {
+        "NONE": 113,
+        "SelectiveDeception": 36,
+        "RiskBasedInvestigation": 68,
+        "RapidProcessResponse": 12,
+        "EscalationDiagnosis": 46,
+        "NetworkContainment": 20,
+        "PrivilegedRecovery": 1
+      },
+      "learned_skill_valid_decisions": 0,
+      "valid_model_action_choices": {
+        "Analyse": 98,
+        "Sleep": 151,
+        "DeployDecoy": 9,
+        "Remove": 28,
+        "Restore": 10
+      },
+      "completed_own_operations": {
+        "Analyse_TRUE": 98,
+        "DeployDecoy_TRUE": 9,
+        "Remove_TRUE": 28,
+        "Restore_TRUE": 10
+      },
+      "source": "/home/jeonges/proposed/research_outputs/rollout-v5/recovery/B4/train/rollout-verification/iteration-0001-001-EscalationDiagnosis_v2/previous-seed-62001/summary.json",
+      "source_sha256": "420fdc02d55815552932fe4d7ab889a21cefb0cf3805a5d2841590bbea76b93b"
+    },
+    {
+      "label": "B4",
+      "comparison": "iteration-0001-001-EscalationDiagnosis_v2",
+      "role": "previous",
+      "seed": 62002,
+      "return": -155.0,
+      "action_cost": -63,
+      "RIA": -73,
+      "LWF": -19,
+      "ASF": 0,
+      "execution_time_s": 1983.30741816503,
+      "skill_valid_decisions": {
+        "NONE": 114,
+        "RiskBasedInvestigation": 39,
+        "SelectiveDeception": 16,
+        "NetworkContainment": 13,
+        "RapidProcessResponse": 12,
+        "EscalationDiagnosis": 127,
+        "PrivilegedRecovery": 3
+      },
+      "learned_skill_valid_decisions": 0,
+      "valid_model_action_choices": {
+        "Sleep": 195,
+        "Analyse": 93,
+        "DeployDecoy": 6,
+        "Remove": 22,
+        "Restore": 8
+      },
+      "completed_own_operations": {
+        "Analyse_TRUE": 93,
+        "DeployDecoy_TRUE": 6,
+        "Remove_TRUE": 22,
+        "Restore_TRUE": 8
+      },
+      "source": "/home/jeonges/proposed/research_outputs/rollout-v5/recovery/B4/train/rollout-verification/iteration-0001-001-EscalationDiagnosis_v2/previous-seed-62002/summary.json",
+      "source_sha256": "8cef3baeb5ee1c6cc10c9877941ee1b29f690b347a30c78029467f5f789aca52"
+    },
+    {
+      "label": "B4",
+      "comparison": "iteration-0001-001-EscalationDiagnosis_v2",
+      "role": "previous",
+      "seed": 62003,
+      "return": -241.0,
+      "action_cost": -70,
+      "RIA": -70,
+      "LWF": -88,
+      "ASF": -13,
+      "execution_time_s": 733.4384703210089,
+      "skill_valid_decisions": {
+        "NONE": 60,
+        "RiskBasedInvestigation": 41,
+        "SelectiveDeception": 12,
+        "NetworkContainment": 7,
+        "RapidProcessResponse": 23,
+        "EscalationDiagnosis": 121,
+        "PrivilegedRecovery": 2
+      },
+      "learned_skill_valid_decisions": 0,
+      "valid_model_action_choices": {
+        "Analyse": 116,
+        "Sleep": 99,
+        "DeployDecoy": 3,
+        "Remove": 39,
+        "Restore": 9
+      },
+      "completed_own_operations": {
+        "Analyse_TRUE": 116,
+        "DeployDecoy_TRUE": 3,
+        "Remove_TRUE": 39,
+        "Restore_TRUE": 9
+      },
+      "source": "/home/jeonges/proposed/research_outputs/rollout-v5/recovery/B4/train/rollout-verification/iteration-0001-001-EscalationDiagnosis_v2/previous-seed-62003/summary.json",
+      "source_sha256": "b01601131819a9aeec900e879daf4a0785af34552aa790f9df004bc69d1a497f"
+    },
+    {
+      "label": "B4",
+      "comparison": "iteration-0001-001-EscalationDiagnosis_v2",
+      "role": "previous",
+      "seed": 62004,
+      "return": -112.0,
+      "action_cost": -74,
+      "RIA": -31,
+      "LWF": -7,
+      "ASF": 0,
+      "execution_time_s": 1179.6560739760753,
+      "skill_valid_decisions": {
+        "NONE": 106,
+        "RiskBasedInvestigation": 100,
+        "NetworkContainment": 24,
+        "SelectiveDeception": 17,
+        "RapidProcessResponse": 9,
+        "EscalationDiagnosis": 29,
+        "PrivilegedRecovery": 3
+      },
+      "learned_skill_valid_decisions": 0,
+      "valid_model_action_choices": {
+        "Analyse": 121,
+        "Sleep": 123,
+        "Remove": 22,
+        "Restore": 8,
+        "DeployDecoy": 14
+      },
+      "completed_own_operations": {
+        "Analyse_TRUE": 121,
+        "Remove_TRUE": 22,
+        "Restore_TRUE": 8,
+        "DeployDecoy_TRUE": 14
+      },
+      "source": "/home/jeonges/proposed/research_outputs/rollout-v5/recovery/B4/train/rollout-verification/iteration-0001-001-EscalationDiagnosis_v2/previous-seed-62004/summary.json",
+      "source_sha256": "44fb3a11539c4d8a1f9decd2217e7b4d32fd32c9b71d1ebe68e4a06913a68f1e"
+    },
+    {
+      "label": "B4",
+      "comparison": "iteration-0001-001-EscalationDiagnosis_v2",
+      "role": "previous",
+      "seed": 62006,
+      "return": -177.0,
+      "action_cost": -68,
+      "RIA": -37,
+      "LWF": -72,
+      "ASF": 0,
+      "execution_time_s": 702.8648814759217,
+      "skill_valid_decisions": {
+        "NONE": 45,
+        "RiskBasedInvestigation": 75,
+        "NetworkContainment": 8,
+        "RapidProcessResponse": 52,
+        "EscalationDiagnosis": 64,
+        "PrivilegedRecovery": 3,
+        "SelectiveDeception": 13
+      },
+      "learned_skill_valid_decisions": 0,
+      "valid_model_action_choices": {
+        "Analyse": 131,
+        "Sleep": 82,
+        "Remove": 34,
+        "Restore": 9,
+        "DeployDecoy": 4
+      },
+      "completed_own_operations": {
+        "Analyse_TRUE": 131,
+        "Remove_TRUE": 34,
+        "Restore_TRUE": 9,
+        "DeployDecoy_TRUE": 4
+      },
+      "source": "/home/jeonges/proposed/research_outputs/rollout-v5/recovery/B4/train/rollout-verification/iteration-0001-001-EscalationDiagnosis_v2/previous-seed-62006/summary.json",
+      "source_sha256": "89f12a7958bb4108c29a525a03200ac4ca01ab8b8ad9a1bf9d9385f606e8f8eb"
+    },
+    {
+      "label": "B4",
+      "comparison": "iteration-0001-001-EscalationDiagnosis_v2",
+      "role": "previous",
+      "seed": 62007,
+      "return": -172.0,
+      "action_cost": -67,
+      "RIA": -99,
+      "LWF": 0,
+      "ASF": -6,
+      "execution_time_s": 1249.9079282940365,
+      "skill_valid_decisions": {
+        "NONE": 150,
+        "RiskBasedInvestigation": 86,
+        "NetworkContainment": 22,
+        "SelectiveDeception": 50,
+        "RapidProcessResponse": 6,
+        "EscalationDiagnosis": 21,
+        "PrivilegedRecovery": 1
+      },
+      "learned_skill_valid_decisions": 0,
+      "valid_model_action_choices": {
+        "Analyse": 97,
+        "Sleep": 206,
+        "DeployDecoy": 10,
+        "Remove": 18,
+        "Restore": 5
+      },
+      "completed_own_operations": {
+        "Analyse_TRUE": 97,
+        "DeployDecoy_TRUE": 10,
+        "Remove_TRUE": 18,
+        "Restore_TRUE": 5
+      },
+      "source": "/home/jeonges/proposed/research_outputs/rollout-v5/recovery/B4/train/rollout-verification/iteration-0001-001-EscalationDiagnosis_v2/previous-seed-62007/summary.json",
+      "source_sha256": "53f25e64b16cf5c5e591ca4d6ce69d185215b71179fd5b6963552533e404e6d0"
+    },
+    {
+      "label": "B4",
+      "comparison": "iteration-0001-001-EscalationDiagnosis_v2",
+      "role": "previous",
+      "seed": 62008,
+      "return": -182.0,
+      "action_cost": -58,
+      "RIA": -32,
+      "LWF": -92,
+      "ASF": 0,
+      "execution_time_s": 755.4625864059199,
+      "skill_valid_decisions": {
+        "NONE": 126,
+        "RiskBasedInvestigation": 60,
+        "SelectiveDeception": 40,
+        "NetworkContainment": 13,
+        "RapidProcessResponse": 8,
+        "EscalationDiagnosis": 60,
+        "PrivilegedRecovery": 2
+      },
+      "learned_skill_valid_decisions": 0,
+      "valid_model_action_choices": {
+        "Analyse": 107,
+        "Sleep": 160,
+        "DeployDecoy": 11,
+        "Remove": 25,
+        "Restore": 6
+      },
+      "completed_own_operations": {
+        "Analyse_TRUE": 107,
+        "DeployDecoy_TRUE": 11,
+        "Remove_TRUE": 25,
+        "Restore_TRUE": 5
+      },
+      "source": "/home/jeonges/proposed/research_outputs/rollout-v5/recovery/B4/train/rollout-verification/iteration-0001-001-EscalationDiagnosis_v2/previous-seed-62008/summary.json",
+      "source_sha256": "790ec95d774d3d104cf7c7e08f9528a7ec0c60b2ff441d8f3b94b8dab81593dd"
+    },
+    {
+      "label": "B4",
+      "comparison": "iteration-0001-001-EscalationDiagnosis_v2",
+      "role": "previous",
+      "seed": 62010,
+      "return": -155.0,
+      "action_cost": -77,
+      "RIA": -76,
+      "LWF": -2,
+      "ASF": 0,
+      "execution_time_s": 745.9259667778388,
+      "skill_valid_decisions": {
+        "NONE": 123,
+        "RiskBasedInvestigation": 55,
+        "NetworkContainment": 17,
+        "SelectiveDeception": 25,
+        "RapidProcessResponse": 15,
+        "EscalationDiagnosis": 71,
+        "PrivilegedRecovery": 2
+      },
+      "learned_skill_valid_decisions": 0,
+      "valid_model_action_choices": {
+        "Analyse": 94,
+        "Sleep": 165,
+        "DeployDecoy": 16,
+        "Remove": 25,
+        "Restore": 8
+      },
+      "completed_own_operations": {
+        "Analyse_TRUE": 94,
+        "DeployDecoy_TRUE": 16,
+        "Remove_TRUE": 24,
+        "Restore_TRUE": 8
+      },
+      "source": "/home/jeonges/proposed/research_outputs/rollout-v5/recovery/B4/train/rollout-verification/iteration-0001-001-EscalationDiagnosis_v2/previous-seed-62010/summary.json",
+      "source_sha256": "79c07f890c492b7e8a0239c8e8c2a9b72fb51f698805ac8773397ebb62286b5d"
+    },
+    {
+      "label": "B4",
+      "comparison": "iteration-0001-001-EscalationDiagnosis_v2",
+      "role": "previous",
+      "seed": 62011,
+      "return": -191.0,
+      "action_cost": -71,
+      "RIA": -81,
+      "LWF": -39,
+      "ASF": 0,
+      "execution_time_s": 744.7793751358986,
+      "skill_valid_decisions": {
+        "NONE": 83,
+        "SelectiveDeception": 35,
+        "NetworkContainment": 4,
+        "RiskBasedInvestigation": 27,
+        "RapidProcessResponse": 17,
+        "EscalationDiagnosis": 137,
+        "PrivilegedRecovery": 3
+      },
+      "learned_skill_valid_decisions": 0,
+      "valid_model_action_choices": {
+        "Analyse": 87,
+        "Sleep": 179,
+        "Remove": 24,
+        "Restore": 14,
+        "DeployDecoy": 2
+      },
+      "completed_own_operations": {
+        "Analyse_TRUE": 87,
+        "Remove_TRUE": 24,
+        "Restore_TRUE": 14,
+        "DeployDecoy_TRUE": 2
+      },
+      "source": "/home/jeonges/proposed/research_outputs/rollout-v5/recovery/B4/train/rollout-verification/iteration-0001-001-EscalationDiagnosis_v2/previous-seed-62011/summary.json",
+      "source_sha256": "3ab45b6505a67dbae6320048b6d5b35a04c7a3e98c10914f8f0a14a49db304e4"
+    },
+    {
+      "label": "B4",
+      "comparison": "iteration-0001-001-EscalationDiagnosis_v2",
+      "role": "previous",
+      "seed": 62012,
+      "return": -190.0,
+      "action_cost": -59,
+      "RIA": -129,
+      "LWF": -2,
+      "ASF": 0,
+      "execution_time_s": 748.5212231669575,
+      "skill_valid_decisions": {
+        "NONE": 96,
+        "RiskBasedInvestigation": 55,
+        "SelectiveDeception": 59,
+        "NetworkContainment": 14,
+        "RapidProcessResponse": 7,
+        "EscalationDiagnosis": 75,
+        "PrivilegedRecovery": 3
+      },
+      "learned_skill_valid_decisions": 0,
+      "valid_model_action_choices": {
+        "Analyse": 99,
+        "Sleep": 164,
+        "DeployDecoy": 16,
+        "Remove": 22,
+        "Restore": 8
+      },
+      "completed_own_operations": {
+        "Analyse_TRUE": 98,
+        "DeployDecoy_TRUE": 16,
+        "Remove_TRUE": 22,
+        "Restore_TRUE": 8
+      },
+      "source": "/home/jeonges/proposed/research_outputs/rollout-v5/recovery/B4/train/rollout-verification/iteration-0001-001-EscalationDiagnosis_v2/previous-seed-62012/summary.json",
+      "source_sha256": "71baded6728d2c29c9d15d7acea4a02d33dc6fe17fed5cb46101aa20420d81e1"
+    },
+    {
+      "label": "B4",
+      "comparison": "iteration-0001-001-EscalationDiagnosis_v2",
+      "role": "previous",
+      "seed": 62014,
+      "return": -192.0,
+      "action_cost": -57,
+      "RIA": -60,
+      "LWF": -75,
+      "ASF": 0,
+      "execution_time_s": 707.3811012539081,
+      "skill_valid_decisions": {
+        "NONE": 85,
+        "NetworkContainment": 10,
+        "SelectiveDeception": 25,
+        "RapidProcessResponse": 5,
+        "EscalationDiagnosis": 85,
+        "RiskBasedInvestigation": 73
+      },
+      "learned_skill_valid_decisions": 0,
+      "valid_model_action_choices": {
+        "Sleep": 121,
+        "Analyse": 109,
+        "DeployDecoy": 6,
+        "Remove": 43,
+        "Restore": 4
+      },
+      "completed_own_operations": {
+        "Analyse_TRUE": 108,
+        "DeployDecoy_TRUE": 6,
+        "Remove_TRUE": 43,
+        "Restore_TRUE": 4
+      },
+      "source": "/home/jeonges/proposed/research_outputs/rollout-v5/recovery/B4/train/rollout-verification/iteration-0001-001-EscalationDiagnosis_v2/previous-seed-62014/summary.json",
+      "source_sha256": "d2cc550cafb6be1f6d1f31119545c20609ee51284cdea3ba1a027bdf1f784867"
+    },
+    {
+      "label": "B4",
+      "comparison": "iteration-0001-001-EscalationDiagnosis_v2",
+      "role": "previous",
+      "seed": 62015,
+      "return": -189.0,
+      "action_cost": -83,
+      "RIA": -70,
+      "LWF": -36,
+      "ASF": 0,
+      "execution_time_s": 736.169276349945,
+      "skill_valid_decisions": {
+        "NONE": 93,
+        "RiskBasedInvestigation": 60,
+        "SelectiveDeception": 30,
+        "NetworkContainment": 20,
+        "RapidProcessResponse": 10,
+        "EscalationDiagnosis": 79,
+        "PrivilegedRecovery": 1
+      },
+      "learned_skill_valid_decisions": 0,
+      "valid_model_action_choices": {
+        "Analyse": 115,
+        "Sleep": 136,
+        "DeployDecoy": 7,
+        "Remove": 28,
+        "Restore": 7
+      },
+      "completed_own_operations": {
+        "Analyse_TRUE": 115,
+        "DeployDecoy_TRUE": 7,
+        "Remove_TRUE": 28,
+        "Restore_TRUE": 7
+      },
+      "source": "/home/jeonges/proposed/research_outputs/rollout-v5/recovery/B4/train/rollout-verification/iteration-0001-001-EscalationDiagnosis_v2/previous-seed-62015/summary.json",
+      "source_sha256": "9a7d5f6534b16c522870e83dfcac66a41b2be24153f49cd372e29f91926a7eb2"
+    },
+    {
+      "label": "B4",
+      "comparison": "iteration-0001-001-EscalationDiagnosis_v2",
+      "role": "previous",
+      "seed": 62016,
+      "return": -146.0,
+      "action_cost": -70,
+      "RIA": -65,
+      "LWF": -11,
+      "ASF": 0,
+      "execution_time_s": 733.6703771930188,
+      "skill_valid_decisions": {
+        "NONE": 107,
+        "RiskBasedInvestigation": 55,
+        "RapidProcessResponse": 9,
+        "EscalationDiagnosis": 94,
+        "PrivilegedRecovery": 2,
+        "NetworkContainment": 16,
+        "SelectiveDeception": 12
+      },
+      "learned_skill_valid_decisions": 0,
+      "valid_model_action_choices": {
+        "Analyse": 101,
+        "Sleep": 147,
+        "Remove": 37,
+        "Restore": 7,
+        "DeployDecoy": 3
+      },
+      "completed_own_operations": {
+        "Analyse_TRUE": 101,
+        "Remove_TRUE": 36,
+        "Restore_TRUE": 7,
+        "DeployDecoy_TRUE": 3
+      },
+      "source": "/home/jeonges/proposed/research_outputs/rollout-v5/recovery/B4/train/rollout-verification/iteration-0001-001-EscalationDiagnosis_v2/previous-seed-62016/summary.json",
+      "source_sha256": "646868cda2e9ed2994617b891406bdd2f6748a830af61cce52781a8d4816e031"
+    },
+    {
+      "label": "B4",
+      "comparison": "iteration-0001-001-EscalationDiagnosis_v2",
+      "role": "previous",
+      "seed": 62018,
+      "return": -208.0,
+      "action_cost": -72,
+      "RIA": -50,
+      "LWF": -86,
+      "ASF": 0,
+      "execution_time_s": 806.9413787468802,
+      "skill_valid_decisions": {
+        "NONE": 160,
+        "RiskBasedInvestigation": 61,
+        "NetworkContainment": 46,
+        "EscalationDiagnosis": 25,
+        "RapidProcessResponse": 3,
+        "SelectiveDeception": 58
+      },
+      "learned_skill_valid_decisions": 0,
+      "valid_model_action_choices": {
+        "Analyse": 89,
+        "Sleep": 231,
+        "Remove": 15,
+        "Restore": 3,
+        "DeployDecoy": 15
+      },
+      "completed_own_operations": {
+        "Analyse_TRUE": 89,
+        "Remove_TRUE": 15,
+        "Restore_TRUE": 3,
+        "DeployDecoy_TRUE": 15
+      },
+      "source": "/home/jeonges/proposed/research_outputs/rollout-v5/recovery/B4/train/rollout-verification/iteration-0001-001-EscalationDiagnosis_v2/previous-seed-62018/summary.json",
+      "source_sha256": "5c9c912ef10a33a4690ff1209d091a2336fa021c1f98b7e4c8c6bafbf9b45187"
+    },
+    {
+      "label": "B4",
+      "comparison": "iteration-0001-001-EscalationDiagnosis_v2",
+      "role": "previous",
+      "seed": 62019,
+      "return": -350.0,
+      "action_cost": -73,
+      "RIA": -147,
+      "LWF": -130,
+      "ASF": 0,
+      "execution_time_s": 807.7888699041214,
+      "skill_valid_decisions": {
+        "SelectiveDeception": 59,
+        "RiskBasedInvestigation": 52,
+        "NONE": 101,
+        "NetworkContainment": 30,
+        "RapidProcessResponse": 20,
+        "EscalationDiagnosis": 68,
+        "PrivilegedRecovery": 4
+      },
+      "learned_skill_valid_decisions": 0,
+      "valid_model_action_choices": {
+        "DeployDecoy": 13,
+        "Sleep": 208,
+        "Analyse": 92,
+        "Remove": 12,
+        "Restore": 9
+      },
+      "completed_own_operations": {
+        "DeployDecoy_TRUE": 13,
+        "Analyse_TRUE": 92,
+        "Remove_TRUE": 12,
+        "Restore_TRUE": 9
+      },
+      "source": "/home/jeonges/proposed/research_outputs/rollout-v5/recovery/B4/train/rollout-verification/iteration-0001-001-EscalationDiagnosis_v2/previous-seed-62019/summary.json",
+      "source_sha256": "804a1379a450d240f4e63e7949d45966df0bfb0134703883a1de39562f9e569e"
+    }
+  ],
+  "actual_training_episodes": {
+    "B2": [
+      {
+        "seed": 61000,
+        "return": -158.0,
+        "source": "/home/jeonges/proposed/research_outputs/rollout-v5/B2/train/episode-0000.json"
+      },
+      {
+        "seed": 61001,
+        "return": -236.0,
+        "source": "/home/jeonges/proposed/research_outputs/rollout-v5/B2/train/episode-0001.json"
+      }
+    ],
+    "B3": [
+      {
+        "seed": 61000,
+        "return": -158.0,
+        "source": "/home/jeonges/proposed/research_outputs/rollout-v5/B3/train/episode-0000.json"
+      },
+      {
+        "seed": 61001,
+        "return": -236.0,
+        "source": "/home/jeonges/proposed/research_outputs/rollout-v5/B3/train/episode-0001.json"
+      }
+    ],
+    "B4": [
+      {
+        "seed": 61000,
+        "return": -163.0,
+        "source": "/home/jeonges/proposed/research_outputs/rollout-v5/B4/train/episode-0000.json"
+      },
+      {
+        "seed": 61001,
+        "return": -281.0,
+        "source": "/home/jeonges/proposed/research_outputs/rollout-v5/B4/train/episode-0001.json"
+      }
+    ]
+  },
+  "decision_comparisons": [],
+  "skill_usage_by_phase_and_red": [],
+  "training_pool_statistics": [
+    {
+      "label": "B2",
+      "skill": "RapidProcessResponse",
+      "version": 1,
+      "frequency": 7,
+      "avg_gain": 0.03799351065727492,
+      "total_gain": 0.2659545746009245,
+      "maturity": 1,
+      "last_evolved_iter": 0,
+      "parent_id": "",
+      "ticks": 62,
+      "valid_decisions": 42,
+      "phases": {
+        "0": 19,
+        "1": 22,
+        "2": 21
+      },
+      "valid_decision_phases": {
+        "0": 12,
+        "1": 14,
+        "2": 16
+      },
+      "red_policies": {
+        "finite": 62
+      },
+      "completed_operations": {
+        "Remove_TRUE": 5,
+        "Analyse_TRUE": 10
+      },
+      "mean_rtg": -25.17321391306959,
+      "mean_advantage": 3.7711509796179277,
+      "scored_proposals": 2,
+      "trajectory_equal_mean_advantage": 3.119370845573912,
+      "positive_gate_proposals": 0,
+      "admitted_proposals": 0,
+      "interpretation": "Training phase statistics only. TRUE completion is not proven cleanup; joint RTG exposure is not individual causal credit."
+    },
+    {
+      "label": "B2",
+      "skill": "EscalationDiagnosis",
+      "version": 1,
+      "frequency": 5,
+      "avg_gain": -0.3508579773640014,
+      "total_gain": -1.7542898868200072,
+      "maturity": 1,
+      "last_evolved_iter": 1,
+      "parent_id": "",
+      "ticks": 13,
+      "valid_decisions": 5,
+      "phases": {
+        "2": 9,
+        "0": 2,
+        "1": 2
+      },
+      "valid_decision_phases": {
+        "2": 3,
+        "0": 1,
+        "1": 1
+      },
+      "red_policies": {
+        "finite": 13
+      },
+      "completed_operations": {
+        "Analyse_TRUE": 4,
+        "Restore_TRUE": 1
+      },
+      "mean_rtg": -21.577158844291557,
+      "mean_advantage": 7.36720604839596,
+      "scored_proposals": 2,
+      "trajectory_equal_mean_advantage": 6.714639717318922,
+      "positive_gate_proposals": 2,
+      "admitted_proposals": 1,
+      "interpretation": "Training phase statistics only. TRUE completion is not proven cleanup; joint RTG exposure is not individual causal credit."
+    },
+    {
+      "label": "B2",
+      "skill": "PrivilegedRecovery",
+      "version": 1,
+      "frequency": 5,
+      "avg_gain": -0.07029270929873335,
+      "total_gain": -0.3514635464936668,
+      "maturity": 1,
+      "last_evolved_iter": 1,
+      "parent_id": "",
+      "ticks": 62,
+      "valid_decisions": 30,
+      "phases": {
+        "0": 27,
+        "2": 35
+      },
+      "valid_decision_phases": {
+        "0": 11,
+        "2": 19
+      },
+      "red_policies": {
+        "finite": 62
+      },
+      "completed_operations": {
+        "Restore_TRUE": 6,
+        "Analyse_TRUE": 8
+      },
+      "mean_rtg": -27.951230775797963,
+      "mean_advantage": 0.9931341168895517,
+      "scored_proposals": 2,
+      "trajectory_equal_mean_advantage": 5.685688226842608,
+      "positive_gate_proposals": 2,
+      "admitted_proposals": 1,
+      "interpretation": "Training phase statistics only. TRUE completion is not proven cleanup; joint RTG exposure is not individual causal credit."
+    },
+    {
+      "label": "B2",
+      "skill": "SelectiveDeception",
+      "version": 1,
+      "frequency": 2,
+      "avg_gain": 0.14223560910307892,
+      "total_gain": 0.28447121820615784,
+      "maturity": 1,
+      "last_evolved_iter": 1,
+      "parent_id": "",
+      "ticks": 18,
+      "valid_decisions": 11,
+      "phases": {
+        "1": 18
+      },
+      "valid_decision_phases": {
+        "1": 11
+      },
+      "red_policies": {
+        "finite": 18
+      },
+      "completed_operations": {
+        "DeployDecoy_TRUE": 4,
+        "Analyse_TRUE": 1,
+        "Remove_TRUE": 1
+      },
+      "mean_rtg": -16.963364173264814,
+      "mean_advantage": 11.981000719422704,
+      "scored_proposals": 2,
+      "trajectory_equal_mean_advantage": 11.981000719422704,
+      "positive_gate_proposals": 2,
+      "admitted_proposals": 1,
+      "interpretation": "Training phase statistics only. TRUE completion is not proven cleanup; joint RTG exposure is not individual causal credit."
+    },
+    {
+      "label": "B2",
+      "skill": "NetworkContainment",
+      "version": 1,
+      "frequency": 6,
+      "avg_gain": -0.028603409235180025,
+      "total_gain": -0.17162045541108015,
+      "maturity": 1,
+      "last_evolved_iter": 1,
+      "parent_id": "",
+      "ticks": 83,
+      "valid_decisions": 63,
+      "phases": {
+        "1": 17,
+        "2": 33,
+        "0": 33
+      },
+      "valid_decision_phases": {
+        "1": 10,
+        "2": 31,
+        "0": 22
+      },
+      "red_policies": {
+        "finite": 83
+      },
+      "completed_operations": {
+        "Analyse_TRUE": 10,
+        "Restore_TRUE": 1,
+        "Remove_TRUE": 3
+      },
+      "mean_rtg": -22.756373680538957,
+      "mean_advantage": 6.187991212148559,
+      "scored_proposals": 2,
+      "trajectory_equal_mean_advantage": 7.148798300389606,
+      "positive_gate_proposals": 2,
+      "admitted_proposals": 1,
+      "interpretation": "Training phase statistics only. TRUE completion is not proven cleanup; joint RTG exposure is not individual causal credit."
+    },
+    {
+      "label": "B2",
+      "skill": "TrafficRecovery",
+      "version": 1,
+      "frequency": 0,
+      "avg_gain": 0.0,
+      "total_gain": 0.0,
+      "maturity": 1,
+      "last_evolved_iter": 0,
+      "parent_id": "",
+      "ticks": 0,
+      "valid_decisions": 0,
+      "phases": {},
+      "valid_decision_phases": {},
+      "red_policies": {},
+      "completed_operations": {},
+      "mean_rtg": null,
+      "mean_advantage": null,
+      "scored_proposals": 0,
+      "trajectory_equal_mean_advantage": null,
+      "positive_gate_proposals": 0,
+      "admitted_proposals": 0,
+      "interpretation": "Training phase statistics only. TRUE completion is not proven cleanup; joint RTG exposure is not individual causal credit."
+    },
+    {
+      "label": "B2",
+      "skill": "RiskBasedInvestigation",
+      "version": 1,
+      "frequency": 60,
+      "avg_gain": 0.00020540463021425555,
+      "total_gain": 0.012324277812855333,
+      "maturity": 1,
+      "last_evolved_iter": 0,
+      "parent_id": "",
+      "ticks": 750,
+      "valid_decisions": 512,
+      "phases": {
+        "0": 245,
+        "1": 275,
+        "2": 230
+      },
+      "valid_decision_phases": {
+        "0": 170,
+        "1": 188,
+        "2": 154
+      },
+      "red_policies": {
+        "finite": 750
+      },
+      "completed_operations": {
+        "Analyse_TRUE": 168,
+        "Remove_TRUE": 25,
+        "Restore_TRUE": 5
+      },
+      "mean_rtg": -29.862928466107217,
+      "mean_advantage": -0.9185635734197006,
+      "scored_proposals": 2,
+      "trajectory_equal_mean_advantage": -0.9185635734197009,
+      "positive_gate_proposals": 0,
+      "admitted_proposals": 0,
+      "interpretation": "Training phase statistics only. TRUE completion is not proven cleanup; joint RTG exposure is not individual causal credit."
+    },
+    {
+      "label": "B2",
+      "skill": "EscalationDiagnosis_v2",
+      "version": 2,
+      "frequency": 0,
+      "avg_gain": 0.0,
+      "total_gain": 0.0,
+      "maturity": 0,
+      "last_evolved_iter": 0,
+      "parent_id": "EscalationDiagnosis",
+      "ticks": 0,
+      "valid_decisions": 0,
+      "phases": {},
+      "valid_decision_phases": {},
+      "red_policies": {},
+      "completed_operations": {},
+      "mean_rtg": null,
+      "mean_advantage": null,
+      "scored_proposals": 0,
+      "trajectory_equal_mean_advantage": null,
+      "positive_gate_proposals": 0,
+      "admitted_proposals": 0,
+      "interpretation": "Training phase statistics only. TRUE completion is not proven cleanup; joint RTG exposure is not individual causal credit."
+    },
+    {
+      "label": "B2",
+      "skill": "PrivilegedRecovery_v2",
+      "version": 2,
+      "frequency": 0,
+      "avg_gain": 0.0,
+      "total_gain": 0.0,
+      "maturity": 0,
+      "last_evolved_iter": 0,
+      "parent_id": "PrivilegedRecovery",
+      "ticks": 0,
+      "valid_decisions": 0,
+      "phases": {},
+      "valid_decision_phases": {},
+      "red_policies": {},
+      "completed_operations": {},
+      "mean_rtg": null,
+      "mean_advantage": null,
+      "scored_proposals": 0,
+      "trajectory_equal_mean_advantage": null,
+      "positive_gate_proposals": 0,
+      "admitted_proposals": 0,
+      "interpretation": "Training phase statistics only. TRUE completion is not proven cleanup; joint RTG exposure is not individual causal credit."
+    },
+    {
+      "label": "B2",
+      "skill": "SelectiveDeception_v2",
+      "version": 2,
+      "frequency": 0,
+      "avg_gain": 0.0,
+      "total_gain": 0.0,
+      "maturity": 0,
+      "last_evolved_iter": 0,
+      "parent_id": "SelectiveDeception",
+      "ticks": 0,
+      "valid_decisions": 0,
+      "phases": {},
+      "valid_decision_phases": {},
+      "red_policies": {},
+      "completed_operations": {},
+      "mean_rtg": null,
+      "mean_advantage": null,
+      "scored_proposals": 0,
+      "trajectory_equal_mean_advantage": null,
+      "positive_gate_proposals": 0,
+      "admitted_proposals": 0,
+      "interpretation": "Training phase statistics only. TRUE completion is not proven cleanup; joint RTG exposure is not individual causal credit."
+    },
+    {
+      "label": "B2",
+      "skill": "NetworkContainment_v2",
+      "version": 2,
+      "frequency": 0,
+      "avg_gain": 0.0,
+      "total_gain": 0.0,
+      "maturity": 0,
+      "last_evolved_iter": 0,
+      "parent_id": "NetworkContainment",
+      "ticks": 0,
+      "valid_decisions": 0,
+      "phases": {},
+      "valid_decision_phases": {},
+      "red_policies": {},
+      "completed_operations": {},
+      "mean_rtg": null,
+      "mean_advantage": null,
+      "scored_proposals": 0,
+      "trajectory_equal_mean_advantage": null,
+      "positive_gate_proposals": 0,
+      "admitted_proposals": 0,
+      "interpretation": "Training phase statistics only. TRUE completion is not proven cleanup; joint RTG exposure is not individual causal credit."
+    },
+    {
+      "label": "B4",
+      "skill": "RapidProcessResponse",
+      "version": 1,
+      "frequency": 24,
+      "avg_gain": 0.003475124989754951,
+      "total_gain": 0.08340299975411883,
+      "maturity": 1,
+      "last_evolved_iter": 0,
+      "parent_id": "",
+      "ticks": 133,
+      "valid_decisions": 76,
+      "phases": {
+        "0": 32,
+        "1": 76,
+        "2": 25
+      },
+      "valid_decision_phases": {
+        "0": 12,
+        "1": 55,
+        "2": 9
+      },
+      "red_policies": {
+        "finite": 133
+      },
+      "completed_operations": {
+        "Remove_TRUE": 18,
+        "Analyse_TRUE": 17,
+        "Restore_TRUE": 1
+      },
+      "mean_rtg": -32.489219473299556,
+      "mean_advantage": -0.14926646389605733,
+      "scored_proposals": 0,
+      "trajectory_equal_mean_advantage": 3.505605916891386,
+      "positive_gate_proposals": 0,
+      "admitted_proposals": 0,
+      "interpretation": "Training phase statistics only. TRUE completion is not proven cleanup; joint RTG exposure is not individual causal credit."
+    },
+    {
+      "label": "B4",
+      "skill": "EscalationDiagnosis",
+      "version": 1,
+      "frequency": 98,
+      "avg_gain": 0.0008819862960094294,
+      "total_gain": 0.08643465700892408,
+      "maturity": 1,
+      "last_evolved_iter": 0,
+      "parent_id": "",
+      "ticks": 341,
+      "valid_decisions": 200,
+      "phases": {
+        "0": 92,
+        "1": 108,
+        "2": 141
+      },
+      "valid_decision_phases": {
+        "0": 43,
+        "1": 85,
+        "2": 72
+      },
+      "red_policies": {
+        "finite": 341
+      },
+      "completed_operations": {
+        "Analyse_TRUE": 94,
+        "Restore_TRUE": 10,
+        "Remove_TRUE": 3,
+        "DeployDecoy_TRUE": 1
+      },
+      "mean_rtg": -20.687763119982264,
+      "mean_advantage": 11.652189889421235,
+      "scored_proposals": 2,
+      "trajectory_equal_mean_advantage": 4.947864538540577,
+      "positive_gate_proposals": 1,
+      "admitted_proposals": 0,
+      "interpretation": "Training phase statistics only. TRUE completion is not proven cleanup; joint RTG exposure is not individual causal credit."
+    },
+    {
+      "label": "B4",
+      "skill": "PrivilegedRecovery",
+      "version": 1,
+      "frequency": 3,
+      "avg_gain": -0.0028112449799196845,
+      "total_gain": -0.008433734939759054,
+      "maturity": 1,
+      "last_evolved_iter": 0,
+      "parent_id": "",
+      "ticks": 15,
+      "valid_decisions": 3,
+      "phases": {
+        "1": 5,
+        "0": 5,
+        "2": 5
+      },
+      "valid_decision_phases": {
+        "1": 1,
+        "0": 1,
+        "2": 1
+      },
+      "red_policies": {
+        "finite": 15
+      },
+      "completed_operations": {
+        "Restore_TRUE": 3
+      },
+      "mean_rtg": -29.319490705263235,
+      "mean_advantage": 3.020462304140267,
+      "scored_proposals": 0,
+      "trajectory_equal_mean_advantage": 2.5776353675366392,
+      "positive_gate_proposals": 0,
+      "admitted_proposals": 0,
+      "interpretation": "Training phase statistics only. TRUE completion is not proven cleanup; joint RTG exposure is not individual causal credit."
+    },
+    {
+      "label": "B4",
+      "skill": "SelectiveDeception",
+      "version": 1,
+      "frequency": 19,
+      "avg_gain": -0.060330082777768246,
+      "total_gain": -1.1462715727775967,
+      "maturity": 1,
+      "last_evolved_iter": 0,
+      "parent_id": "",
+      "ticks": 42,
+      "valid_decisions": 34,
+      "phases": {
+        "0": 18,
+        "1": 13,
+        "2": 11
+      },
+      "valid_decision_phases": {
+        "0": 14,
+        "1": 11,
+        "2": 9
+      },
+      "red_policies": {
+        "finite": 42
+      },
+      "completed_operations": {
+        "DeployDecoy_TRUE": 8
+      },
+      "mean_rtg": -42.633813739372805,
+      "mean_advantage": -10.293860729969305,
+      "scored_proposals": 0,
+      "trajectory_equal_mean_advantage": -13.6041203362111,
+      "positive_gate_proposals": 0,
+      "admitted_proposals": 0,
+      "interpretation": "Training phase statistics only. TRUE completion is not proven cleanup; joint RTG exposure is not individual causal credit."
+    },
+    {
+      "label": "B4",
+      "skill": "NetworkContainment",
+      "version": 1,
+      "frequency": 22,
+      "avg_gain": 0.00244220123738197,
+      "total_gain": 0.05372842722240334,
+      "maturity": 1,
+      "last_evolved_iter": 0,
+      "parent_id": "",
+      "ticks": 38,
+      "valid_decisions": 25,
+      "phases": {
+        "0": 17,
+        "1": 8,
+        "2": 13
+      },
+      "valid_decision_phases": {
+        "0": 11,
+        "1": 6,
+        "2": 8
+      },
+      "red_policies": {
+        "finite": 38
+      },
+      "completed_operations": {
+        "Analyse_TRUE": 8,
+        "DeployDecoy_TRUE": 1,
+        "Restore_TRUE": 1
+      },
+      "mean_rtg": -48.11806175650719,
+      "mean_advantage": -15.77810874710369,
+      "scored_proposals": 0,
+      "trajectory_equal_mean_advantage": -1.2246940759516018,
+      "positive_gate_proposals": 0,
+      "admitted_proposals": 0,
+      "interpretation": "Training phase statistics only. TRUE completion is not proven cleanup; joint RTG exposure is not individual causal credit."
+    },
+    {
+      "label": "B4",
+      "skill": "TrafficRecovery",
+      "version": 1,
+      "frequency": 0,
+      "avg_gain": 0.0,
+      "total_gain": 0.0,
+      "maturity": 1,
+      "last_evolved_iter": 0,
+      "parent_id": "",
+      "ticks": 0,
+      "valid_decisions": 0,
+      "phases": {},
+      "valid_decision_phases": {},
+      "red_policies": {},
+      "completed_operations": {},
+      "mean_rtg": null,
+      "mean_advantage": null,
+      "scored_proposals": 0,
+      "trajectory_equal_mean_advantage": null,
+      "positive_gate_proposals": 0,
+      "admitted_proposals": 0,
+      "interpretation": "Training phase statistics only. TRUE completion is not proven cleanup; joint RTG exposure is not individual causal credit."
+    },
+    {
+      "label": "B4",
+      "skill": "RiskBasedInvestigation",
+      "version": 1,
+      "frequency": 57,
+      "avg_gain": 0.0033563132421724736,
+      "total_gain": 0.191309854803831,
+      "maturity": 1,
+      "last_evolved_iter": 0,
+      "parent_id": "",
+      "ticks": 180,
+      "valid_decisions": 81,
+      "phases": {
+        "0": 82,
+        "1": 24,
+        "2": 74
+      },
+      "valid_decision_phases": {
+        "0": 40,
+        "1": 11,
+        "2": 30
+      },
+      "red_policies": {
+        "finite": 180
+      },
+      "completed_operations": {
+        "Analyse_TRUE": 55,
+        "Remove_TRUE": 22
+      },
+      "mean_rtg": -38.17211000882467,
+      "mean_advantage": -5.832156999421165,
+      "scored_proposals": 0,
+      "trajectory_equal_mean_advantage": -4.991764328400314,
+      "positive_gate_proposals": 0,
+      "admitted_proposals": 0,
+      "interpretation": "Training phase statistics only. TRUE completion is not proven cleanup; joint RTG exposure is not individual causal credit."
+    }
+  ],
+  "queue_status_counts": {},
+  "selection": null,
+  "metadata_repair": {
+    "registered_unix": 1795209367.2367787,
+    "source_root": "/home/jeonges/proposed/revisions/rollout-v5-metadata-fix",
+    "source_sha256": {
+      "research/__init__.py": "a6a3fe43b4b652e3cbe49fff17029ca23a08c26b36905e9d4131d16e44d375fb",
+      "research/__main__.py": "8c82846a331c1cb1e9f397c56a30fd984c609d56784fba01ffacf9c3b268b515",
+      "research/adapter.py": "ad39ac101b8f93cea887605f83be331e226afb85dfb20140226b37e74c988b92",
+      "research/behavior.py": "098f38d3ad7ba6a4dfc3155096672905281aec9f30d49f0d04c1f93b3f3d06e0",
+      "research/behavior_skills.py": "e788ab2e0a5e3adb6b9188e0a8e30a7b64fd92c30f4852872d41c2a977f905a6",
+      "research/client.py": "68c43e791d11e0e7d0e7f15ea713c5bb76511b42c69c95acb63a58895c4cd1c3",
+      "research/config.py": "6ae003578b0685c9a1d23c31ed826b0f7490b6c01c3fbb431c8b4be5a1a565dd",
+      "research/evolution.py": "f1c50ef08eaf761e6d317ffdc3315f0fc1f4248b4597a3bb8e4bfa4b756144cb",
+      "research/experiment.py": "d6542de333bce3fdaa1379549bf5efdfc3cff136d6e1b28a7e7b12648e066370",
+      "research/gate.py": "9fae1dba41d0f18ffb571d675516011d4509d5b736bfb20c0d8acbfa77b02231",
+      "research/metrics.py": "fa5acc93526659ae96497d0ddcefefe9c720de75e5521467ce1bad9cfa97c918",
+      "research/model_server.py": "7acc0c79caa693479615bf4b362ef5b90055047df0606a7077b5898c0cdb4ea0",
+      "research/official.py": "54192c231e878c97e8d47a3d1a4eaf7ce85c0e72c1ff71c945dad1c5528e4e60",
+      "research/paper_algorithm.py": "656bd2e674b69f8dfe2fa4974d7c21dd01ba8a189cc57bd83501e1bab448eff6",
+      "research/reporting.py": "e4484ed10cb3978b9c4b6d82bf60ebd20483387c2dda32921330003b083bdd5a",
+      "research/reward_audit.py": "f7563466a8d6011f0b16cb29804bc99764312da5fa868d2d88a6d76e1e3e2bef",
+      "research/rollout.py": "d1534e4eee591d736f45c6a3bbeb7a6364fa04ab2800bb3e1182eb4192b7e32a",
+      "research/rollout_execution.py": "5177940d956012fee7209d9395f72df37a1081fe77a2cee20eafb1d4bc92d072",
+      "research/semantic_evidence.py": "e22e85d2cd686e1b8322a21e0c1d5d060fc00881849e10699edb8e827905433b",
+      "research/skills.py": "17a5c9216c0930f86831c9e5731f7c9729fd0d6301be7627e541f5147a32c2f9",
+      "research/upstream.py": "0d226601790d2cb61868a0a9a5024d24c6e86c30c5601c9b614daeeb7e3a2962",
+      "research.sh": "de4038462f6190d24c29051449439bde10b908414c177febd475c943741b3306"
+    },
+    "original_protocol_sha256": "ef1f2f4cfacf9ef9162ec677e58b0e3bfb7d099529744007e04ba4d0f345ab46",
+    "recovery_driver_sha256": "f3f2fe2337ad03926648f536cfcdd5510dda41448bad4e8e8b689a3dd558d85c",
+    "campaign_driver_sha256": "00bbe7059e9e44375f71f75d66ccb6f09d000c25487adef9cff046bd6c78b7ef",
+    "change": "Add episodes_completed and total_training_episodes to validation snapshot metadata only.",
+    "unchanged": "All actor, observation, model, SG, PPO, pool, reward, seeds, admission criteria and original deadlines.",
+    "failed_validation_not_performance": true,
+    "reuse_existing_candidate_and_training": true,
+    "selection_rule": "Freeze the committed first-loop pool before final tests. If training/validation is incomplete, keep the initial pool. No held-out reward selects a pool, threshold or iteration.",
+    "budget": {
+      "started_unix": 1795203761.9776363,
+      "model_deadline_unix": 1795232561.9776363,
+      "validation_deadline_unix": 1795222661.9776363,
+      "no_new_episode_after_unix": 1795232381.9776363,
+      "limit_hours": 8,
+      "basis": "Total model campaign elapsed wall time with up to four GPUs; user approved eight-hour option.",
+      "primary_health": {
+        "model": "Qwen/Qwen3-8B",
+        "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+        "backend": "transformers",
+        "transformers": "4.51.3",
+        "torch": "2.6.0+cu124",
+        "dtype": "bfloat16",
+        "weights_frozen": true,
+        "trainable_parameters": 0,
+        "temperature_scoring": true,
+        "scoring_mode": "incremental_teacher_forcing",
+        "chat_template_sha256": "a55ee1b1660128b7098723e0abcd92caa0788061051c62d51cbe87d9cf1974d8"
+      },
+      "primary_port": 8018,
+      "primary_pid": 3761356
+    },
+    "tests": 138,
+    "integration_before": "KeyError episodes_completed reproduced; after actual normal evaluation loader passes",
+    "validation_priority": "Retry B4 first. B3 keeps running its original training; retry its unchanged candidate only after B4 completes and before the original validation deadline."
+  },
+  "static_pool_loading_repair": {
+    "registered_unix": 1795211409.46822,
+    "source_root": "/home/jeonges/proposed/revisions/rollout-v5-static-pool-fix",
+    "source_sha256": {
+      "research/__init__.py": "a6a3fe43b4b652e3cbe49fff17029ca23a08c26b36905e9d4131d16e44d375fb",
+      "research/__main__.py": "8c82846a331c1cb1e9f397c56a30fd984c609d56784fba01ffacf9c3b268b515",
+      "research/adapter.py": "ad39ac101b8f93cea887605f83be331e226afb85dfb20140226b37e74c988b92",
+      "research/behavior.py": "098f38d3ad7ba6a4dfc3155096672905281aec9f30d49f0d04c1f93b3f3d06e0",
+      "research/behavior_skills.py": "e788ab2e0a5e3adb6b9188e0a8e30a7b64fd92c30f4852872d41c2a977f905a6",
+      "research/client.py": "68c43e791d11e0e7d0e7f15ea713c5bb76511b42c69c95acb63a58895c4cd1c3",
+      "research/config.py": "6ae003578b0685c9a1d23c31ed826b0f7490b6c01c3fbb431c8b4be5a1a565dd",
+      "research/evolution.py": "f1c50ef08eaf761e6d317ffdc3315f0fc1f4248b4597a3bb8e4bfa4b756144cb",
+      "research/experiment.py": "b8f5607604a919e81c56babb59bb7dbdb160ffc915beed78d2fa5459ace96124",
+      "research/gate.py": "9fae1dba41d0f18ffb571d675516011d4509d5b736bfb20c0d8acbfa77b02231",
+      "research/metrics.py": "fa5acc93526659ae96497d0ddcefefe9c720de75e5521467ce1bad9cfa97c918",
+      "research/model_server.py": "7acc0c79caa693479615bf4b362ef5b90055047df0606a7077b5898c0cdb4ea0",
+      "research/official.py": "54192c231e878c97e8d47a3d1a4eaf7ce85c0e72c1ff71c945dad1c5528e4e60",
+      "research/paper_algorithm.py": "656bd2e674b69f8dfe2fa4974d7c21dd01ba8a189cc57bd83501e1bab448eff6",
+      "research/reporting.py": "e4484ed10cb3978b9c4b6d82bf60ebd20483387c2dda32921330003b083bdd5a",
+      "research/reward_audit.py": "f7563466a8d6011f0b16cb29804bc99764312da5fa868d2d88a6d76e1e3e2bef",
+      "research/rollout.py": "d1534e4eee591d736f45c6a3bbeb7a6364fa04ab2800bb3e1182eb4192b7e32a",
+      "research/rollout_execution.py": "5177940d956012fee7209d9395f72df37a1081fe77a2cee20eafb1d4bc92d072",
+      "research/semantic_evidence.py": "e22e85d2cd686e1b8322a21e0c1d5d060fc00881849e10699edb8e827905433b",
+      "research/skills.py": "17a5c9216c0930f86831c9e5731f7c9729fd0d6301be7627e541f5147a32c2f9",
+      "research/upstream.py": "0d226601790d2cb61868a0a9a5024d24c6e86c30c5601c9b614daeeb7e3a2962",
+      "research.sh": "de4038462f6190d24c29051449439bde10b908414c177febd475c943741b3306"
+    },
+    "final_driver_sha256": "9cb3ba7dc3de12e704fc4da14b1297ff25c1b0dda69587ae3d87eeb8ded82fc9",
+    "original_protocol_sha256": "ef1f2f4cfacf9ef9162ec677e58b0e3bfb7d099529744007e04ba4d0f345ab46",
+    "metadata_repair_protocol_sha256": "472c40d83d95ddf2b1caf66f88f3f0c075bccb7550f39095f5c7941c2bdff542",
+    "change": "E1 with an explicit pool must load that pool instead of constructing the default six response seeds.",
+    "fairness": "Restore the registered B1 common seven-skill initial-pool condition, exactly shared with B2/B3/B4. No final evaluation had started.",
+    "unchanged": "E0/E2/E3 behavior, actor, observations, SG, PPO, reward, validation criteria, seeds, candidates, training traces and original eight-hour deadline.",
+    "training_source_root": "/home/jeonges/proposed/revisions/rollout-v5",
+    "validation_source_root": "/home/jeonges/proposed/revisions/rollout-v5-metadata-fix",
+    "final_source_root": "/home/jeonges/proposed/revisions/rollout-v5-static-pool-fix",
+    "registered_initial_pool_sha256": "0d89f1b9abccdcd85e9c83da529875f159992cd9b12bc68ed3c10e6cd63380c7",
+    "same_budget": {
+      "started_unix": 1795203761.9776363,
+      "model_deadline_unix": 1795232561.9776363,
+      "validation_deadline_unix": 1795222661.9776363,
+      "no_new_episode_after_unix": 1795232381.9776363,
+      "limit_hours": 8,
+      "basis": "Total model campaign elapsed wall time with up to four GPUs; user approved eight-hour option.",
+      "primary_health": {
+        "model": "Qwen/Qwen3-8B",
+        "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+        "backend": "transformers",
+        "transformers": "4.51.3",
+        "torch": "2.6.0+cu124",
+        "dtype": "bfloat16",
+        "weights_frozen": true,
+        "trainable_parameters": 0,
+        "temperature_scoring": true,
+        "scoring_mode": "incremental_teacher_forcing",
+        "chat_template_sha256": "a55ee1b1660128b7098723e0abcd92caa0788061051c62d51cbe87d9cf1974d8"
+      },
+      "primary_port": 8018,
+      "primary_pid": 3761356
+    },
+    "tests_passed": 139,
+    "before_fix_regression": "Explicit seven-skill static pool is silently replaced by default six; regression reproduced.",
+    "test_rewards_used": false,
+    "candidate_regenerated": false,
+    "existing_B4_validation_pid": 4046328
+  },
+  "audit": {
+    "passed": true,
+    "real_500_step_final_episodes": 0,
+    "common_initial_actor_prompt_pairs": 0,
+    "prior_files_preserved": 409,
+    "weights_frozen": true,
+    "official_reward_unchanged": true,
+    "source_unchanged_after_registration": true,
+    "no_mock_performance": true
+  },
+  "limitation": "Eight-hour resource limit; planned100 seeds per finite arm is not inferred from partial actual N. Small-N bootstrap intervals do not certify general superiority."
+}

@@ -1,0 +1,152 @@
+{
+  "passed": true,
+  "checked_unique_actions": 13,
+  "unavailable_older_records": 0,
+  "max_absolute_difference": 4.76837158203125e-07,
+  "tolerance": 0.0001,
+  "actions": [
+    {
+      "checkpoint": "research_outputs/real-continued/E2-hybrid-finite/train/checkpoint.json",
+      "seed": 100,
+      "agent": "blue_agent_4",
+      "step": 0,
+      "skill_id": "NetworkContainment",
+      "skill_version": 1,
+      "generation": -1.6655261516571045,
+      "teacher_forcing": -1.6655261516571045,
+      "absolute_difference": 0.0
+    },
+    {
+      "checkpoint": "research_outputs/real-continued/E2-hybrid-finite/train/checkpoint.json",
+      "seed": 100,
+      "agent": "blue_agent_4",
+      "step": 2,
+      "skill_id": "NetworkContainment",
+      "skill_version": 1,
+      "generation": -1.3944120407104492,
+      "teacher_forcing": -1.394411563873291,
+      "absolute_difference": 4.76837158203125e-07
+    },
+    {
+      "checkpoint": "research_outputs/real-continued/E2-hybrid-finite/train/checkpoint.json",
+      "seed": 100,
+      "agent": "blue_agent_4",
+      "step": 3,
+      "skill_id": "NetworkContainment",
+      "skill_version": 1,
+      "generation": -0.3020058572292328,
+      "teacher_forcing": -0.3020055294036865,
+      "absolute_difference": 3.2782554626464844e-07
+    },
+    {
+      "checkpoint": "research_outputs/real-continued/E2-hybrid-finite/train/checkpoint.json",
+      "seed": 100,
+      "agent": "blue_agent_4",
+      "step": 4,
+      "skill_id": "NetworkContainment",
+      "skill_version": 1,
+      "generation": -0.389870285987854,
+      "teacher_forcing": -0.3898700177669525,
+      "absolute_difference": 2.682209014892578e-07
+    },
+    {
+      "checkpoint": "research_outputs/real-continued/E2-hybrid-finite/train/checkpoint.json",
+      "seed": 100,
+      "agent": "blue_agent_4",
+      "step": 5,
+      "skill_id": "NetworkContainment",
+      "skill_version": 1,
+      "generation": -0.07129615545272827,
+      "teacher_forcing": -0.07129591703414917,
+      "absolute_difference": 2.384185791015625e-07
+    },
+    {
+      "checkpoint": "research_outputs/real-continued/E2-hybrid-finite/train/checkpoint.json",
+      "seed": 100,
+      "agent": "blue_agent_4",
+      "step": 6,
+      "skill_id": "NetworkContainment",
+      "skill_version": 1,
+      "generation": -0.14722217619419098,
+      "teacher_forcing": -0.14722242951393127,
+      "absolute_difference": 2.5331974029541016e-07
+    },
+    {
+      "checkpoint": "research_outputs/real-continued/E2-hybrid-finite/train/checkpoint.json",
+      "seed": 101,
+      "agent": "blue_agent_4",
+      "step": 0,
+      "skill_id": "NetworkContainment",
+      "skill_version": 1,
+      "generation": -3.0552902221679688,
+      "teacher_forcing": -3.055290460586548,
+      "absolute_difference": 2.384185791015625e-07
+    },
+    {
+      "checkpoint": "research_outputs/real-continued/E2-hybrid-finite/train/checkpoint.json",
+      "seed": 101,
+      "agent": "blue_agent_4",
+      "step": 2,
+      "skill_id": "NetworkContainment",
+      "skill_version": 1,
+      "generation": -1.1107336282730103,
+      "teacher_forcing": -1.110733151435852,
+      "absolute_difference": 4.76837158203125e-07
+    },
+    {
+      "checkpoint": "research_outputs/real-continued/E2-hybrid-finite/train/checkpoint.json",
+      "seed": 101,
+      "agent": "blue_agent_4",
+      "step": 3,
+      "skill_id": "NetworkContainment",
+      "skill_version": 1,
+      "generation": -1.966180443763733,
+      "teacher_forcing": -1.9661803245544434,
+      "absolute_difference": 1.1920928955078125e-07
+    },
+    {
+      "checkpoint": "research_outputs/real-continued/E2-hybrid-finite/train/checkpoint.json",
+      "seed": 101,
+      "agent": "blue_agent_4",
+      "step": 4,
+      "skill_id": "NetworkContainment",
+      "skill_version": 1,
+      "generation": -0.222920224070549,
+      "teacher_forcing": -0.22291989624500275,
+      "absolute_difference": 3.2782554626464844e-07
+    },
+    {
+      "checkpoint": "research_outputs/real-continued/E2-hybrid-finite/train/checkpoint.json",
+      "seed": 101,
+      "agent": "blue_agent_4",
+      "step": 5,
+      "skill_id": "NetworkContainment",
+      "skill_version": 1,
+      "generation": -0.06135161966085434,
+      "teacher_forcing": -0.06135115027427673,
+      "absolute_difference": 4.6938657760620117e-07
+    },
+    {
+      "checkpoint": "research_outputs/real-continued/E2-hybrid-finite/train/checkpoint.json",
+      "seed": 101,
+      "agent": "blue_agent_4",
+      "step": 6,
+      "skill_id": "NetworkContainment",
+      "skill_version": 1,
+      "generation": -0.14714504778385162,
+      "teacher_forcing": -0.14714527130126953,
+      "absolute_difference": 2.2351741790771484e-07
+    },
+    {
+      "checkpoint": "research_outputs/real-continued/E2-hybrid-finite/train/checkpoint.json",
+      "seed": 104,
+      "agent": "blue_agent_4",
+      "step": 9,
+      "skill_id": "HostInvestigation",
+      "skill_version": 1,
+      "generation": -0.09425678849220276,
+      "teacher_forcing": -0.09425702691078186,
+      "absolute_difference": 2.384185791015625e-07
+    }
+  ]
+}

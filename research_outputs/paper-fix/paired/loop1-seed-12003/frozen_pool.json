@@ -1,0 +1,230 @@
+{
+  "pool": {
+    "max_size": 10,
+    "skills": [
+      {
+        "name": "ThreatRemoval",
+        "initiation": "When observable events support a user-level compromise or a malicious process on an assigned host.",
+        "policy": [
+          "Check the affected host and previous analysis/monitor evidence.",
+          "Remove malicious processes on that host.",
+          "Verify the returned status; re-analyse if evidence is inconclusive."
+        ],
+        "termination": "Removal completed and subsequent observations no longer support the same malicious process, or removal failed and further analysis is needed.",
+        "frequency": 38,
+        "avg_gain": 0.0012323731014282607,
+        "total_gain": 0.0468301778542739,
+        "maturity": 1,
+        "success_count": 0,
+        "last_evolved_iter": 1,
+        "parent_id": "",
+        "version": 1,
+        "allowed_actions": [
+          "Remove",
+          "Analyse"
+        ],
+        "family": "ThreatRemoval"
+      },
+      {
+        "name": "DeceptionDeployment",
+        "initiation": "When the defender is available and a legitimate assigned host can host a useful decoy.",
+        "policy": [
+          "Choose a valid assigned host without repeating a failed deployment blindly.",
+          "DeployDecoy on the host.",
+          "Wait for completion and examine status and subsequent monitor events."
+        ],
+        "termination": "Deployment has completed or failed and its result has been checked.",
+        "frequency": 9,
+        "avg_gain": 0.013581957061758623,
+        "total_gain": 0.1222376135558276,
+        "maturity": 1,
+        "success_count": 0,
+        "last_evolved_iter": 0,
+        "parent_id": "",
+        "version": 1,
+        "allowed_actions": [
+          "DeployDecoy",
+          "Analyse"
+        ],
+        "family": "DeceptionDeployment"
+      },
+      {
+        "name": "TrafficRecovery",
+        "initiation": "When the defender has observable evidence of its previous traffic block and can reassess its need.",
+        "policy": [
+          "Identify the previously blocked subnet from observed action history.",
+          "Check current phase and available threat evidence.",
+          "AllowTrafficZone when recovery is justified and check the actual status."
+        ],
+        "termination": "Traffic restoration has completed or failed and its result has been inspected.",
+        "frequency": 5,
+        "avg_gain": 0.03523183643665573,
+        "total_gain": 0.17615918218327864,
+        "maturity": 1,
+        "success_count": 0,
+        "last_evolved_iter": 1,
+        "parent_id": "",
+        "version": 1,
+        "allowed_actions": [
+          "AllowTrafficZone"
+        ],
+        "family": "TrafficRecovery"
+      },
+      {
+        "name": "WaitVerification",
+        "initiation": "When an action is still in progress or an already initiated response must be checked before another intervention.",
+        "policy": [
+          "Inspect Last Action Status and the busy bit.",
+          "Sleep while the previous action remains in progress.",
+          "Read the completed action status and automatic Monitor observations before continuing."
+        ],
+        "termination": "The outstanding action has completed and its observable outcome is available.",
+        "frequency": 29,
+        "avg_gain": 0.005505547092584873,
+        "total_gain": 0.15966086568496132,
+        "maturity": 1,
+        "success_count": 0,
+        "last_evolved_iter": 1,
+        "parent_id": "",
+        "version": 1,
+        "allowed_actions": [
+          "Sleep"
+        ],
+        "family": "WaitVerification"
+      },
+      {
+        "name": "ThreatRemoval_v2",
+        "initiation": "IF observable events strongly indicate a user-level compromise OR a malicious process on the host AND prior analysis confirms the presence of threat indicators",
+        "policy": [
+          "Perform a comprehensive analysis to confirm the presence of user-level compromise or active malicious processes on the host.",
+          "Execute removal actions only after verification that the threat indicators are confirmed and documented.",
+          "Verify the removal status and ensure the system is in a stable state; if evidence is inconclusive, re-analyse before proceeding.",
+          "Avoid repeated or unnecessary actions on the same host without updated evidence of a threat."
+        ],
+        "termination": "Stop IF all malicious processes are confirmed to be removed AND subsequent monitoring no longer detects threat indicators OR if further analysis is required due to inconclusive evidence.",
+        "frequency": 0,
+        "avg_gain": 0.0,
+        "total_gain": 0.0,
+        "maturity": 0,
+        "success_count": 0,
+        "last_evolved_iter": 0,
+        "parent_id": "ThreatRemoval",
+        "version": 2,
+        "allowed_actions": [
+          "Remove",
+          "Analyse"
+        ],
+        "family": "ThreatRemoval"
+      },
+      {
+        "name": "HostRecovery_v2",
+        "initiation": "IF observable admin-level compromise is confirmed AND restoration is deemed necessary based on availability cost analysis",
+        "policy": [
+          "Verify admin-compromise evidence through multiple validation checks before initiating restoration",
+          "Execute restoration action while prioritizing system availability and resource constraints",
+          "Wait for explicit confirmation of restoration result through post-action validation"
+        ],
+        "termination": "Stop IF restoration result is explicitly confirmed as successful OR restoration action has failed with clear diagnostic feedback",
+        "frequency": 0,
+        "avg_gain": 0.0,
+        "total_gain": 0.0,
+        "maturity": 0,
+        "success_count": 0,
+        "last_evolved_iter": 0,
+        "parent_id": "HostRecovery",
+        "version": 2,
+        "allowed_actions": [
+          "Restore",
+          "Analyse"
+        ],
+        "family": "HostRecovery"
+      },
+      {
+        "name": "TrafficRecovery_v2",
+        "initiation": "IF clear, observable evidence of prior traffic block AND phase indicates readiness for recovery",
+        "policy": [
+          "Confirm presence of clear, observable evidence of a prior traffic block from action history",
+          "Verify current phase and validate threat evidence to ensure recovery conditions are met",
+          "Execute 'AllowTrafficZone' only after confirming the previously blocked subnet and validating traffic restoration status",
+          "Check for residual threats and ensure full traffic flow before proceeding"
+        ],
+        "termination": "Stop IF traffic restoration has completed AND result has been fully inspected AND all traffic zones are validated",
+        "frequency": 0,
+        "avg_gain": 0.0,
+        "total_gain": 0.0,
+        "maturity": 0,
+        "success_count": 0,
+        "last_evolved_iter": 0,
+        "parent_id": "TrafficRecovery",
+        "version": 2,
+        "allowed_actions": [
+          "AllowTrafficZone"
+        ],
+        "family": "TrafficRecovery"
+      },
+      {
+        "name": "WaitVerification_v2",
+        "initiation": "IF an action is explicitly in progress OR a prior response requires verification BEFORE proceeding",
+        "policy": [
+          "1. Confirm action status and verify the busy bit is set to IN_PROGRESS",
+          "2. Await completion of the ongoing action with a timed check to avoid indefinite waiting",
+          "3. Validate the final status of the action and Monitor observations before proceeding"
+        ],
+        "termination": "Stop IF the previous action has completed AND its observable outcome is definitively known",
+        "frequency": 0,
+        "avg_gain": 0.0,
+        "total_gain": 0.0,
+        "maturity": 0,
+        "success_count": 0,
+        "last_evolved_iter": 0,
+        "parent_id": "WaitVerification",
+        "version": 2,
+        "allowed_actions": [
+          "Sleep"
+        ],
+        "family": "WaitVerification"
+      }
+    ]
+  },
+  "model_identity": {
+    "model": "Qwen/Qwen3-8B",
+    "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+    "backend": "transformers",
+    "transformers": "4.51.3",
+    "torch": "2.6.0+cu124",
+    "dtype": "bfloat16",
+    "weights_frozen": true,
+    "trainable_parameters": 0,
+    "temperature_scoring": true,
+    "scoring_mode": "incremental_teacher_forcing",
+    "chat_template_sha256": "a55ee1b1660128b7098723e0abcd92caa0788061051c62d51cbe87d9cf1974d8"
+  },
+  "training_provenance": {
+    "path": "/home/jeonges/proposed/research_outputs/paper-fix/E3-hybrid-finite/train/pool-iteration-0001.json",
+    "sha256": "b2e875a0533b9ec8c3cdd0aee0344f129b7f9833715f18bbc42731e30ebe29d4",
+    "episodes_completed": 2,
+    "total_training_episodes": 2,
+    "training_seeds": [
+      100,
+      101
+    ],
+    "algorithm": {
+      "enabled": true,
+      "schedule": "paper_batch",
+      "gate_mode": "paper_rtg",
+      "maintenance_mode": "paper_algorithm1",
+      "ppo_gate": true,
+      "semantic_gradient": true,
+      "score_maintenance": true,
+      "threshold": 2,
+      "max_evolutions": 10,
+      "best_of_n": 2,
+      "semantic_chunk_steps": 32,
+      "semantic_chunk_chars": 48000,
+      "clip": 0.2,
+      "gamma": 0.99,
+      "ema_alpha": 0.1,
+      "acceptance_margin": 0.0
+    }
+  }
+}

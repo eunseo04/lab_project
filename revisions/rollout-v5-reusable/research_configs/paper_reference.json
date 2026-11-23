@@ -1,0 +1,8 @@
+{
+  "source": "https://arxiv.org/abs/2505.04843v2",
+  "kind": "paper_reference",
+  "scope": "Reported aggregate across red-policy variants; not one episode and not Qwen measurements",
+  "aggregation_uncertainty": "Exact cross-red weighting and standard-deviation convention are not fully specified by the paper",
+  "all_rl": {"model": "KEEP GNN-PPO", "mean_joint_reward": -493.0, "reward_std": 95.9, "execution_time_s": 45.2},
+  "all_llm": {"model": "GPT-4o-mini", "mean_joint_reward": -2547.2, "reward_std": 498.8, "execution_time_s": 4704.6}
+}

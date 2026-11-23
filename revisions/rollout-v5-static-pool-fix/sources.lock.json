@@ -1,0 +1,24 @@
+{
+  "sources": {
+    "cage-challenge-4": {
+      "url": "https://github.com/cage-challenge/cage-challenge-4",
+      "commit": "8c3c50ca54b176c2de199847944e8dcc035497e3"
+    },
+    "llms-are-acd": {
+      "url": "https://github.com/r4wd3r/llms-are-acd",
+      "commit": "81ff29a0d8f7a7184cafecc62c39945d03acdda6"
+    },
+    "cage-4-submission": {
+      "url": "https://github.com/cybermonic/cage-4-submission",
+      "commit": "2afd652d80ce9d4051a07c23c2538f3dec6bb6c6"
+    }
+  },
+  "published_weights_sha256": {
+    "gnn_ppo-0.pt": "991d96cb5132eec36595f6d407e67b93b2e5045c960dc4d25586e0c0bf124e60",
+    "gnn_ppo-1.pt": "27072ef12bab1e1b2ec9b9143845d07af7545c615c92ef44c59b67268cb98502",
+    "gnn_ppo-2.pt": "a76ea99d830976aa4c7f370c1fc575746de7c8a1618dd239ff34f0525da11478",
+    "gnn_ppo-3.pt": "acca6460545401e47c1dfe30d9f761f4955437b9c13f8098d5856e7995163fe4",
+    "gnn_ppo-4.pt": "ea9c664085987f4c191b74f2d4ffa44453461990d0c8cc1c1525ec4d8f7372d2"
+  },
+  "paper": "https://arxiv.org/abs/2505.04843v2"
+}
