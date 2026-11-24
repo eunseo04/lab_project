@@ -3,6 +3,7 @@
 .model-venv
 .download-tools
 .local-configs/
+.local_archive/
 /models
 /third_party
 /runtime
@@ -13,11 +14,16 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-.local-configs/
 
-# Captured evidence is added explicitly from docs/export_manifest.json.
+# Full paper copies stay local alongside the consolidated research assets.
+/references/*.pdf
+/references/*.txt
+
+# Generated experiment results and raw records stay local.
 research_outputs/
 verification/
+analysis_outputs/
+reports/
 *.jsonl
 *.log
 *.pid

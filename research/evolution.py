@@ -1,5 +1,5 @@
 """Non-parametric Skill-Pro evolution, preserving official components and modes."""
-from collections import defaultdict
+from collections import Counter, defaultdict
 from copy import deepcopy
 import json
 import time
@@ -12,13 +12,15 @@ from .gate import gate_score
 
 
 class Evolution(OriginalEvolution):
-    def __init__(self, model, config):
+    def __init__(self, model, config, rollout_validator=None):
         super().__init__(model, threshold=config.get("threshold", 6), epsilon=config.get("clip", 0.2))
         self.config = config
         self.gradients = []
         self._gradient_cache = {}
         self.fifo = ExperiencePool(max_size=config.get("experience_capacity", 1000))
         self.golden = GoldenExperiencePool(max_size=config.get("golden_capacity", 20))
+        self.rollout_validator=rollout_validator
+        self.rollout_attempts=Counter()
 
     def _generate_semantic_gradient(self, old_skill, experience):
         cache_key = (old_skill.name, id(experience))
@@ -58,17 +60,28 @@ class Evolution(OriginalEvolution):
                     "action_record_format": "The acting policy's output is primitive-action JSON. Skill names are procedural guidance, not executable environment actions."}
                 if any("behavior_context" in record for record in visible):
                     visible[0]["execution_contract"]["behavior_diagnostics"]=(
-                        "Case history contains only this Blue's observed PID/file events and own action outcomes. "
+                        "Case history contains only this Blue's observed PID/file/connection events and own action outcomes. "
+                        "Partial connection fields are uncertain investigation leads, not confirmed compromise. "
                         "Repeated analysis, duplicate successful decoys and Sleep with an open case are diagnostic evidence, not shaped rewards. "
+                        "A repeated same-host decoy may add a different observed service or replace one after Restore; its host count alone does not prove waste. "
                         "Monitor runs automatically; busy Sleep has no alternative accepted intervention. "
                         "A flagged PID supports timely Remove; observed privilege escalation requires Restore because Remove cannot kill privileged persistence. "
                         "TRUE Remove is not proof of successful cleanup, and unchanged old cmd files alone are not fresh compromise. "
                         "Refine initiation, response sequence and termination using actual outcome transitions rather than copying another agent's action frequencies.")
             local = Experience(reward=experience.reward, skill=experience.skill,
                 trajectory=json.dumps(visible, ensure_ascii=False), transitions=transitions, env_name=experience.env_name)
-            gradient, related = super()._generate_semantic_gradient(old_skill, local)
+            audits=[]
+            if self.config.get("evidence_verification",False):
+                from .semantic_evidence import EvidenceModel
+                original_model=self.evolver_model;verified=EvidenceModel(original_model,visible,
+                    diagnosis_verification=self.config.get('diagnosis_verification',False))
+                self.evolver_model=verified
+                try:gradient,related=super()._generate_semantic_gradient(old_skill,local)
+                finally:self.evolver_model=original_model
+                audits=verified.audits
+            else:gradient, related = super()._generate_semantic_gradient(old_skill, local)
             self.gradients.append({"skill": old_skill.name, "steps": [t["step"] for t in transitions],
-                                   "gradient": gradient, "related": related})
+                                   "gradient": gradient, "related": related,**({"evidence_audits":audits} if audits else {})})
             if related:
                 gradients.append(gradient)
         combined = {key: "\n".join(g[key] for g in gradients if g.get(key))
@@ -76,6 +89,20 @@ class Evolution(OriginalEvolution):
         if reuse:
             self._gradient_cache[cache_key] = (combined, bool(gradients))
         return combined, bool(gradients)
+
+    def _run_semantic_update(self,old_skill,gradients_list,evolution_type):
+        if self.config.get("evidence_verification",False) and not gradients_list:
+            return {}  # No ungrounded NEW fallback after all evidence was rejected.
+        if self.config.get("evidence_verification",False):
+            original=self.evolver_model
+            def constrained(prompt):
+                return original(prompt+"\nOnly modify components with nonempty evidence-supported gradients. "
+                    "Copy every other original initiation/policy/termination component EXACTLY, without paraphrasing. "
+                    "Do not include training host instance names, IP addresses or trace citations in the reusable Skill.")
+            self.evolver_model=constrained
+            try:return super()._run_semantic_update(old_skill,gradients_list,evolution_type)
+            finally:self.evolver_model=original
+        return super()._run_semantic_update(old_skill,gradients_list,evolution_type)
 
     def probabilities(self, skill, experiences):
         samples = []
@@ -111,7 +138,19 @@ class Evolution(OriginalEvolution):
             ready = [s for s in pool.skills if len(self.experience_buffer[s.name]) >= self.threshold]
             ready.sort(key=lambda s: get_priority(s, pool.skills, iteration), reverse=True)
             ready = ready[:self.config.get("max_evolutions", 2)]
+        rollout_mode=self.config.get("rollout_verification",False)
+        if rollout_mode:
+            if self.rollout_validator is None:raise RuntimeError("Rollout verification enabled without a validator")
+            # Proposed resource policy: calibrate the best-supported parent first.
+            # No fixed minimum sample count is silently added to original Skill-Pro.
+            ready.sort(key=lambda s:(self.rollout_attempts[getattr(s,'family',s.name)],
+                -sum(t.get("policy_invoked",False) and t.get("request_applied",False)
+                and not t.get("parse_error") for e in current_batch[s.name] for t in e.transitions)))
+        rollout_checks=0
         for parent in ready:
+            if rollout_mode:
+                parent=next((s for s in pool.skills if s.name==parent.name),None)
+                if parent is None:continue
             before_skills, before_cache = deepcopy(pool.skills), deepcopy(pool._skill_embs)
             evidence = list(current_batch[parent.name]) if paper_batch else build_success_failure_eval_batch(self.experience_buffer[parent.name], self.threshold)
             self._gradient_cache.clear()
@@ -127,10 +166,23 @@ class Evolution(OriginalEvolution):
                       "evidence_source": "current_training_batch" if paper_batch else "historical_buffer",
                       "evidence_trajectories": len(evidence),
                       "valid_behavior_decisions": sum(len(e.transitions) for e in gate_evidence)}
+            from .attribution import support_statistics
+            record['experience_support']=support_statistics(gate_evidence)
+            required=self.config.get('minimum_independent_episodes',0)
+            if record['experience_support']['independent_episode_count'] < required:
+                record['deferred']='insufficient_independent_training_episodes'
+                record['additional_training_episodes_needed']=required-record['experience_support']['independent_episode_count']
+                record['pool_changed']=False
+                logs.append(record);continue
             start_gradient = len(self.gradients)
+            if rollout_mode and rollout_checks>=self.config.get("maximum_rollout_candidates_per_iteration",1):
+                record["deferred"]="registered_rollout_budget_exhausted; keep previous skill including rare skills"
+                logs.append(record);continue
             try:
                 gate_enabled = self.config.get("ppo_gate", True)
-                old = self.probabilities(parent, gate_evidence) if gate_enabled else None
+                # Proposed-only: reject unsupported diagnoses before spending
+                # exact-scoring calls. B2's original calculation is unchanged.
+                old = self.probabilities(parent, gate_evidence) if gate_enabled and not self.config.get('evidence_verification',False) else None
                 candidates = []
                 for index in range(self.config.get("best_of_n", 3)):
                     if self.config.get("semantic_gradient", True):
@@ -160,7 +212,15 @@ class Evolution(OriginalEvolution):
                             candidate.name = f"{base}_c{index}_{suffix}"
                             suffix += 1
                     item["skill"] = candidate.__dict__.copy()
+                    if self.config.get("evidence_verification",False):
+                        from .semantic_evidence import candidate_supported
+                        support=candidate_supported(parent,candidate,self.gradients[start_gradient:])
+                        item['semantic_support']=support
+                        if not support['passed']:
+                            item['error']='candidate_changes_not_supported_by_observable_evidence'
+                            record['candidates'].append(item);continue
                     if gate_enabled:
+                        if old is None:old=self.probabilities(parent,gate_evidence)
                         new = self.probabilities(candidate, gate_evidence)
                         value, diagnostics = gate_score(gate_evidence, old, new, baselines,
                             mode=self.config.get("gate_mode", "official_code"), epsilon=self.epsilon)
@@ -179,6 +239,16 @@ class Evolution(OriginalEvolution):
                         selected = [best] if best[0] > self.config.get("acceptance_margin", 0.0) else []
                     for value, candidate, item in selected:
                         candidate.maturity = 0
+                        if rollout_mode:
+                            item["ppo_accepted"]=True;rollout_checks+=1
+                            self.rollout_attempts[getattr(parent,'family',parent.name)]+=1
+                            validation=self.rollout_validator(pool,candidate,{"parent":parent.name,"iteration":iteration,
+                                "valid_behavior_decisions":record["valid_behavior_decisions"],"evidence_trajectories":len(evidence)})
+                            item["rollout_validation"]=validation
+                            if not validation.get("accepted",False):continue
+                            pool.restore(validation["verified_pool"])
+                            item["accepted"]=record["accepted"]=True
+                            continue
                         parent.last_evolved_iter = iteration
                         pool.add_skill(candidate)
                         item["accepted"] = True
@@ -202,15 +272,19 @@ class Evolution(OriginalEvolution):
                 maintenance = pool.maintain()  # actual official-code LCB/semantic pruning
         else:
             maintenance = pool.maintain_fifo()
+        from .attribution import evolution_statistics
         return {"evolution": logs, "maintenance": maintenance,
+                "skill_experience_statistics":evolution_statistics(experiences,logs),
                 "seconds": time.perf_counter()-started, "pool_size": len(pool.skills)}
 
     def snapshot(self):
-        return {"buffers": {k: [e.__dict__ for e in v] for k, v in self.experience_buffer.items()},
+        return {"rollout_attempts":dict(self.rollout_attempts),
+                "buffers": {k: [e.__dict__ for e in v] for k, v in self.experience_buffer.items()},
                 "fifo": [e.__dict__ for e in self.fifo.experiences],
                 "golden": [e.__dict__ for e in self.golden.get_all()]}
 
     def restore(self, data):
+        self.rollout_attempts=Counter(data.get('rollout_attempts',{}))
         self.experience_buffer = defaultdict(list, {k: [Experience(**e) for e in v] for k, v in data.get("buffers", {}).items()})
         for e in data.get("fifo", []): self.fifo.add(Experience(**e))
         for e in data.get("golden", []): self.golden.add(Experience(**e))

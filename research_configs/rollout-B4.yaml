@@ -1,0 +1,103 @@
+arm: E2
+composition: hybrid
+red: finite
+steps: 500
+episodes: 100
+train_episodes: 6
+iterations: 3
+train_seed: 91000
+eval_seed: 101000
+validation_seed: 99000
+validation_episodes: 0
+threads: 1
+profile: controlled-comparison
+action_contract: explicit
+scoring: official
+communication: paper_projected_keep
+skip_busy_policy: true
+pool_size: 24
+weights: third_party/cage-4-submission/weights
+output: research_outputs/full/B4
+model:
+  endpoint: http://127.0.0.1:8418
+  scoring_endpoints: []
+  model: Qwen/Qwen3-8B
+  revision: b968826d9c46dd6066d109eabc6255188de91218
+  temperature: 1.0
+  max_tokens: 192
+  timeout_seconds: 240
+selector:
+  epsilon: 0.1
+  max_skill_age: 16
+  verification_history: accepted_decisions
+  domain_verification_revision: v4
+evolution:
+  enabled: true
+  schedule: paper_batch
+  gate_mode: paper_rtg
+  maintenance_mode: paper_algorithm1
+  ppo_gate: true
+  semantic_gradient: true
+  score_maintenance: true
+  threshold: 2
+  max_evolutions: 10
+  best_of_n: 2
+  semantic_chunk_steps: 32
+  semantic_chunk_chars: 48000
+  clip: 0.2
+  gamma: 0.99
+  ema_alpha: 0.1
+  acceptance_margin: 0.0
+  evidence_verification: true
+  rollout_verification: true
+  maximum_rollout_candidates_per_iteration: 1
+  diagnosis_verification: true
+  minimum_independent_episodes: 2
+behavior_context: evidence_v1
+skill_seed_set: response_v1
+case_presentation: readable
+pool: artifacts/initial_pool.json
+connection_leads: true
+diagnostics:
+  reward_events: true
+  skill_attribution: true
+comparison_id: B4
+rollout_validation:
+  seeds:
+  - 97000
+  - 97001
+  - 97002
+  - 97003
+  - 97004
+  - 97005
+  - 97006
+  - 97007
+  - 97008
+  - 97009
+  - 97010
+  - 97011
+  - 97012
+  - 97013
+  - 97014
+  - 97015
+  - 97016
+  - 97017
+  - 97018
+  - 97019
+  ports:
+  - 8418
+  minimum_mean_gain: 0.0
+  minimum_win_rate: 0.6
+  minimum_median_gain: 0.0
+  maximum_seed_loss: 50.0
+  maximum_mean_lwf_loss: 0.0
+  maximum_mean_asf_loss: 0.0
+  maximum_std_ratio: 1.25
+  maximum_std_increase: 25.0
+  support_threshold_grid:
+  - 0
+  - 4
+  - 8
+  - 16
+  - 32
+experiment_version: cage4-skillpro-full

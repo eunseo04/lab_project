@@ -11,7 +11,7 @@ def main():
     sub = p.add_subparsers(dest="command", required=True)
     for command in ("evaluate", "train", "compare", "official"):
         s = sub.add_parser(command)
-        s.add_argument("--config", default=str(ROOT/"research_configs/controlled.yaml"))
+        s.add_argument("--config", default=str(ROOT/"research_configs/rollout-B0.yaml"))
         s.add_argument("--arm", choices=ARMS)
         s.add_argument("--red", choices=REDS)
         s.add_argument("--composition", choices=("hybrid", "all_llm", "no_blue", "all_rl"))
@@ -49,7 +49,7 @@ def main():
         if args.command == "compare":
             for red in args.reds:
                 for arm in args.arms:
-                    case = {**c, "arm": arm, "red": red}
+                    case = {**c, "arm": arm, "red": red, "comparison_id": arm}
                     if args.train and arm in ("E2", "E3"):
                         training = run(case, "train", resume=args.resume, limit=args.limit)
                         if training["status"] != "completed":
@@ -62,7 +62,7 @@ def main():
             run(c, "train" if args.command == "train" else "eval", args.output, args.resume, args.limit)
     elif args.command == "doctor":
         from .client import ModelClient
-        c = load(ROOT/"research_configs/controlled.yaml")
+        c = load(ROOT/"research_configs/rollout-B0.yaml")
         import importlib.metadata as m
         import shutil
         output = {"workspace": str(ROOT), "cpu_environment": sys.prefix,
@@ -73,8 +73,8 @@ def main():
         except Exception as exc: output["local_qwen_error"] = str(exc)
         print(json.dumps(output, indent=2))
     elif args.command == "report":
-        from .reporting import report
-        report(args.directory, reasoning=args.reasoning)
+        from scripts.report_experiment import report_experiment
+        print(json.dumps(report_experiment(args.directory, include_trace=args.reasoning)))
     elif args.command == "test":
         import subprocess
         sys.exit(subprocess.call([sys.executable, "-m", "pytest", "tests", "research_tests", "-q", "--junitxml=research_outputs/tests.xml"], cwd=ROOT))

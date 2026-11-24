@@ -1,68 +1,75 @@
-# ACD + Skill-Pro + CAGE4 연구
+# CAGE4 + ACD + Skill-Pro
 
-Qwen3-8B와 KEEP 4개를 결합한 자율 사이버 방어 실험이다. Qwen 가중치를 고정하고 외부 Security Skill을 개선하며, Skill-Pro의 PPO Gate 뒤에서 실제 CAGE4 rollout으로 후보를 검증한다.
+고정 Qwen3-8B와 KEEP 4개가 CAGE4 가상 기업망을 방어하고, 실행 경험으로 외부 Security Skill을 개선하는 연구 코드다. Qwen 가중치는 업데이트하지 않는다.
 
-이 저장소는 **2026-11-24 시점의 연구 코드와 선별한 실험 증거**를 모은 것이다. 중단된 실험과 성능이 낮았던 결과도 보존했다. 원래 작업 디렉터리는 변경하지 않았다.
+현재 실행 코드는 루트 `research/` 하나다. 과거 실행 결과·원시 로그·revision 보존본·일회성 분석 도구는 제거했다. 모델·가상환경·원본 소스·runtime은 실행에 필요한 로컬 자원으로 유지하며 Git에는 포함하지 않는다. 과거 성능 수치나 학습 완료 Pool을 제공하는 저장소는 아니다.
 
-## 현재 확인된 결과
+[파일별 기능·데이터 구조](docs/code_and_data_guide.md), [전체 파일 목록 CSV](docs/code_and_data_inventory.csv), [논문·원본 출처](references/README.md)를 제공한다.
 
-| 실험 | 실제 수행 및 해석 |
-|---|---|
-| v2 FiniteState | 동일 이력 ACD −183.75, 최종 loop2 −240.00. 평균 차이 −56.25. |
-| v2 AggressiveFSM | ACD −262.50, 최종 Skill −211.75. 4개 시드에서 평균 +50.75. |
-| v4 수동 Skill | 평균 +35.50이지만 개선은 1/4. 자동 학습 결과와 구분한다. |
-| v5 B4 후보 검증 | 이전 Pool −190.55, 후보 −189.00. 20개 대응 시드의 평균 +1.55, 승률 50%. 안정성·Green 조건 미달로 거부했다. |
-| v5 최종 B0–B4 테스트 | 실행되지 않았다. 100개 테스트 시드와 일반화 성능을 완료했다고 주장하지 않는다. |
+## 비교 실험군
 
-세부 상태와 검증 근거는 [연구 snapshot](docs/research_snapshot.md), 이전 전체 실행 기록은 [기존 보고서](docs/execution_report.md)에 있다. 과거 보고서의 `running`·진행 예정 문구는 캡처 당시 상태다.
+| 군 | 구성 | 내부 arm |
+|---|---|---|
+| B0 | Qwen ACD + 공통 관찰/사건 이력 | E0 |
+| B1 | B0 + 고정 초기 Security Skill | E1 |
+| B2 | Skill-Pro 논문식 SG·batch·RTG·PPO Gate | E2 |
+| B3 | B2 + evidence/diagnosis 검증·독립 episode 지원 | E2 |
+| B4 | B3 + 실제 대응 CAGE4 Rollout 검증·rollback | E2 |
 
-## 파일 구성
+B3/B4도 B2와 같은 actor/selector를 사용한다. B4를 내부 E3와 혼용하지 않는다. `artifacts/initial_pool.json`은 B1–B4가 공유하는 정적 초기 절차이며 학습 결과가 아니다.
 
-- `research/`, `acd/`: 기존 ACD와 Skill-Pro 이식 구현.
-- `revisions/`: 실험별 보존 코드. `rollout-v5-reusable`은 여러 loop와 warm start의 provenance 처리를 보강한 실행용 버전이다.
-- `research_configs/`, `configs/`: 실험 설정과 프롬프트.
-- `scripts/`, `tests/`, `research_tests/`: 설치·실행·분석·회귀 검사.
-- `docs/`, `reports/`: 원인 분석, 방법론, 실행 기록.
-- `research_outputs/`, `analysis_outputs/`, `verification/`: 선별한 요약·표·그래프·테스트 증거.
-- `artifacts/pools/`: 실제 Skill 텍스트를 보존한 경량 Pool snapshot. 원본 hash와 생략한 필드를 함께 기록했다.
+## 설치와 실행
 
-5GB의 원시 실행 로그, 대형 checkpoint, 신경망 가중치, 가상환경, 외부 원본 저장소, 생성 runtime과 논문 PDF는 포함하지 않는다. [반출 목록](docs/export_manifest.json)과 [재현 범위](docs/PUBLICATION.md)를 참고한다.
-
-## 새 환경에서 실행
-
-기록된 CPU·모델 환경은 Python 3.10 기준이다. 모델 다운로드와 GPU 실험은 다음 명령을 직접 실행할 때 시작된다.
+기록된 환경은 Python 3.10이다. 고정 source/model revision과 의존성 lock을 사용한다.
 
 ```bash
 ./scripts/setup_research.sh --download
-python3 scripts/prepare_checkout.py
-CUDA_VISIBLE_DEVICES=0 ./scripts/start_qwen.sh --port 8018
 ```
 
-별도 터미널에서 실행한다. 학습과 검증은 오래 걸릴 수 있으므로 episode 수와 출력 경로를 명시한다.
+모델 서버를 실행하는 터미널:
 
 ```bash
-# 동일 사건 이력 ACD
-./scripts/run_research.sh B0 evaluate --episodes 4 \
-  --output "$PWD/research_outputs/new-evaluation/B0"
+CUDA_VISIBLE_DEVICES=0 ./scripts/start_qwen.sh --port 8418
+```
 
-# Proposed 학습: 설정은 4 episodes / 2 loops, 분리된 20개 검증 시드
-./scripts/run_research.sh B4 train
+실험 터미널:
 
-# 완료된 학습 Pool을 명시해서 평가
+```bash
+# 동일 사건 이력 ACD / 고정 Skill
+./scripts/run_research.sh B0 evaluate --episodes 4 --output "$PWD/research_outputs/new/B0"
+./scripts/run_research.sh B1 evaluate --episodes 4 --output "$PWD/research_outputs/new/B1"
+
+# Proposed 훈련: 기본 6 episode / 3 loop, 후보마다 20개 대응 검증 seed
+./scripts/run_research.sh B4 train --output "$PWD/research_outputs/new/B4/train"
+
+# 훈련이 완료된 Pool을 명시해 동결 평가
 ./scripts/run_research.sh B4 evaluate --episodes 4 \
-  --pool "$PWD/research_outputs/rollout-reproduction/B4/E3-hybrid-finite/train/pool-iteration-0002.json" \
-  --output "$PWD/research_outputs/new-evaluation/B4"
+  --pool "$PWD/research_outputs/new/B4/train/pool-iteration-0003.json" \
+  --output "$PWD/research_outputs/new/B4/eval"
+
+# B0–B4 label을 구분하고 train/test/미학습 대조군을 분리한 비교
+./research.sh report research_outputs/new --reasoning
+python3 scripts/recompute_public_metrics.py --episodes research_outputs/new/report/episodes.json
 ```
 
-`prepare_checkout.py`는 현재 체크아웃 경로에 맞춘 설정을 `.local-configs/`에 만든다. 보존한 원본 설정·소스·실험 hash는 바꾸지 않는다. 과거 캡처 안의 절대 경로는 원래 측정 경로다.
+B2–B4의 학습 후 성능은 완료한 훈련 Pool로 평가한다. 초기 Pool을 명시해 평가한 경우 새 비교 도구는 `untrained_control`로 분리한다. 기존 출력 경로를 덮어쓰지 말고 새 실험 경로를 지정한다. 생성한 결과는 Git에서 제외한다.
+
+4개 GPU의 점유 시간 합계를 제한하는 별도 pilot 관리자가 있다. 이 관리자는 모델 서버의 기동·종료도 담당한다.
 
 ```bash
-# 오프라인 회귀 검사: 모델 API 호출을 막는 fixture 사용
-./research_v5_reusable.sh test
+.venv/bin/python scripts/run_campaign.py --output "$PWD/research_outputs/pilot-new" --gpu-hours 8
+./research.sh report research_outputs/pilot-new --reasoning
 ```
 
-실측 수정본의 기존 전체 회귀 검사는 139개, 재사용 보강본은 141개가 통과했다. 이번 반출본에서의 재검사 결과는 [반출 검증](docs/publication_validation.json)에 기록한다. 테스트 통과와 방어 성능 개선은 별개다.
+full 설정과 작은 pilot 계획을 같은 실험으로 합산하지 않는다. 학습·후보 검증·최종 test seed는 분리돼 있다. 실험 설정은 `research_configs/`, 현재 경로용 생성 설정은 `.local-configs/`에 있다.
 
-## 원문과 재사용
+## 검사
 
-[출판물·원본 코드](references/README.md), [출처 표기](NOTICE.md), [보존된 라이선스](LICENSE)를 참고한다. 원래 긴 작업 기록은 [README.workspace.md](README.workspace.md)에 있다.
+```bash
+.venv/bin/python -m pytest -q
+./scripts/run_research.sh B4 evaluate --help
+```
+
+정리 후 회귀 검사 175개가 통과했다. 모델 추론/방어 성능 검증을 대신하는 결과는 아니다. 공식 reward·PPO 수식·고정 모델 및 KEEP lock은 유지하며 테스트의 기준 hash는 `tests/fixtures/reference_integrity.json`에 있다.
+
+구조화된 진단 검증은 행동·대상·시점을 검사하지만 자유 서술 전체의 의미나 인과관계를 보증하지 않는다. 공동 reward를 개별 Skill의 직접 기여로 해석하지 않으며, PPO Gate 양수만으로 방어 성능 개선을 주장하지 않는다.

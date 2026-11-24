@@ -77,6 +77,13 @@ def structurally_valid(skill):
 
 class CAGEVerifier:
     """E3 only: checks are based exclusively on this Blue's observation/history."""
+    def __init__(self, history_mode="legacy_ticks", revision="v4"):
+        if history_mode not in ("legacy_ticks", "accepted_decisions"):
+            raise ValueError("Invalid verification history mode")
+        self.history_mode = history_mode
+        if revision not in ("v4","v5"):raise ValueError("Invalid domain verification revision")
+        self.revision=revision
+
     def check(self, skill, state, history):
         if not structurally_valid(skill):
             return False, "invalid_skill_structure"
@@ -89,8 +96,14 @@ class CAGEVerifier:
         status = str(raw.get("success", "UNKNOWN"))
         if "IN_PROGRESS" in status:
             return False, "action_in_progress"
-        if len(history) >= 2:
-            last, previous = history[-1], history[-2]
+        decisions = history
+        if self.history_mode == "accepted_decisions":
+            # Retain deliberate free Sleep: it breaks a consecutive intervention
+            # sequence. Only automatic busy rows and invalid requests are skipped.
+            decisions = [h for h in history if h.get("policy_invoked")
+                and h.get("request_applied") and not h.get("parse_error")]
+        if len(decisions) >= 2:
+            last, previous = decisions[-1], decisions[-2]
             evidence = {str(k): v for k, v in raw.items() if k not in ("action", "phase", "message")}
             current_hash = hashlib.sha256(json.dumps(evidence, sort_keys=True).encode()).hexdigest()
             # Busy placeholders and deliberate waiting are not repeated policy
@@ -108,7 +121,7 @@ class CAGEVerifier:
         response_profile=state.get("behavior_seed_set")=="response_v1"
         if response_profile:
             from .behavior_skills import initiation_matches
-            if not initiation_matches(family,state["behavior_context"]):
+            if not initiation_matches(family,state["behavior_context"],revision=self.revision):
                 return False,"observable_case_initiation_not_satisfied"
         text = state["user_prompt"].lower()
         if not response_profile and family == "HostRecovery" and "critical:" not in text:
@@ -134,7 +147,7 @@ class SkillController:
         self.active, self.started = None, None
         self.history = []
         self.proposed = proposed
-        self.verifier = CAGEVerifier()
+        self.verifier = CAGEVerifier(config.get("verification_history", "legacy_ticks"),config.get("domain_verification_revision","v4"))
         self.last_event = {}
 
     def choose(self, state, step):

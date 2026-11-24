@@ -1,3 +1,0 @@
-| Arm | Red | N | Mean Reward | Sample Std | Seconds | Status |
-|---|---|---|---|---|---|---|
-| E0 | finite | 2 | -3.000 | 2.828 | 26.770 | completed |

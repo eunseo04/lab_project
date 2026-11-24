@@ -1,5 +1,0 @@
-{
-  "passed": false,
-  "error": "TypeError: cannot pickle 'mappingproxy' object",
-  "no_causal_claim": true
-}

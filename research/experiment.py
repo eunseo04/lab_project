@@ -74,6 +74,10 @@ def run_episode(config, seed, episode_id, client, pool, text_model, directory):
     text_model.seed, text_model.counter = seed, 0
     env = make_environment(config, seed)
     observations, _ = env.reset(seed=seed)
+    reward_audit=None
+    if config.get("diagnostics",{}).get("reward_events",False):
+        from .reward_audit import RewardAudit
+        reward_audit=RewardAudit(env,directory/f"episode-{episode_id:04d}-reward-events.jsonl")
     role_map = policy_roles(config["composition"])
     old_config = {**config, "team": "mixed" if config["composition"] == "hybrid" else
         ("all_rl" if config["composition"] == "all_rl" else "all_llm"),
@@ -123,6 +127,7 @@ def run_episode(config, seed, episode_id, client, pool, text_model, directory):
             if config["scoring"] == "terminal_inclusive" and terminal:
                 ledger.rewards.append(joint); included = True
             step_rewards.append(joint if included else 0.0)
+            if reward_audit:reward_audit.capture(step,joint,included)
             after = env.raw_observations()
             for agent, role in role_map.items():
                 action = env.action_translator(agent, actions[agent])
@@ -177,6 +182,12 @@ def run_episode(config, seed, episode_id, client, pool, text_model, directory):
         "model_identity": client.identity if client else None,
         "kind": "mock_test" if getattr(client, "is_mock", False) else "real_cage4",
         "weights": weights, "trace": str(trace), "calls": deepcopy(client.calls) if client else []}
+    if reward_audit:result.update(reward_audit.finish(ledger.total))
+    if config.get('diagnostics',{}).get('skill_attribution',False):
+        from .attribution import auxiliary_attribution
+        diagnostic=directory/f'episode-{episode_id:04d}-skill-attribution.json'
+        atomic_json(diagnostic,auxiliary_attribution(rows,reward_audit.ticks if reward_audit else []))
+        result['auxiliary_attribution']=str(diagnostic)
     atomic_json(directory/f"episode-{episode_id:04d}.json", result)
     return result, experiences
 
@@ -220,6 +231,9 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
         text_model = TextModel(client)
         pool = SecuritySkillPool(config["pool_size"],seed_set=config["skill_seed_set"]) if config["arm"] != "E0" and needs_llm else None
         evolution = Evolution(text_model, config["evolution"]) if pool and config["arm"] in ("E2", "E3") else None
+        if evolution and stage=="train" and config["evolution"].get("rollout_verification",False):
+            from .rollout_execution import EnvironmentVerifier
+            evolution.rollout_validator=EnvironmentVerifier(config,output,client.identity)
         checkpoint_path = output/"checkpoint.json"
         checkpoint = json.loads(checkpoint_path.read_text()) if checkpoint_path.exists() else None
         training_provenance = None
@@ -249,7 +263,7 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
             if evolution: evolution.restore(checkpoint.get("experience", {}))
         elif stage == "eval" and (output/"frozen_pool.json").is_file() and pool:
             pool.restore(json.loads((output/"frozen_pool.json").read_text())["pool"])
-        elif stage == "eval" and config["arm"] in ("E2", "E3"):
+        elif stage == "eval" and (config["arm"] in ("E2", "E3") or config["arm"] == "E1" and config.get("pool")):
             pool_path = Path(config.get("pool") or output.parent/"train/checkpoint.json")
             if not pool_path.is_file(): raise FileNotFoundError(f"Train this arm first or specify --pool: {pool_path}")
             trained = json.loads(pool_path.read_text())

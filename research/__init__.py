@@ -1,4 +1,4 @@
-"""Research extension; the pre-existing acd package and its results are preserved."""
+"""Frozen-Qwen ACD and Skill-Pro research pipeline."""
 from pathlib import Path
 import acd  # installs the pinned CybORG runtime on the Python path
 

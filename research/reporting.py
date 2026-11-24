@@ -24,6 +24,13 @@ def number(value):
     return "N/A" if value is None else f"{value:.3f}"
 
 
+def unbundled_reference():
+    """Literature result files are not required to report new local runs."""
+    fields = ('mean_joint_reward', 'reward_std', 'execution_time_s')
+    return {'all_rl': dict.fromkeys(fields), 'all_llm': dict.fromkeys(fields),
+            'aggregation_uncertainty': 'Literature result data is not bundled; compare new local runs separately.'}
+
+
 def report(directory, reasoning=False):
     import matplotlib
     matplotlib.use("Agg")
@@ -87,7 +94,7 @@ def report(directory, reasoning=False):
     fig.tight_layout(); fig.savefig(destination/"figure1_architecture.png", dpi=180); plt.close(fig)
     if not groups:
         (destination/"status.md").write_text("No completed real Qwen comparison episodes. All measured performance cells are N/A. Mock results are excluded.\n")
-        reference = json.loads((ROOT/"research_configs/paper_reference.json").read_text())
+        reference = unbundled_reference()
         render_table(destination/"table1_overall", ["Metric", "KEEP (Paper Reference)", "GPT-4o-mini (Paper Reference)", *ARMS],
             [[label, number(reference["all_rl"][field]), number(reference["all_llm"][field]), *["N/A"]*4]
              for label, field in (("Mean Joint Reward","mean_joint_reward"),("Reward Std.","reward_std"),("Execution Time (s)","execution_time_s"))])
@@ -148,7 +155,7 @@ def report(directory, reasoning=False):
                     if row.get("policy") != "llm": continue
                     if row.get("automatic_monitor"): automatic_counts[arm]["Monitor"] += 1
                     for action in row.get("executed_actions", []): counts[arm][action["name"]] += 1
-        reference = json.loads((ROOT/"research_configs/paper_reference.json").read_text())
+        reference = unbundled_reference()
         rows = []
         for label, field, old_field in [("Mean Joint Reward", "mean_joint_reward", "mean_joint_reward"),
             ("Reward Std. (sample)", "reward_std", "reward_std"), ("Execution Time (s)", "execution_time_s", "execution_time_s")]:

@@ -22,7 +22,8 @@ def validate(config):
         "communication": "paper_projected_keep", "threads": 1,
         "weights": "third_party/cage-4-submission/weights", "pool_size": 10,
         "output": "research_outputs", "skip_busy_policy": True, "action_contract": "legacy",
-        "behavior_context": "legacy", "skill_seed_set": "legacy", "case_presentation": "json"}
+        "behavior_context": "legacy", "skill_seed_set": "legacy", "case_presentation": "json",
+        "connection_leads": False}
     for key, value in defaults.items(): c.setdefault(key, value)
     c.setdefault("validation_episodes", 1)
     c.setdefault("validation_seed", 5000)
@@ -30,6 +31,7 @@ def validate(config):
         "revision": "b968826d9c46dd6066d109eabc6255188de91218", "temperature": 1.0,
         "max_tokens": 192, "timeout_seconds": 240})
     c.setdefault("selector", {"epsilon": 0.1, "max_skill_age": 8})
+    c["selector"].setdefault("verification_history", "legacy_ticks")
     c.setdefault("evolution", {})
     for key, value in {"enabled": True, "ppo_gate": True, "semantic_gradient": True,
         "score_maintenance": True, "gate_mode": "official_code", "threshold": 6,
@@ -49,6 +51,12 @@ def validate(config):
         raise ValueError("Invalid observable behavior context")
     if c["case_presentation"] not in ("json","readable"):
         raise ValueError("Invalid case history presentation")
+    if type(c["connection_leads"]) is not bool:
+        raise ValueError("connection_leads must be a boolean")
+    if c["connection_leads"] and c["behavior_context"] != "evidence_v1":
+        raise ValueError("Connection lead history requires evidence_v1")
+    if c["selector"]["verification_history"] not in ("legacy_ticks", "accepted_decisions"):
+        raise ValueError("Invalid verification history mode")
     if c["skill_seed_set"] not in ("legacy", "response_v1"):
         raise ValueError("Invalid versioned skill seed set")
     if c["skill_seed_set"]=="response_v1" and c["behavior_context"]!="evidence_v1":
@@ -65,6 +73,13 @@ def validate(config):
     if type(c["validation_episodes"]) is not int or c["validation_episodes"] < 0:
         raise ValueError("validation_episodes must be a nonnegative integer")
     e = c["evolution"]
+    if e.get('diagnosis_verification',False) and not e.get('evidence_verification',False):
+        raise ValueError('CAGE4 diagnosis verification requires trace evidence verification')
+    minimum=e.get('minimum_independent_episodes',0)
+    if type(minimum) is not int or minimum<0:
+        raise ValueError('minimum_independent_episodes must be a nonnegative integer')
+    if minimum and not e.get('evidence_verification',False):
+        raise ValueError('Experience support gating is a Proposed ablation, not original B2')
     if e["gate_mode"] not in ("official_code", "paper_rtg"): raise ValueError("Invalid PPO gate mode")
     if e["maintenance_mode"] not in ("official_code", "paper_score", "paper_algorithm1"):
         raise ValueError("Invalid maintenance mode")
@@ -84,6 +99,20 @@ def validate(config):
     if c["profile"] == "paper-compatible" and c["skip_busy_policy"]:
         raise ValueError("Paper-compatible mode requires skip_busy_policy: false")
     if c["model"].get("temperature", 1.0) <= 0: raise ValueError("Positive policy temperature required")
+    if c['selector'].get('domain_verification_revision','v4') not in ('v4','v5'):
+        raise ValueError('Invalid domain verification revision')
+    if e.get('rollout_verification',False):
+        if not e.get('ppo_gate',True) or e['schedule']!='paper_batch':
+            raise ValueError('Proposed rollout verification requires the unchanged paper PPO gate')
+        rule=c.get('rollout_validation',{})
+        seeds=rule.get('seeds',[])
+        if not seeds or len(set(seeds))!=len(seeds) or any(type(s) is not int for s in seeds):
+            raise ValueError('Explicit unique rollout validation seeds required')
+        if set(seeds)&(train_seeds|eval_seeds|validation_seeds):
+            raise ValueError('Rollout validation seeds overlap other splits')
+        required=('minimum_mean_gain','minimum_win_rate','minimum_median_gain','maximum_seed_loss',
+            'maximum_mean_lwf_loss','maximum_mean_asf_loss','maximum_std_ratio','maximum_std_increase','ports')
+        if any(k not in rule for k in required):raise ValueError('Incomplete registered rollout approval rule')
     if not c["model"].get("model") or not c["model"].get("revision"):
         raise ValueError("Explicit model ID and pinned revision are required; no model fallback")
     for key in ("weights", "output", "pool"):

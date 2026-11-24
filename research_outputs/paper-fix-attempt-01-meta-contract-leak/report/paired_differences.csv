@@ -1,7 +1,0 @@
-comparison,n,seeds,differences,mean_difference,wins
-loop1 - baseline,0,[],[],,0
-loop2 - baseline,0,[],[],,0
-loop1 - static_verified,0,[],[],,0
-loop2 - static_verified,0,[],[],,0
-loop2 - loop1,0,[],[],,0
-transfer_loop2 - transfer_baseline,0,[],[],,0

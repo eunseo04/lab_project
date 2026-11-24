@@ -1,7 +1,0 @@
-stage,n,planned_n,mean,sample_std,returns_by_seed,policy_decisions,policy_errors,evolved_policy_decisions
-baseline,3,4,-286.0,148.98657657654934,"{""12001"": -203.0, ""12002"": -197.0, ""12003"": -458.0}",1236,0,0
-static_verified,0,4,,,{},0,0,0
-loop1,0,4,,,{},0,0,0
-loop2,0,4,,,{},0,0,0
-transfer_baseline,0,4,,,{},0,0,0
-transfer_loop2,0,4,,,{},0,0,0

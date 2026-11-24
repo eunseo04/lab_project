@@ -13,12 +13,12 @@ LIMIT=10*1024*1024
 PRIVATE={'.bash_history','.lesshst','.env','.aws','.ssh','.codex','.idea','.vscode','.DS_Store'}
 RUNTIME={'.venv','.model-venv','models','third_party','runtime','checkpoints','__pycache__','.pytest_cache'}
 BINARY={'.safetensors','.pt','.pth','.ckpt','.bin','.npy','.npz','.whl','.sqlite','.db'}
-ALLOWED={'acd','research','revisions','research_configs','configs','scripts','tests','research_tests',
-    'docs','reports','references','artifacts','research_outputs','analysis_outputs','verification',
-    '.gitignore','.gitattributes','README.md','README.workspace.md','LICENSE','NOTICE.md','pytest.ini',
+ALLOWED={'acd','research','research_configs','configs','scripts','tests','research_tests',
+    'docs','references','artifacts',
+    '.gitignore','.gitattributes','README.md','LICENSE','NOTICE.md','pytest.ini',
     'requirements.txt','requirements.lock.txt','requirements-model.txt','requirements-model.lock.txt',
     'sources.lock.json','research_sources.lock.json','research_models.lock.json','setup.sh','run.sh',
-    'research.sh','research_v3.sh','research_v4.sh','research_v5.sh','research_v5_reusable.sh'}
+    'research.sh'}
 SECRETS={
     'private_key':re.compile(rb'-----BEGIN (?:[A-Z ]+ )?PRIVATE KEY-----'),
     'github_token':re.compile(rb'\b(?:gh[pousr]_[A-Za-z0-9]{30,255}|github_pat_[A-Za-z0-9_]{50,255})\b'),

@@ -1,7 +1,0 @@
-Arm,Red,N,Mean Reward,Sample Std,Seconds,Status
-E0,finite,2,-267.500,75.660,1102.076,completed
-E1,finite,2,-355.000,156.978,1733.956,completed
-E2,finite,2,-355.000,156.978,1719.161,completed
-E3,finite,2,-269.500,7.778,1408.709,completed
-E0,aggressive,2,-257.000,69.296,1179.990,completed
-E3,aggressive,2,-450.000,97.581,1406.676,completed

@@ -108,7 +108,7 @@ class DefensePolicy:
                 "\n## COMMON CONTROLLED ACTION RULES\nSleep is permitted while an action is in progress or to wait for its observed result. "
                 "Monitor runs automatically at every turn; do not select it explicitly. Return JSON with action and reason.\n")
         self.controller = SkillController(pool, text_model, config["selector"], proposed=config["arm"] == "E3") if pool else None
-        self.ledger=ObservableCaseLedger(agent) if config.get("behavior_context")=="evidence_v1" else None
+        self.ledger=ObservableCaseLedger(agent, connection_leads=config.get("connection_leads", False)) if config.get("behavior_context")=="evidence_v1" else None
 
     def prepare_state(self,state,step):
         if self.ledger is None or "behavior_context" in state:return state

@@ -9,6 +9,6 @@ repositories, generated simulator sources, model weights and virtual environment
 are not vendored in this snapshot. Setup fetches the pinned upstream sources with
 their existing license and attribution files.
 
-Recorded reports describe this implementation and its experiments. They do not
-claim to reproduce every number in the original publications or establish a
-statistically significant performance gain.
+The code provides reproduction and comparison tools. No historical experiment
+outputs or source snapshots are bundled, and no performance gain is claimed
+from this cleanup.

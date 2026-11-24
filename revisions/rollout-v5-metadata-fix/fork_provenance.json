@@ -1,8 +1,0 @@
-{
-  "parent": "/home/jeonges/proposed/revisions/rollout-v5",
-  "created_unix": 1795209364.5622835,
-  "change": "Validation snapshot includes required episodes_completed and total_training_episodes. Actor/SG/PPO/reward unchanged.",
-  "original_source_preserved": true,
-  "new_integration_test": "research_tests/test_validation_snapshot_integration.py",
-  "passed_regression_tests": 138
-}

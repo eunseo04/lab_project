@@ -27,6 +27,8 @@ def chosen_action(row):
             pass
     parts = text.split()
     name = parts[0] if parts else "Sleep"
+    canonical={value.lower():value for value in HOST_ACTIONS | {"Sleep","BlockTrafficZone","AllowTrafficZone"}}
+    name=canonical.get(name.lower(),name)
     target = parts[-1].removeprefix("host:").removeprefix("subnet:") if len(parts)>1 else None
     return name, target
 
@@ -45,6 +47,8 @@ def readable_context(context):
         for key in ("last_analysis","last_remove","last_restore"):
             operation=case.get(key)
             if operation:facts.append(f"{operation['name']} completed at step {operation['completed_at']} with status {operation['status']}")
+        if case.get("last_successful_restore_at",-1)>=0:
+            facts.append(f"the current evidence epoch follows successful Restore at step {case['last_successful_restore_at']}")
         if case["verification_due"]:
             facts.append("follow-up diagnosis after Remove has NOT been reviewed; the completed Remove call alone does not establish cleanup")
         elif case["observed_level"]>=3:
@@ -53,6 +57,10 @@ def readable_context(context):
             facts.append("no response has yet been completed for this evidence version")
         lines.append("- "+"; ".join(facts)+".")
     if not context.get("open_cases"):lines.append("No unreviewed local cases are retained. Quiet Sleep remains available.")
+    if "investigation_leads" in context:
+        lines.append("Connection leads below are observed network activity, not proof of compromise. They can justify bounded information gathering; no PID alert does not certify a safe host.")
+        for lead in context["investigation_leads"]:
+            lines.append(f"- Connection lead on {lead['host']}: last seen {lead['age']} steps ago; observed endpoints={json.dumps(lead['endpoints'])}; last successful review={lead['reviewed_at']}; investigation_due={lead['investigation_due']}; cooldown_remaining={lead['cooldown_remaining']}.")
     if context.get("additional_open_cases"):lines.append(f"Additional retained cases: {context['additional_open_cases']}; highest-severity cases are listed above.")
     lines.append("Successful own decoys: "+json.dumps(context.get("successful_decoys",{})))
     lines.append("Successful own blocks still recorded: "+json.dumps(context.get("own_observed_blocks",[])))
@@ -68,7 +76,7 @@ class ObservableCaseLedger:
     can remain after Remove, so an unchanged cmd.sh alone is not new compromise.
     Closing a reviewed case is a workflow fact, never a hidden-state clean label.
     """
-    def __init__(self, agent):
+    def __init__(self, agent, connection_leads=False):
         self.agent = agent
         self.allowed_hosts = set()
         self.cases = {}
@@ -77,18 +85,54 @@ class ObservableCaseLedger:
         self.decoys = Counter()
         self.blocks = set()
         self.last_context = None
+        self.connection_leads = connection_leads
+        self.leads = {}
+
+    def _observe_connections(self, host, body, step):
+        # CAGE4 observations can omit either address or either port. The event
+        # itself remains visible evidence of activity, not proof of compromise.
+        endpoints={}
+        for process in body.get("Processes",[]) or []:
+            if not isinstance(process,dict):continue
+            for connection in process.get("Connections",[]) or []:
+                if not isinstance(connection,dict):continue
+                fields={str(k):deepcopy(v) for k,v in connection.items() if v is not None and v!=""}
+                if not fields:continue
+                for field in ("remote_address","local_address","remote_port","local_port"):
+                    if field in fields:fields[field]=str(fields[field])
+                remote=fields.get("remote_address","");local=fields.get("local_port","")
+                # Preserve the complete-endpoint v3 representation and its
+                # remote ephemeral-port deduplication. Partial events retain
+                # the actual supplied fields; missing values are not invented.
+                if remote and local:
+                    visible={"remote_address":remote,"local_port":local}
+                else:visible=fields
+                key=(remote,local,fields.get("remote_port","") if not local else "",
+                    fields.get("local_address","") if not remote else "")
+                if not any(key):key=("","","",json.dumps(fields,sort_keys=True))
+                endpoints[key]=visible
+        if not endpoints:
+            return
+        lead = self.leads.setdefault(host, {"host":host, "last_seen":step,
+            "reviewed_at":None, "endpoints":{}})
+        lead["last_seen"] = step
+        for endpoint,fields in endpoints.items():
+            lead["endpoints"][endpoint] = {"last_seen":step,"fields":fields}
 
     def _case(self, host):
         return self.cases.setdefault(host, {"host":host, "level":0, "version":0,
             "pids":set(), "iocs":set(), "active":False, "last_evidence":-1,
             "last_new_pid":-1,
             "responded_version":-1, "analysed_version":-1, "verify_due":False,
-            "last_analysis":None, "last_remove":None, "last_restore":None})
+            "last_analysis":None, "last_remove":None, "last_restore":None,
+            "last_successful_restore_at":-1})
 
     def observe(self, raw, step):
         for host, body in raw.items():
             if host not in self.allowed_hosts or not isinstance(body, dict):
                 continue
+            if self.connection_leads:
+                self._observe_connections(host, body, step)
             level, pids, iocs = visible_evidence(body)
             if not level:
                 continue
@@ -117,7 +161,8 @@ class ObservableCaseLedger:
                 "verification_due":case["verify_due"],
                 "analysis_due":case["version"]>case["analysed_version"],
                 "last_analysis":case["last_analysis"], "last_remove":case["last_remove"],
-                "last_restore":case["last_restore"]})
+                "last_restore":case["last_restore"],
+                "last_successful_restore_at":case["last_successful_restore_at"]})
         cases.sort(key=lambda c:(-c["observed_level"],not c["verification_due"],-c["evidence_age"],c["host"]))
         peers=[]
         ids=[i for i in range(5) if i!=int(self.agent.rsplit("_",1)[-1])]
@@ -133,6 +178,24 @@ class ObservableCaseLedger:
                 "TRUE means an action completed, not proof a threat disappeared. Old file artifacts may persist. "
                 "An absent current alert does not erase an unreviewed earlier observation. "
                 "Busy Sleep is automatic; a free agent retains the same primitive actions as the baseline."}
+        if self.connection_leads:
+            leads=[]
+            for host, lead in self.leads.items():
+                age=step-lead["last_seen"]
+                if age>32:
+                    continue
+                reviewed=lead["reviewed_at"]
+                cooldown=max(0, 16-(step-reviewed)) if reviewed is not None else 0
+                due=(reviewed is None or lead["last_seen"]>reviewed) and cooldown==0
+                endpoints=[deepcopy(record["fields"])
+                    for ep,record in sorted(lead["endpoints"].items()) if step-record["last_seen"]<=32]
+                leads.append({"host":host, "age":age, "reviewed_at":reviewed,
+                    "endpoints":endpoints[:3], "investigation_due":due,
+                    "cooldown_remaining":cooldown})
+            leads.sort(key=lambda x:(not x["investigation_due"], x["age"], x["host"]))
+            self.last_context["investigation_leads"]=leads[:8]
+            self.last_context["additional_investigation_leads"]=max(0,len(leads)-8)
+            self.last_context["connection_schema"]="optional_endpoint_fields_v2"
         return deepcopy(self.last_context)
 
     def transition(self, row):
@@ -155,8 +218,13 @@ class ObservableCaseLedger:
             if self.pending is not None:
                 raise RuntimeError("An available policy decision must not overwrite an unfinished own action")
             self.pending={"name":name,"target":target,"started_at":step,"evidence_version":version}
-        self.observe(row["observation_after"],step+1)
         status=str(row["observation_after"].get("success","UNKNOWN"))
+        # A successful own Restore resets pre-restore evidence. Process its
+        # returned target observation after the reset, so same-name indicators
+        # and reused PIDs remain visible as post-restore evidence.
+        reset_target=self.pending["target"] if (self.pending and
+            self.pending["name"]=="Restore" and status=="TRUE") else None
+        self.observe({h:b for h,b in row["observation_after"].items() if h!=reset_target},step+1)
         completed=None
         if self.pending is not None and status in ("TRUE","FALSE"):
             completed={**self.pending,"completed_at":step+1,"status":status}
@@ -167,14 +235,18 @@ class ObservableCaseLedger:
                 case=self._case(target)
                 if name=="Remove":
                     case["last_remove"]=deepcopy(completed)
-                    case["responded_version"]=max(case["responded_version"],completed["evidence_version"])
+                    if status=="TRUE":
+                        case["responded_version"]=max(case["responded_version"],completed["evidence_version"])
                     case["verify_due"]=True
                     case["active"]=True
                 elif name=="Restore":
                     case["last_restore"]=deepcopy(completed)
-                    if status=="TRUE" and case["version"]<=completed["evidence_version"]:
+                    if status=="TRUE":
                         case["active"]=case["verify_due"]=False
                         case["level"]=0
+                        case["pids"].clear();case["iocs"].clear();case["last_new_pid"]=-1
+                        case["last_successful_restore_at"]=step+1
+                        self.observe({target:row["observation_after"].get(target,{})},step+1)
                 else:
                     body=row["observation_after"].get(target,{})
                     level,_,iocs=visible_evidence(body)
@@ -185,12 +257,18 @@ class ObservableCaseLedger:
                     case["analysed_version"]=max(case["analysed_version"],analysed)
                     if status=="TRUE":
                         newer=new_pid
-                        after_removal=case["last_remove"] is not None
+                        removed=case["last_remove"]
+                        after_removal=bool(removed and removed["status"]=="TRUE"
+                            and case["last_new_pid"]<=removed["started_at"]
+                            and removed["completed_at"]>=case["last_successful_restore_at"])
                         if level>=3:
                             case["active"]=True
-                        elif not newer and (after_removal or level<2):
+                        elif not newer and (after_removal or level==0):
                             case["active"]=False
                         case["verify_due"]=False
+            if (self.connection_leads and status=="TRUE" and name in {"Analyse","Restore"}
+                    and target in self.leads):
+                self.leads[target]["reviewed_at"]=step+1
             if status=="TRUE" and name=="DeployDecoy":self.decoys[target]+=1
             if status=="TRUE" and name=="BlockTrafficZone":self.blocks.add(target)
             if status=="TRUE" and name=="AllowTrafficZone":self.blocks.discard(target)

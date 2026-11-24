@@ -1,7 +1,0 @@
-| Configuration | Composition | Red | Nominal steps | Gate mode | Maintenance mode | N | Mean Reward | Sample Std | Time |
-|---|---|---|---|---|---|---|---|---|---|
-| Full Skill-Pro | hybrid | finite | 500 | official_code | official_code | 2 | -355.000 | 156.978 | 1719.161 |
-| Proposed | hybrid | finite | 500 | official_code | official_code | 2 | -269.500 | 7.778 | 1408.709 |
-| Without Semantic Gradient | N/A | N/A | N/A | N/A | N/A | 0 | N/A | N/A | N/A |
-| Without PPO Gate | N/A | N/A | N/A | N/A | N/A | 0 | N/A | N/A | N/A |
-| Without Score Maintenance | N/A | N/A | N/A | N/A | N/A | 0 | N/A | N/A | N/A |

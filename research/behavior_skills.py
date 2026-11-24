@@ -50,16 +50,38 @@ RESPONSE_SEEDS = [
 ]
 
 
-def initiation_matches(family, context):
+def initiation_matches(family, context, revision="v4"):
     """E3 initiation checks on the same observable context supplied to the actor."""
     cases=context.get("open_cases",[])
+    if revision not in ("v4","v5"):raise ValueError("Unknown domain verification revision")
+    if revision=="v5":
+        def failed_current_remove(case):
+            last=case.get("last_remove") or {}
+            reviewed=case.get("last_analysis") or {}
+            checked_after_failure=(reviewed.get("status")=="TRUE" and
+                reviewed.get("completed_at",-1)>last.get("completed_at",-1))
+            return (last.get("status")=="FALSE" and last.get("evidence_version")==case.get("evidence_version")
+                and not checked_after_failure)
+        def fresh_response(case):
+            return (case["response_due"] and (case["flagged_pids"] or case["observed_level"]==2)
+                and case["observed_level"]<3 and not failed_current_remove(case))
+        if family=="RapidProcessResponse":return any(fresh_response(c) for c in cases)
+        if family=="EscalationDiagnosis":
+            # A follow-up flag must not outrank already observed admin persistence.
+            if any(c["observed_level"]>=3 for c in cases):return False
+            return any((c["verification_due"] or c["analysis_due"]) and not fresh_response(c) for c in cases)
     if family=="RapidProcessResponse":
         return any(c["response_due"] and (c["flagged_pids"] or c["observed_level"]==2)
                    and c["observed_level"]<3 for c in cases)
     if family=="EscalationDiagnosis":
         return any(c["verification_due"] or c["analysis_due"] and c["observed_level"]<3 for c in cases)
     if family=="PrivilegedRecovery":return any(c["observed_level"]>=3 for c in cases)
-    if family=="SelectiveDeception":return not cases and not context.get("pending_action")
+    if family=="SelectiveDeception":
+        return (not cases and not context.get("pending_action")
+            and not any(lead["investigation_due"] for lead in context.get("investigation_leads",[])))
+    if family=="RiskBasedInvestigation":
+        return (not cases and not context.get("pending_action")
+            and any(lead["investigation_due"] for lead in context.get("investigation_leads",[])))
     if family=="NetworkContainment":
         return any(p["detected_origin_agents"] or p["reported_compromise"]>=2 for p in context.get("peers",[]))
     if family=="TrafficRecovery":return bool(context.get("own_observed_blocks"))

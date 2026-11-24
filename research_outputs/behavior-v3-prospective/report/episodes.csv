@@ -1,9 +1,0 @@
-arm,red,seed,return,meta,due_lead_opportunities,targeted_lead_investigations,source
-E0,finite,24000,-264.0,"{""selection_xml_errors"": 0, ""termination_xml_errors"": 0, ""unknown_selection_names"": 0}",90,29,research_outputs/behavior-v3-prospective/finite-E0-seed-24000/summary.json
-E3,finite,24000,-214.0,"{""selection_xml_errors"": 0, ""termination_xml_errors"": 0, ""unknown_selection_names"": 1}",43,27,research_outputs/behavior-v3-prospective/finite-E3-seed-24000/summary.json
-E0,finite,24001,-208.0,"{""selection_xml_errors"": 0, ""termination_xml_errors"": 0, ""unknown_selection_names"": 0}",84,20,research_outputs/behavior-v3-prospective/finite-E0-seed-24001/summary.json
-E3,finite,24001,-498.0,"{""selection_xml_errors"": 0, ""termination_xml_errors"": 0, ""unknown_selection_names"": 0}",76,20,research_outputs/behavior-v3-prospective/finite-E3-seed-24001/summary.json
-E0,finite,24002,-237.0,"{""selection_xml_errors"": 0, ""termination_xml_errors"": 0, ""unknown_selection_names"": 0}",125,21,research_outputs/behavior-v3-prospective/finite-E0-seed-24002/summary.json
-E3,finite,24002,-263.0,"{""selection_xml_errors"": 0, ""termination_xml_errors"": 0, ""unknown_selection_names"": 1}",42,20,research_outputs/behavior-v3-prospective/finite-E3-seed-24002/summary.json
-E0,finite,24003,-194.0,"{""selection_xml_errors"": 0, ""termination_xml_errors"": 0, ""unknown_selection_names"": 0}",102,25,research_outputs/behavior-v3-prospective/finite-E0-seed-24003/summary.json
-E3,finite,24003,-221.0,"{""selection_xml_errors"": 0, ""termination_xml_errors"": 0, ""unknown_selection_names"": 0}",42,27,research_outputs/behavior-v3-prospective/finite-E3-seed-24003/summary.json

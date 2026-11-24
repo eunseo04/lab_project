@@ -3,6 +3,9 @@ import importlib.util
 from pathlib import Path
 import tempfile
 import unittest
+import yaml
+import hashlib
+import json
 
 ROOT=Path(__file__).resolve().parents[1]
 def module(name):
@@ -22,11 +25,11 @@ class PublicationTests(unittest.TestCase):
     def test_unrelated_files_are_rejected(self):
         self.assertIn('outside_research_scope',check.blob_issues('personal/notes.txt','100644',b'notes'))
 
-    def test_relative_revision_asset_link_is_safe(self):
-        self.assertEqual(check.blob_issues('revisions/frozen/.venv','120000',b'../../.venv'),[])
+    def test_relative_internal_asset_link_is_safe(self):
+        self.assertEqual(check.blob_issues('artifacts/local-env','120000',b'../.venv'),[])
 
     def test_absolute_link_is_rejected(self):
-        self.assertIn('external_symlink',check.blob_issues('revisions/frozen/.venv','120000',b'/private/environment'))
+        self.assertIn('external_symlink',check.blob_issues('artifacts/local-env','120000',b'/private/environment'))
 
     def test_secret_values_are_detected_without_printing_them(self):
         synthetic=('ghp_'+'x'*36).encode()
@@ -36,17 +39,31 @@ class PublicationTests(unittest.TestCase):
         self.assertIn('raw_or_transient_output',check.blob_issues('research_outputs/episode.jsonl','100644',b'{}'))
 
     def test_portable_config_preserves_model_and_admission_criteria(self):
-        source=ROOT/'revisions/rollout-v5-reusable/research_configs/rollout-B4.yaml'
+        source=ROOT/'research_configs/rollout-B4.yaml'
         original=source.read_text()
         with tempfile.TemporaryDirectory() as temporary:
             output=Path(temporary)
             result=prepare.prepare(ROOT,output)
             copied=(output/'rollout-B4.yaml').read_text()
-            self.assertEqual(copied,original.replace(prepare.RECORDED_ROOT,str(ROOT)))
+            expected=yaml.safe_load(original)
+            for field in ('weights','output','pool'):
+                if expected.get(field):expected[field]=str(ROOT/expected[field])
+            self.assertEqual(yaml.safe_load(copied),expected)
             self.assertIn('Qwen/Qwen3-8B',copied)
             self.assertIn('minimum_win_rate: 0.6',copied)
             self.assertEqual(source.read_text(),original)
             self.assertEqual(len(result),5)
+
+    def test_shared_initial_pool_preserves_the_fixed_skill_snapshot(self):
+        pool=json.loads((ROOT/'artifacts/initial_pool.json').read_text())
+        reference=json.loads((ROOT/'tests/fixtures/reference_integrity.json').read_text())
+        self.assertTrue(pool['initialization_only'])
+        self.assertEqual(pool['episodes_completed'],0)
+        self.assertEqual(hashlib.sha256(json.dumps(pool['pool'],sort_keys=True).encode()).hexdigest(),
+                         reference['initial_pool_snapshot_sha256'])
+        for label in ['B1','B2','B3','B4']:
+            cfg=yaml.safe_load((ROOT/f'research_configs/rollout-{label}.yaml').read_text())
+            self.assertEqual(cfg['pool'],'artifacts/initial_pool.json')
 
 
 if __name__=='__main__':unittest.main()
