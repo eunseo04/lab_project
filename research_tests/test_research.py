@@ -338,3 +338,161 @@ def test_wrong_or_trainable_policy_backend_is_rejected(monkeypatch,identity):
     from research.client import ModelClient,ModelFailure
     monkeypatch.setattr(ModelClient,"_request",lambda *a,**k:identity)
     with pytest.raises(ModelFailure):ModelClient(validate({})["model"])
+
+
+@pytest.mark.parametrize('boundary',['sg_chunk','candidate_saved','score_sample'])
+def test_durable_optimizer_resume_matches_continuous_without_repeating_calls(offline,tmp_path,monkeypatch,boundary):
+    """Fault injection is contract verification, never Qwen/CAGE4 performance."""
+    from research.client import ModelClient,TextModel
+    from research.progress import BudgetExceeded,Journal
+    backend={'completed':[],'fail':None,'failed':False,'new_scores':0}
+    identity={'model':'Qwen/Qwen3-8B','revision':'fixture','weights_frozen':True,
+        'scoring_mode':'incremental_teacher_forcing','dtype':'fixture','chat_template_sha256':'fixture'}
+    def request(self,route,payload=None,endpoint=None):
+        if route=='health':return identity
+        if route=='tokenize':
+            return {'prompt_token_ids':list(json.dumps(payload['messages'],ensure_ascii=False).encode()),'identity':identity,'prompt_tokens':30,'max_context':24576}
+        if route=='generate':
+            stage=payload['request_context'].get('stage')
+            if backend['fail']=='sg_chunk' and stage=='sg_chunk' and payload['request_context'].get('chunk')==1 and not backend['failed']:
+                backend['failed']=True;raise BudgetExceeded('Injected SG interruption')
+            text=payload['messages'][-1]['content']
+            answer=json.dumps({'is_related':True,'semantic_gradient':{'initiation':'','policy':'Inspect actual outcome','termination':''}}) if 'Skill Doctor' in text else json.dumps({'skill_name':'next','initiation':'When observed','policy':['Inspect actual outcome'],'termination':'After verification'})
+            backend['completed'].append(('generate',payload['request_id'],payload['seed']))
+            return {'text':answer,'token_ids':[1,2],'identity':identity,'prompt_tokens':30,'output_tokens':2,'seconds':.01}
+        if route=='score':
+            stage=payload['request_context'].get('stage')
+            if stage=='new_score':
+                backend['new_scores']+=1
+                stop=(backend['fail']=='candidate_saved' and backend['new_scores']==1 or backend['fail']=='score_sample' and backend['new_scores']==2)
+                if stop and not backend['failed']:
+                    backend['failed']=True;raise BudgetExceeded('Injected scoring interruption')
+            backend['completed'].extend(('score',key,None) for key in payload['request_ids'])
+            return {'identity':identity,'scores':[{'sum':-1.0,'tokens':len(s['token_ids'])} for s in payload['samples']]}
+        raise AssertionError(route)
+    monkeypatch.setattr(ModelClient,'_request',request)
+    exp=experience(count=3)
+    for t in exp.transitions:
+        t['state']=json.dumps([{'role':'system','content':'base'},{'role':'user','content':str(t['step'])}])
+        t['observation_before']={'z':{'q':3,'a':1},'b':4}  # Noncanonical source order must survive resume.
+    evolution_config={'schedule':'paper_batch','gate_mode':'paper_rtg','maintenance_mode':'paper_algorithm1',
+        'best_of_n':2,'semantic_chunk_steps':1,'semantic_chunk_chars':48000}
+    def execute(db):
+        client=ModelClient({'endpoint':'http://fixture','model':identity['model'],'revision':'fixture','journal_path':str(db),
+            'request_context':{'experiment':'fixture','arm':'B2'}})
+        text=TextModel(client);text.purpose='evolution'
+        pool=SecuritySkillPool(24);ev=Evolution(text,evolution_config)
+        result=ev.update(pool,[exp],{'test':0.},1)
+        return pool.snapshot(),result,text.snapshot()
+    expected,complete,expected_counter=execute(tmp_path/'continuous.sqlite3')
+    expected_requests=set(backend['completed'])
+    backend.update(completed=[],fail=boundary,failed=False,new_scores=0)
+    db=tmp_path/'resume.sqlite3'
+    with pytest.raises(BudgetExceeded):execute(db)
+    before=list(backend['completed'])
+    assert before and Journal(db).tasks(('completed',))
+    actual,resumed,counter=execute(db)
+    assert actual==expected and counter==expected_counter
+    assert resumed['evolution']==complete['evolution']
+    assert resumed['optimizer_status']=='completed_changed'
+    ids=[(route,key) for route,key,seed in backend['completed']]
+    assert len(ids)==len(set(ids))  # Every completed logical response/sample is reused.
+    assert set(backend['completed'])==expected_requests  # Exact prompts/seeds match continuous execution.
+    assert all(item in backend['completed'] for item in before)
+    after=len(backend['completed']);execute(db)
+    assert len(backend['completed'])==after  # A committed loop is idempotent too.
+
+
+def test_sg_parallel_reservations_and_deterministic_merge_match_serial(offline):
+    from research.client import TextModel
+    offline.config={'sg_workers':1};offline.journal=None
+    def gradients(workers):
+        offline.config['sg_workers']=workers;seen=[]
+        original=offline.generate
+        def generate(messages,**kwargs):
+            seen.append((kwargs['seed'],hashlib.sha256(messages[0]['content'].encode()).hexdigest()))
+            return original(messages,**kwargs)
+        offline.generate=generate
+        try:
+            text=TextModel(offline);text.purpose='evolution';ev=Evolution(text,{'schedule':'paper_batch','semantic_chunk_steps':1})
+            exp=experience(count=5);parent=SecuritySkillPool().skills[3]
+            result=ev._generate_semantic_gradient(parent,exp)
+            return result,ev.gradients,text.snapshot(),seen
+        finally:offline.generate=original
+    serial=gradients(1);parallel=gradients(3)
+    assert serial[:3]==parallel[:3] and sorted(serial[3])==sorted(parallel[3])
+
+
+def test_journal_rejects_live_duplicate_owner_and_preserves_budget_on_restart(tmp_path):
+    from research.progress import Journal,TaskInProgress,BudgetExceeded
+    db=tmp_path/'journal.sqlite3';j=Journal(db)
+    payload={'z':{'q':3,'a':1},'b':4};j.checkpoint('ordered',payload)
+    assert json.dumps(Journal(db).restore('ordered'))==json.dumps(payload)
+    assert j.start('request','sg_chunk',{'seed':1})
+    with pytest.raises(TaskInProgress):Journal(db).start('request','sg_chunk',{'seed':1})
+    j.finish('request',{'exact':'response'})
+    assert not j.start('request','sg_chunk',{'seed':1})
+    j.budget_configure(8,36000,now=100)
+    j.budget_start('two',2,now=100);j.budget_heartbeat('two',stop=True,now=1900)
+    resumed=Journal(db);resumed.budget_configure(8,36000,now=1900)
+    resumed.budget_start('one',1,now=1900)
+    assert resumed.budget_usage(now=5500)['gpu_hours']==2
+    with pytest.raises(ValueError):resumed.budget_configure(8,72000,now=5500)
+    with pytest.raises(BudgetExceeded):resumed.check_budget(now=27101)
+
+
+def test_preparation_resume_does_not_apply_running_baseline_or_online_scores_twice(offline,tmp_path,monkeypatch):
+    from research.progress import Journal,BudgetExceeded
+    c=validate({'arm':'E2','composition':'all_llm','steps':6,'episodes':1,'train_episodes':2,'iterations':1,
+        'validation_episodes':0,'evolution':{'schedule':'paper_batch','gate_mode':'paper_rtg','maintenance_mode':'paper_algorithm1',
+        'best_of_n':1,'semantic_chunk_steps':2}})
+    def model(directory):
+        obj=TestModel();obj.journal=Journal(directory/'journal.sqlite3');obj.base_context={'experiment':'fixture','arm':'B2'}
+        return obj
+    continuous=tmp_path/'continuous';continuous.mkdir()
+    run(c,stage='train',output=continuous,client=model(continuous))
+    expected=json.loads((continuous/'checkpoint.json').read_text())
+    resumed=tmp_path/'resumed';resumed.mkdir()
+    original=Evolution.update
+    def interrupted(*args,**kwargs):raise BudgetExceeded('After baseline preparation, before optimizer')
+    monkeypatch.setattr(Evolution,'update',interrupted)
+    with pytest.raises(BudgetExceeded):run(c,stage='train',output=resumed,client=model(resumed))
+    traces={p.name:p.read_bytes() for p in resumed.glob('episode-????.jsonl')}
+    monkeypatch.setattr(Evolution,'update',original)
+    run(c,stage='train',output=resumed,resume=True,client=model(resumed))
+    actual=json.loads((resumed/'checkpoint.json').read_text())
+    assert actual['baselines']==expected['baselines'] and actual['pool']==expected['pool']
+    assert actual['experience']==expected['experience']
+    assert {p.name:p.read_bytes() for p in resumed.glob('episode-????.jsonl')}==traces
+
+
+@pytest.mark.parametrize('minimum,status',[(0,'completed_unchanged'),(2,'completed_no_eligible_skill')])
+def test_completed_optimizer_status_is_independent_of_pool_change(offline,tmp_path,minimum,status):
+    from research.progress import Journal
+    from research.client import TextModel
+    offline.journal=Journal(tmp_path/'journal.sqlite3');offline.base_context={'experiment':'fixture','arm':'B3' if minimum else 'B2'}
+    model=TextModel(offline);model.purpose='evolution';pool=SecuritySkillPool(24)
+    before=deepcopy(pool.snapshot());exp=experience()
+    for row in exp.transitions:row.update(seed=11,episode_id=0)
+    ev=Evolution(model,{'schedule':'paper_batch','gate_mode':'paper_rtg','maintenance_mode':'paper_algorithm1',
+        'best_of_n':2,'minimum_independent_episodes':minimum})
+    result=ev.update(pool,[exp],{'test':100.},1)
+    assert result['optimizer_status']==status and not result['pool_changed'] and pool.snapshot()==before
+    if minimum:assert not offline.calls and result['evolution'][0]['deferred']
+    else:assert len(result['evolution'][0]['candidates'])==2 and not any(c['accepted'] for c in result['evolution'][0]['candidates'])
+
+
+def test_public_variant_comparison_uses_distinct_configs_and_directories(offline,tmp_path,monkeypatch):
+    import sys
+    from research.__main__ import main
+    seen=[]
+    def record(config,stage,output,**kwargs):
+        seen.append((config['comparison_id'],config['evolution']['minimum_independent_episodes'],stage,str(output)))
+        return {'status':'completed'}
+    monkeypatch.setattr('research.experiment.run',record)
+    monkeypatch.setattr('scripts.report_experiment.report_experiment',lambda *a,**kw:None)
+    monkeypatch.setattr(sys,'argv',['research','compare','--variants','B3-no-support','B3','--reds','finite','--train','--output',str(tmp_path)])
+    main()
+    assert [(label,minimum,stage) for label,minimum,stage,path in seen]==[
+        ('B3-no-support',0,'train'),('B3-no-support',0,'eval'),('B3',2,'train'),('B3',2,'eval')]
+    assert len({path for label,minimum,stage,path in seen})==4

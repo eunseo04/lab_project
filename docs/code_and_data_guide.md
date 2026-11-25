@@ -5,7 +5,7 @@
 ## 실행 흐름
 
 ```text
-scripts/run_research.sh B0|B1|B2|B3|B4 train|evaluate
+scripts/run_research.sh B0|B1|B2|B3|B4|B3-no-support train|evaluate
   → scripts/prepare_checkout.py → .local-configs/rollout-B*.yaml
   → research.sh → research/__main__.py → experiment.run()
   → CAGE4 부분 관찰 → 사건 이력 → Skill 선택 → Qwen primitive 행동
@@ -16,7 +16,7 @@ scripts/run_research.sh B0|B1|B2|B3|B4 train|evaluate
 
 | 위치 | 역할 |
 |---|---|
-| `research/` | 현재 연구 모듈 23개. 단일 실행 구현 |
+| `research/` | 현재 연구 모듈 24개. 단일 실행 구현 |
 | `acd/` | 공통 ACD 프롬프트·행동 JSON·통신·CybORG/KEEP 연동 |
 | `research_configs/` | B0–B4와 최소 경험 지원 no-support ablation |
 | `artifacts/initial_pool.json` | B1–B4 공통의 정적 초기 Skill. 학습 결과가 아님 |
@@ -51,8 +51,11 @@ Qwen은 Blue의 부분 관찰과 사건 이력을 텍스트로 읽는다. KEEP�
 
 ```text
 research_outputs/<새 실험>/
-├── protocol.json                 campaign의 사전 계획·hash·seed·예산
-└── <개별 실행>/
+├── protocol.json                 campaign의 사전 계획·hash·seed·독립 GPU/wall cap
+├── journal.sqlite3               압축 payload를 정확히 복원하는 작업/캐시/RNG/budget DB
+├── cleanup.json                  소유 PID·GPU·포트 종료 확인
+├── report/                       비용·진행·복구·진단·성능·재현 bundle
+└── runs/<개별 실행>/
     ├── manifest.json             실제 설정과 구현 hash
     ├── invocations/*.json        호출별 resume/limit 정보
     ├── initial_pool.json         해당 훈련의 시작 Pool
@@ -109,7 +112,7 @@ RewardAudit는 공식 reward를 변경하지 않고 사건별 합계를 대조�
 
 Pool은 max_size/seed_set/skills를 가진다. Skill은 name/initiation/policy/termination, version/family/parent_id, frequency/gain/maturity 등의 통계와 allowed_actions 메타데이터를 갖는다. 초기 보안 절차 7개는 RapidProcessResponse, EscalationDiagnosis, PrivilegedRecovery, SelectiveDeception, NetworkContainment, TrafficRecovery, RiskBasedInvestigation이다.
 
-Checkpoint는 Pool 외에 완료 수·훈련 seed·모델 정보·baseline·FIFO/Golden/Skill별 buffer·history·pending batch를 보관한다. 완료 환경 episode가 optimizer 커밋보다 먼저 저장될 수 있으므로 summary의 완료 수와 개별 episode 파일을 구분한다. 중단된 SG/PPO 내부 계산은 재실행이 필요할 수 있다. 초기 Pool 파일만으로 학습 완료나 재개 가능성을 주장하지 않는다.
+Checkpoint는 Pool 외에 완료 수·훈련 seed·모델 정보·baseline·FIFO/Golden/Skill별 buffer·history·pending batch를 보관한다. 완료 환경 episode가 optimizer 커밋보다 먼저 저장될 수 있으므로 summary의 완료 수와 개별 episode 파일을 구분한다. SG/후보/score/rollout의 완료 작업은 journal에서 재사용한다. CPU 제어 흐름은 loop 시작 상태에서 재생하며 baseline·통계를 중복 반영하지 않는다. 완료 여부가 unknown인 요청은 재시도 기록을 남기며, 부분 환경 episode는 seed부터 CPU 환경을 재실행한다. 초기 Pool 파일만으로 학습 완료나 재개 가능성을 주장하지 않는다.
 
 ## 검증과 평가 분리
 
@@ -118,8 +121,8 @@ Checkpoint는 Pool 외에 완료 수·훈련 seed·모델 정보·baseline·FIFO
 | 훈련 | seed 91000–91005, 6 episode / 3 iteration |
 | 후보 Rollout validation | 97000–97019 |
 | 보조 validation 예약 | 99000, 기본 사용 수 0 |
-| 독립 test | 101000–101099 |
-| 다른 Red pilot | 102000 |
+| 독립 test | 201000–201099 |
+| 다른 Red pilot | 202000 |
 
 후보 하나는 이전 Pool 20회와 후보 Pool 20회의 대응 결과를 비교한다. 독립 seed 쌍은 20개다. 모든 지정 seed 완료, 평균 개선·승률·중앙값·최악 손실·Green 피해·분산 기준을 유지하고 승인 시 검증한 정확한 Pool을 사용한다. 거부 시 이전 Pool을 유지한다. validation을 test에 섞지 않는다. 작은 campaign pilot은 별도 version과 더 작은 수집 계획으로 기록된다.
 
@@ -141,9 +144,9 @@ train/test/untrained_control은 분리한다. 학습 완료 provenance가 없는
 
 ## 검사와 한계
 
-현재 회귀 검사와 고정 core/초기 Pool/검증 임계값 기준은 tests 및 research_tests에 있다. 기준 hash fixture는 source 복사본이 아니라 변경 방지용 작은 고정 값이다. 정리 후 175개 검사가 통과했다.
+현재 회귀 검사와 고정 core/초기 Pool/검증 임계값 기준은 tests 및 research_tests에 있다. 기준 hash fixture는 source 복사본이 아니라 변경 방지용 작은 고정 값이다. 검사 결과는 새 실험의 오프라인 검증 기록과 구분해 보관한다.
 
-진단 검증은 구조화된 관찰 일관성을 검사하지만 자유 서술의 모순·인과 진단 전체를 보증하지 못한다. 공동 reward만으로 특정 Skill의 인과 기여를 알 수 없으며, PPO Gate 양수나 훈련 reward를 독립 test 개선으로 해석하지 않는다. 가상 기업망 결과를 실제 기업망 성능으로 바로 일반화하지 않는다.
+B3/B4의 원문 diagnosis/free gradient는 후보 입력에서 격리한다. 검증된 관찰 사실과 같은 성분의 연결된 구조화 가설만 넘긴다. 이 제한된 관계 검사와 성분 변경 검사는 일반 자연어 의미·인과·절차의 효과를 보증하지 않는다. 공동 reward만으로 특정 Skill의 인과 기여를 알 수 없으며, PPO Gate 양수나 훈련 reward를 독립 test 개선으로 해석하지 않는다. 가상 기업망 결과를 실제 기업망 성능으로 바로 일반화하지 않는다.
 
 ## 파일별 핵심 기능
 
@@ -152,7 +155,7 @@ train/test/untrained_control은 분리한다. 학습 완료 provenance가 없는
 | [__init__.py](../research/__init__.py) | 연구 package와 해당 revision ROOT 경로 정의 |
 | [__main__.py](../research/__main__.py) | 연구 CLI: 훈련·평가·비교·공식 평가·보고·검사 연결 |
 | [adapter.py](../research/adapter.py) | CAGE4 관찰·통신을 Qwen/KEEP 입력과 primitive 행동으로 연결 |
-| [attribution.py](../research/attribution.py) | 독립 경험·Skill 성과 통계와 공동 보상 귀속 보조 진단 |
+| [attribution.py](../research/attribution.py) | 독립 경험·Skill 성과, 자유 결정/실행/완료 분모, 선택 분포 변화와 최초 궤적 차이·공동 보상 보조 진단 |
 | [behavior.py](../research/behavior.py) | 관찰 기반 사건 이력과 비동기 행동·증거 버전 추적 |
 | [behavior_skills.py](../research/behavior_skills.py) | 보안 초기 절차와 관찰 기반 Skill initiation 조건 |
 | [client.py](../research/client.py) | 동일 로컬 모델의 생성·exact scoring·embedding 요청과 식별 검증 |
@@ -162,22 +165,23 @@ train/test/untrained_control은 분리한다. 학습 완료 provenance가 없는
 | [experiment.py](../research/experiment.py) | 공동 episode 실행·trace/결과/체크포인트·학습/동결 평가·복구 |
 | [gate.py](../research/gate.py) | RTG·Advantage·importance ratio·clipped surrogate 계산 |
 | [metrics.py](../research/metrics.py) | 공동 보상 중복 방지와 공식 채점·episode 통계 |
+| [progress.py](../research/progress.py) | 공통 원자 저장·작업 journal·정확 캐시·RNG·누적 GPU/wall 예산. 다른 구현 복사 없이 공유 |
 | [model_server.py](../research/model_server.py) | 고정 Qwen BF16 로컬 서버 및 exact teacher-forced token scoring |
 | [official.py](../research/official.py) | 원래 CAGE4 evaluator 실행과 계산 대조 |
 | [paper_algorithm.py](../research/paper_algorithm.py) | 논문식 running baseline·온라인 Skill score·Pool 유지 |
 | [reporting.py](../research/reporting.py) | 완료된 실행에서 성능 표·그림·reason 분석 생성 |
-| [reward_audit.py](../research/reward_audit.py) | 공식 보상 원값을 유지한 사건별 LWF/ASF/RIA/행동 비용 검사 |
-| [rollout.py](../research/rollout.py) | 대응 후보 검증의 승인 계산과 transactional Pool 유지/rollback |
+| [reward_audit.py](../research/reward_audit.py) | 공식 LWF/ASF/RIA/행동 비용 대조와 동시 Red/Green 명령 기록. 정책 입력에서 제외 |
+| [rollout.py](../research/rollout.py) | 20쌍 승인 계산, 별도 버전 거부 전용 prefix, exact Pool 유지/rollback |
 | [rollout_execution.py](../research/rollout_execution.py) | 실제 CAGE4 이전/후보 Pool 평가 worker와 결정 JSON |
-| [semantic_evidence.py](../research/semantic_evidence.py) | 실제 기록 인용과 변경 성분 지원·훈련 host/IP 암기 검사 |
-| [skills.py](../research/skills.py) | Skill Pool·선택·활성 상태·종료와 E3용 실행 검증 |
+| [semantic_evidence.py](../research/semantic_evidence.py) | 실제 기록 인용·완료 행동 필드 해석·변경 성분 지원·ASV 실행 근거 범위·훈련 host/IP 암기 검사 |
+| [skills.py](../research/skills.py) | Skill Pool·선택·활성/종료, 실제 selector 입출력 감사와 같은 훈련 상태의 SSV paired replay |
 | [upstream.py](../research/upstream.py) | 고정한 Skill-Pro 원본 자료형/진화 클래스와 encoder 연결 |
 
 ## 유지한 실행·분석 도구
 
 | scripts/ 파일 | 기능 |
 |---|---|
-| [audit_training_cost.py](../scripts/audit_training_cost.py) | 실제 훈련 trace의 문자량·예정 SG chunk 호출 수 계산 |
+| [audit_training_cost.py](../scripts/audit_training_cost.py) | 실제 trace의 필드 반복률·최종 SG token·단계별 실측 비용과 예정 비용 분리·보수적 preflight |
 | [audit_training_coverage.py](../scripts/audit_training_coverage.py) | 완료 trace에서 미활성 Skill 포함 독립 episode/행동/phase/결과 복구 |
 | [check_publication.py](../scripts/check_publication.py) | Git index blob의 범위·비밀 값·대형 파일·외부 symlink 반출 검사 |
 | [download_research_models.py](../scripts/download_research_models.py) | 모델 lock의 공개 Qwen/encoder 파일을 revision 고정 다운로드 |
@@ -189,9 +193,23 @@ train/test/untrained_control은 분리한다. 학습 완료 provenance가 없는
 | [recompute_public_metrics.py](../scripts/recompute_public_metrics.py) | 공개 compact episode만으로 분리된 평균·분산·대응 차이 계산 |
 | [report_experiment.py](../scripts/report_experiment.py) | 새 완료 결과를 label/version/Red/split별로 분리하고 미학습 대조군·후보 validation을 최종 test와 구분 |
 | [run_campaign.py](../scripts/run_campaign.py) | 현재 코드로 예산 내 Qwen 훈련·동결·비교와 task-owned 서버 관리 |
-| [run_research.sh](../scripts/run_research.sh) | B0–B4 설정을 현재 v6 launcher로 전달하는 공개 실행기 |
+| [run_research.sh](../scripts/run_research.sh) | B0–B4/no-support 설정을 단일 research.sh로 전달하는 공개 실행기 |
 | [setup_research.sh](../scripts/setup_research.sh) | CPU/모델 환경 분리 설치와 네 고정 원본·선택적 모델 다운로드 |
 | [start_qwen.sh](../scripts/start_qwen.sh) | 고정된 로컬 Qwen 모델 서버 실행 |
 | [verify_research_assets.py](../scripts/verify_research_assets.py) | 고정 모델/encoder 파일 크기·SHA256의 offline 검사 |
 
-전체 관리 파일 100개 경로는 CSV에 있다. 모델·가상환경·생성 결과를 코드 파일 수에 합치지 않는다.
+전체 관리 파일 101개 경로는 CSV에 있다. 모델·가상환경·생성 결과를 코드 파일 수에 합치지 않는다.
+
+완료 상태와 Pool 변경 여부는 별도다. `completed_unchanged`도 동결 평가할 수 있고, 지원 부족의 정상 종료와 오류/예산 중단을 구분한다. Golden buffer의 동점 ID는 재시작 가능한 삽입 순서이며 paper_batch 판정에 사용하지 않는다. 데이터 payload의 원래 dict 순서와 actor prompt 문자열은 그대로 보관한다. 저장 압축은 입력 token 절감이 아니다.
+
+기본 scorer는 incremental reference다. 실험용 full-sequence backend는 CPU indexing 검사만으로 채택하지 않는다. 실제 BF16 Qwen의 token 합·PPO objective·최종 판정·EOS/mixed-length/긴 prompt까지 검증한 인증과 경계 reference 재확인이 필요하다.
+
+이전 4개 GPU를 함께 점유한 8 GPU-hour 설정의 wall 상한은 120분(학습 85분/rollout 83.5분)이었다. 현재 관리자는 기본 1 GPU, 신규 GPU-hour와 wall-clock cap을 독립 관리하며 resume 시 초기화하지 않는다. 실제 GPU 수를 줄인 것 자체는 처리량 향상 근거가 아니다. B2 한 update의 완료 비용을 먼저 확인하고 B4 40개 환경 실행과 최종 test 비용이 확보되지 않으면 후속 군을 시작하지 않는다.
+
+새 캠페인은 호출 전에 훈련 212000·212001, 후보 검증 213000–213019, test 211000부터와 다른 Red 215000을 등록한다. 이미 확인한 201000·201001은 개발 자료다. 기존 YAML은 과거 재현 설정이며 새 최종 성능 입증에 재사용하지 않는다. B3-no-support는 독립 variant ID이며 B3−B2는 진단과 최소 지원 조건을 함께 추가한 효과다. 분리 비교는 no-support−B2, B3−no-support, B4−B3다. 실행하지 않은 ablation은 설정만 있다고 측정 결과로 보고하지 않는다.
+
+GPU 절약용 pilot은 한 GPU의 한 모델에서 요청을 직렬 처리한다. 실험용 full-sequence scorer의 메모리 큰 batch probe는 기본 비활성화하고, 명시한 경우에만 실행한다. preflight는 실측 prefill과 decode를 나눠 예측하므로 이미 측정한 decode 시간을 전체 prefill 배율로 다시 곱하지 않는다. 예측은 보수적 추정이며 누적 GPU/wall hard cap과 구분한다. 표본을 2 seed로 정한 경우 별도 pilot version으로 표시하고 full 결과와 합치지 않는다.
+
+ASV/SSV는 `research.config.variant_config()`에서 기존 설정의 명시적 override로 생성한다. `B2-ASV`/`B2-SSV`/결합군과 B4 추가군은 기존 B0–B4와 다른 비교 ID다. 행동 근거 부족과 selector 분포 변화는 실제 환경 검증을 요구할 사유이며 행동 금지나 성능 실패 판정이 아니다. 선택 빈도는 자유 결정·busy 대기·활성화·실행 tick·완료 호출별로 분모를 구분한다. SSV는 live RNG/counter를 유지하고 최종 test 상태를 받지 않는다.
+
+`run_campaign.py --fixed-update-from`은 이전에 완료한 B2 전체 update를 고정해 초기 Pool과 비교한다. 과거 SQLite는 read-only로 읽고 입력 해시를 전후 대조한다. 기존 8 GPU-hour의 사용량은 `--prior-gpu-hours`로 명시하며 잔여 cap만 새 ledger에 등록한다. 새 B3/B4 학습과 혼동하지 않는다. 거부 전용 2쌍 screen이 불확실하면 이전 Pool을 유지하고 보류한다. 20쌍 승인 기준을 낮추지 않는다. 동일 Pool의 B1 성능 재사용은 별도 매핑으로 표시하고 새 episode를 만들거나 증가시키지 않는다. 원래 궤적에 Red/Green 명령이 없으면 복원했다고 쓰지 않으며, 새 reward sidecar에서만 동시 명령을 추가 기록한다.

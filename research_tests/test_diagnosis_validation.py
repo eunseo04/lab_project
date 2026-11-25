@@ -73,6 +73,16 @@ def test_correct_recorded_failure_supports_a_procedural_update():
     assert result['passed'] and result['status']=='supported_observation'
 
 
+def test_displayed_completed_action_supports_a_typed_normal_case_and_still_checks_target():
+    data,rows=evidence()
+    rows[0]['behavior_outcome']={'completed_action':{'name':'Remove','target':'h1',
+        'status':'FALSE','started_at':3,'completed_at':6}}
+    data['evidence'][0]['field']='completed_action'
+    assert audit(data,rows)['passed']
+    data['claims'][0]['target']='h2'
+    assert not audit(data,rows)['passed']
+
+
 def test_nonexistent_admin_and_service_evidence_are_rejected():
     data,rows=evidence()
     for finding,extras in [('observed_admin_indicator',{'indicator':'escalate.sh'}),
@@ -126,3 +136,122 @@ def test_partial_status_with_complete_seed_list_still_rejects():
     old,new=episodes(),episodes(20);new[0]['status']='partial'
     result=compare_rollouts(old,new,rule())
     assert not result['accepted'] and result['reason']=='incomplete_episode_status'
+
+
+def add_proposal(data,operation='check_call_outcome'):
+    data['proposals']=[{'component':'policy','evidence_ids':['E0'],'observed_action':data['claims'][0]['action'],
+        'operation':operation,'scope':'same_observed_host_and_epoch','causal_status':'untested_hypothesis'}]
+    data['is_related']=True
+    return data
+
+
+@pytest.mark.parametrize('status',['TRUE','FALSE'])
+def test_structured_positive_cases_pass_and_raw_contradiction_is_quarantined(status):
+    data,rows=evidence(status=status)
+    data['claims'][0]['finding']='completed_success' if status=='TRUE' else 'completed_failure'
+    add_proposal(data)
+    data['diagnosis']='Contradictory raw prose: Remove succeeded AND failed; blame other agents.'
+    data['semantic_gradient']['policy']='UNSAFE_RAW_INSTRUCTION: Restore every host without evidence.'
+    model=EvidenceModel(lambda prompt:json.dumps(data),rows,diagnosis_verification=True)
+    result=json.loads(model('original prompt'))
+    assert result['is_related'] and model.audits[-1]['passed']
+    assert 'UNSAFE_RAW_INSTRUCTION' not in json.dumps(result)
+    assert 'Contradictory raw prose' not in json.dumps(result)
+    assert 'UNSAFE_RAW_INSTRUCTION' in model.audits[-1]['raw_response']
+    payload=json.loads(result['semantic_gradient']['policy'])
+    assert payload['verified_observations'][0]['finding']==data['claims'][0]['finding']
+    assert payload['untested_modification_hypothesis']['causal_status']=='untested_hypothesis'
+
+
+def test_correct_claim_with_unrelated_proposal_is_deferred():
+    data,rows=evidence();add_proposal(data,operation='review_privilege_indicator')
+    model=EvidenceModel(lambda prompt:json.dumps(data),rows,diagnosis_verification=True)
+    result=json.loads(model('prompt'))
+    assert not result['is_related'] and not model.audits[-1]['passed']
+    assert 'proposal_unrelated_to_validated_finding' in model.audits[-1]['structured_proposals']['errors']
+
+
+def controlled_native_diagnosis_cases():
+    """Real partial CAGE4 records under scripted actions, not an LLM performance run."""
+    from research.adapter import make_environment,plain,BLUE_AGENTS
+    from research.behavior import ObservableCaseLedger
+    from research.diagnosis import operation,restore_boundary
+    from research.config import validate
+    from acd.runner import seed_everything
+    from CybORG.Simulator.Actions import Sleep
+    seed=58000;config=validate({'steps':500});seed_everything(seed,1)
+    env=make_environment(config,seed);env.reset(seed=seed)
+    agent='blue_agent_4';ledger=ObservableCaseLedger(agent);rows=[]
+    host_actions=[a for a in env.actions(agent) if type(a).__name__=='Analyse']
+    host=next(a.hostname for a in host_actions if 'server_host' in a.hostname)
+    sequence=['Analyse','Remove','Restore','Analyse','Remove_invalid_session'];next_action=0
+    for step in range(30):
+        raw=plain(env.raw_observations()[agent]);busy='IN_PROGRESS' in str(raw.get('success'))
+        ledger.context({'observation':raw,'hosts':[host],'user_prompt':'controlled native diagnostic'},step)
+        if not busy and next_action<len(sequence):
+            kind=sequence[next_action];next_action+=1
+            action=deepcopy(next(a for a in env.actions(agent) if type(a).__name__==kind.split('_')[0] and getattr(a,'hostname',None)==host))
+            if kind.endswith('_invalid_session'):action.session=999999
+        else:action=Sleep()
+        chosen={a:Sleep() for a in BLUE_AGENTS};chosen[agent]=action
+        env.step(chosen)
+        after=plain(env.raw_observations()[agent])
+        row={'step':step,'seed':seed,'episode_id':-1,'agent':agent,'policy':'scripted_diagnostic',
+            'requested_action':str(action),'policy_invoked':not busy,'request_applied':not busy,
+            'action_status':str(after['success']),'observation_before':raw,'observation_after':after}
+        ledger.transition(row);rows.append(row)
+        if next_action==len(sequence) and ledger.pending is None:break
+    selected={}
+    for row in rows:
+        op=operation(row)
+        if not op.get('target'):continue
+        finding=('completed_success' if op['status']=='TRUE' else 'completed_failure' if op['status']=='FALSE' else 'pending' if op['status']=='IN_PROGRESS' else None)
+        if finding:selected.setdefault((op['name'],finding),row)
+    cases=[]
+    def data_for(row):
+        op=operation(row);finding='pending' if op['status']=='IN_PROGRESS' else 'completed_success' if op['status']=='TRUE' else 'completed_failure'
+        data={'diagnosis_status':'supported','reward_attribution':'unknown','is_related':True,
+            'semantic_gradient':{'policy':'This prose is not trusted as a fact.'},
+            'evidence':[{'component':'policy','evidence_id':'E0','field':'action_status'}],
+            'claims':[{'component':'policy','evidence_id':'E0','action':op['name'],'target':op['target'],
+                'finding':finding,'phase':'after','as_of_step':row['step']+1,
+                'restore_epoch':restore_boundary([row],agent,op['target'],row['step']+1),'causal_attribution':'unknown'}]}
+        return add_proposal(data,'wait_for_completion' if finding=='pending' else 'check_call_outcome')
+    for (name,finding),row in selected.items():cases.append((name+'_'+finding,True,data_for(row),[row]))
+    analyse=next(r for r in selected.values() if operation(r)['name']=='Analyse' and operation(r)['status']=='TRUE')
+    busy=next(r for r in selected.values() if operation(r)['status']=='IN_PROGRESS')
+    data=data_for(busy);data['claims'][0]['finding']='completed_failure';data['proposals'][0]['operation']='check_call_outcome'
+    cases.append(('busy_as_failure',False,data,[busy]))
+    data=data_for(analyse);data['claims'][0]['action']='Remove';data['proposals'][0]['observed_action']='Remove'
+    cases.append(('analyse_as_remove',False,data,[analyse]))
+    data=data_for(analyse);data['claims'][0]['target']='other_unobserved_host'
+    cases.append(('other_host',False,data,[analyse]))
+    data=data_for(analyse);data['claims'][0].update(finding='observed_pid',pid=99999999);data['proposals'][0]['operation']='review_observed_pid'
+    cases.append(('other_pid',False,data,[analyse]))
+    restored=next(r for r in selected.values() if operation(r)['name']=='Restore' and operation(r)['status']=='TRUE')
+    data=data_for(restored);data['claims'][0]['restore_epoch']=-1
+    cases.append(('old_restore_epoch',False,data,[restored]))
+    data=data_for(analyse);data['semantic_gradient']['policy']='UNTRUSTED_MARKER: Analyse was Remove and failed.'
+    data['diagnosis']='UNTRUSTED_MARKER: blame the skill for all joint reward loss'
+    cases.append(('valid_claim_contradictory_prose_quarantined',True,data,[analyse]))
+    data=data_for(analyse);data['proposals'][0]['operation']='review_privilege_indicator'
+    cases.append(('unrelated_proposal',False,data,[analyse]))
+    return rows,cases
+
+
+def evaluate_controlled_native_cases():
+    rows,cases=controlled_native_diagnosis_cases();out=[]
+    for name,expected,data,source in cases:
+        model=EvidenceModel(lambda prompt:json.dumps(data),source,diagnosis_verification=True)
+        response=json.loads(model('Controlled validator input; not Qwen-generated'))
+        passed=bool(response['is_related']);audit=model.audits[-1]
+        out.append({'case':name,'expected_safe_canonical_path':expected,'actual_safe_canonical_path':passed,
+            'raw_prose_quarantined':'UNTRUSTED_MARKER' not in json.dumps(response),'audit':audit})
+    return rows,out
+
+
+def test_native_cage4_observation_cases_have_positive_and_negative_paths():
+    rows,result=evaluate_controlled_native_cases()
+    assert any(r['case']=='Remove_completed_failure' for r in result)
+    assert rows and any(r['expected_safe_canonical_path'] for r in result) and any(not r['expected_safe_canonical_path'] for r in result)
+    assert all(r['expected_safe_canonical_path']==r['actual_safe_canonical_path'] and r['raw_prose_quarantined'] for r in result)

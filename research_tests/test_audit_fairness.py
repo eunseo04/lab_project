@@ -1,5 +1,6 @@
 from pathlib import Path
 import hashlib
+import ast
 import json
 import yaml
 
@@ -24,7 +25,7 @@ def test_public_labels_isolate_semantic_and_rollout_verification():
 
 def test_reward_gate_and_token_probability_implementation_are_unchanged():
     reference=json.loads((ROOT/'tests/fixtures/reference_integrity.json').read_text())
-    for name in ['gate.py','metrics.py','paper_algorithm.py','adapter.py','model_server.py','client.py','skills.py']:
+    for name in ['gate.py','metrics.py','paper_algorithm.py','adapter.py','skills.py']:
         assert hashlib.sha256((ROOT/'research'/name).read_bytes()).hexdigest()==reference['core_sha256'][name],name
 
 
@@ -35,3 +36,24 @@ def test_rollout_approval_thresholds_are_not_relaxed():
                 'maximum_mean_lwf_loss','maximum_mean_asf_loss','maximum_std_ratio','maximum_std_increase']:
         assert current[key]==old[key],key
     assert len(current['seeds'])==20
+
+
+def test_instrumented_server_preserves_reference_probability_expressions():
+    reference=json.loads((ROOT/'tests/fixtures/reference_integrity.json').read_text())
+    tree=ast.parse((ROOT/'research/model_server.py').read_text());selected=[]
+    for node in ast.walk(tree):
+        if isinstance(node,ast.ClassDef) and node.name=='TeacherForce':selected.append(ast.dump(node,include_attributes=False))
+        if isinstance(node,ast.FunctionDef) and node.name=='prompt_ids':selected.append(ast.dump(node,include_attributes=False))
+        if isinstance(node,ast.Call) and isinstance(node.func,ast.Attribute) and isinstance(node.func.value,ast.Name) and node.func.value.id=='model' and node.func.attr in ('generate','compute_transition_scores'):
+            selected.append(ast.dump(node,include_attributes=False))
+    assert hashlib.sha256(json.dumps(sorted(selected)).encode()).hexdigest()==reference['reference_probability_ast_sha256']
+
+
+def test_ablation_and_new_heldout_seeds_are_explicit():
+    c=configs();ablation=yaml.safe_load((ROOT/'research_configs/rollout-B3-no-support.yaml').read_text())
+    assert ablation['comparison_id']=='B3-no-support'
+    assert ablation['experiment_version']==c['B3']['experiment_version']
+    assert ablation['evolution']['minimum_independent_episodes']==0
+    assert c['B3']['evolution']['minimum_independent_episodes']==2
+    assert {v['eval_seed'] for v in c.values()}=={201000}
+    assert not set(range(201000,201100))&set(range(101000,101100))

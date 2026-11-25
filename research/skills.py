@@ -3,6 +3,7 @@ from dataclasses import asdict
 import hashlib
 import json
 import re
+import random
 from .upstream import Skill, OriginalSkillPool
 
 SEEDS = [
@@ -152,6 +153,7 @@ class SkillController:
 
     def choose(self, state, step):
         events = []
+        selection_audit=None
         if self.active is not None:
             if step - self.started >= self.config.get("max_skill_age", 8):
                 events.append({"terminated": self.active.name, "reason": "maximum_age"})
@@ -182,16 +184,88 @@ Output EXACTLY <status>DONE</status> or <status>CONTINUE</status>."""
                     events.append({"error": "invalid_termination_response", "raw": response})
         if self.active is None:
             candidates = list(self.pool.skills)
+            calls=[];before_rng=random.getstate()
+            def observed_selector(prompt):
+                response=self.model(prompt)
+                calls.append({'prompt':prompt,'response':response})
+                return response
             try:
                 if self.proposed:
                     self.pool.skills = [s for s in candidates if self.verifier.check(s, state, self.history)[0]]
-                self.active = self.pool.select_skill(state["user_prompt"], llm_agent=self.model,
+                offered=[{'name':s.name,'initiation':s.initiation} for s in self.pool.skills]
+                self.active = self.pool.select_skill(state["user_prompt"], llm_agent=observed_selector,
                     select_type="llm_model", epsilon=self.config.get("epsilon", 0.1))
+                selection_audit={'source':'llm' if calls else 'epsilon_exploration',
+                    'state_prompt':state['user_prompt'],'offered_skills':offered,
+                    'model_calls':calls,'selected':self.active.name if self.active else None,
+                    'python_rng_before':before_rng,'python_rng_after':random.getstate(),
+                    'input_unchanged':True}
             finally:
                 self.pool.skills = candidates
             if self.active is not None:
                 self.started = step
                 events.append({"activated": self.active.name, "version": self.active.version})
         self.last_event = {"events": events, "active": self.active.name if self.active else None,
-                           "started": self.started, "age": step-self.started if self.active else 0}
+                           "started": self.started, "age": step-self.started if self.active else 0,
+                           "selection_audit":selection_audit}
         return self.active
+
+
+def probe_selection(previous, proposed, records, client, rule=None, data_role='training'):
+    """Run the unchanged upstream selector on paired recorded states, never infer reward.
+
+    An independent TextModel reservation and restored Python RNG keep the live
+    optimizer counter/RNG untouched. The primitive actor's appended action contract
+    is removed only to recover the exact earlier selector state.
+    """
+    from contextlib import nullcontext
+    from .client import TextModel,stable_seed
+    from .progress import digest,rng_snapshot,rng_restore
+    from .attribution import selection_shift
+    from copy import deepcopy
+    if data_role not in ('training','validation','historical_training'):
+        raise ValueError('Final-test/development states cannot decide Skill admission')
+    rule=rule or {};forbidden=set(rule.get('forbidden_seeds',[]))
+    choices=[];seen=set()
+    for row in records:
+        if row.get('seed') in forbidden:raise ValueError('Final-test state leaked into selector verification')
+        if rule.get('allowed_seeds') is not None and row.get('seed') not in rule['allowed_seeds']:
+            raise ValueError('Selector state is outside registered training/validation seeds')
+        if not row.get('policy_invoked') or not row.get('user_prompt'):continue
+        prompt=row['user_prompt'].split('\n\n# EXECUTABLE ACTION CONTRACT\n',1)[0]
+        state_id=digest([row.get('seed'),row.get('agent'),row.get('step'),prompt])
+        if state_id not in seen:choices.append((row,prompt,state_id));seen.add(state_id)
+    maximum=rule.get('maximum_states',24)
+    if type(maximum) is not int or maximum<1:raise ValueError('Positive selector probe state count required')
+    if not choices:raise ValueError('No recorded selector states')
+    indices=sorted({i*len(choices)//min(maximum,len(choices)) for i in range(min(maximum,len(choices)))})
+    saved=rng_snapshot();text=TextModel(client)
+    try:
+        pools={}
+        for name,snapshot in (('previous',previous),('candidate',proposed)):
+            pool=SecuritySkillPool(snapshot['max_size'],snapshot.get('seed_set','legacy'));pool.restore(snapshot);pools[name]=pool
+        if rule.get('include_controls',False):
+            old={s.name:s for s in pools['previous'].skills};clone=deepcopy(pools['candidate'])
+            for s in clone.skills:
+                if s.name not in old and getattr(s,'parent_id',None) in old:s.initiation=old[s.parent_id].initiation
+            pools['new_entry_old_initiation']=clone
+            reordered=deepcopy(pools['candidate']);reordered.skills=list(reversed(reordered.skills));pools['candidate_reversed_order']=reordered
+        results={name:[] for name in pools}
+        for index in indices:
+            row,prompt,state_id=choices[index];seed=stable_seed(row.get('seed'),row.get('step'),row.get('agent'),'selector-probe-v1')
+            for name,pool in pools.items():
+                random.seed(seed);calls=[]
+                reservation={'seed':seed,'counter':1,'purpose':'skill_selection','max_tokens':48}
+                def ask(message):
+                    answer=text.invoke(message,reservation);calls.append({'prompt':message,'response':answer});return answer
+                scope=client.context(stage='selector_probe',probe_role=name,state_id=state_id,logical_sampling_seed=seed) if hasattr(client,'context') else nullcontext()
+                with scope:selected=pool.select_skill(prompt,llm_agent=ask,select_type='llm_model',epsilon=rule.get('epsilon',.1))
+                results[name].append({'state_id':state_id,'sampling_seed':seed,'record_seed':row.get('seed'),
+                    'step':row.get('step'),'choice':selected.name if selected else None,
+                    'selector_source':'llm' if calls else 'epsilon_exploration','model_calls':calls})
+    finally:rng_restore(saved)
+    result=selection_shift(results['previous'],results['candidate'],rule)
+    result.update(probes=results,data_role=data_role,live_rng_restored=True,
+        previous_pool_sha256=digest(previous),candidate_pool_sha256=digest(proposed),
+        controls_note='Entry name/order/count and initiation affect selection; policy/termination text are absent from the upstream selection prompt.')
+    return result

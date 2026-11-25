@@ -62,3 +62,25 @@ def test_different_model_conditions_do_not_share_a_comparison(tmp_path):
     write_run(tmp_path,'B1','eval',[-5],model='different_fixture')
     with pytest.raises(ValueError,match='conditions differ'):
         reporter.collect(tmp_path)
+
+
+def test_core_and_ablation_pairs_report_unchanged_policy_without_claiming_gain(tmp_path):
+    write_run(tmp_path,'B0','eval',[-10,-30])
+    write_run(tmp_path,'B1','eval',[-5,-25])
+    run=write_run(tmp_path,'B2','eval',[-5,-25],trained=2)
+    summary=json.loads((run/'summary.json').read_text());summary['training_provenance']['optimizer_status']='completed_unchanged'
+    (run/'summary.json').write_text(json.dumps(summary))
+    write_run(tmp_path,'B3-no-support','eval',[-4,-24],trained=2)
+    result=reporter.report_experiment(tmp_path)
+    metrics=json.loads((Path(result['output'])/'metrics.json').read_text())
+    pairs={p['comparison']:p for p in metrics['paired_comparisons']}
+    assert pairs['B2-B1']['mean_difference']==0 and pairs['B2-B1']['win_tie_loss']==[0,2,0]
+    assert pairs['B3-no-support-B2']['mean_difference']==1
+    assert pairs['B4-B2']['mean_difference'] is None and pairs['B4-B2']['paired_n']==0
+
+
+def test_source_or_frozen_pool_mismatch_is_not_merged(tmp_path):
+    first=write_run(tmp_path,'B0','eval',[-10]);second=write_run(tmp_path,'B1','eval',[-5])
+    for run,source in ((first,'source_a'),(second,'source_b')):
+        (run/'manifest.json').write_text(json.dumps({'implementation_sha256':{'adapter.py':source}}))
+    with pytest.raises(ValueError,match='conditions differ'):reporter.collect(tmp_path)

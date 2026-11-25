@@ -225,3 +225,32 @@ def test_actor_json_instructions_never_enter_selector_or_termination(offline):
     assert len(meta_prompts)==2 and "<status>" in meta_prompts[1]
     assert all("# EXECUTABLE ACTION CONTRACT" not in prompt and "Return one JSON object" not in prompt for prompt in meta_prompts)
     assert state["user_prompt"]=="Visible state"
+
+
+def test_experimental_full_sequence_boundary_padding_temperature_and_eos():
+    """CPU causal toy verifies indexing/math only; real BF16 Qwen parity remains required."""
+    import torch
+    from types import SimpleNamespace
+    from research.model_server import full_sequence_scores
+    class Causal(torch.nn.Module):
+        def __init__(self):super().__init__();self.dummy=torch.nn.Parameter(torch.zeros(1))
+        def forward(self,input_ids,attention_mask,position_ids,use_cache=False,logits_to_keep=0):
+            # A prefix-dependent causal distribution; incorrect masks/positions change scores.
+            visible=(input_ids*attention_mask).cumsum(-1)+position_ids
+            vocab=torch.arange(13).float()
+            logits=-((visible.unsqueeze(-1)%13)-vocab).abs()/7
+            if logits_to_keep:logits=logits[:,-logits_to_keep:]
+            return SimpleNamespace(logits=logits)
+    model=Causal();prefixes=[[1,3,5],[1],[1,4,2,8,5,3,1]];targets=[[4,5,12],[12],[2,4,6,8,12]]
+    for temperature in (.7,1.,1.3):
+        actual=full_sequence_scores(model,prefixes,targets,temperature,0)
+        for i,(prefix,target) in enumerate(zip(prefixes,targets)):
+            expected=[]
+            for n,wanted in enumerate(target):
+                ids=torch.tensor([prefix+target[:n]])
+                output=model(ids,torch.ones_like(ids),torch.arange(ids.shape[-1]).unsqueeze(0))
+                expected.append(torch.log_softmax(output.logits[0,-1]/temperature,dim=-1)[wanted].item())
+            assert actual[i]['token_logprobs']==pytest.approx(expected,abs=1e-6)
+            assert actual[i]['sum']==pytest.approx(sum(expected),abs=1e-5)
+            assert actual[i]['tokens']==len(target)  # EOS and every target token included.
+    with pytest.raises(ValueError):full_sequence_scores(model,[[1]],[[]],1.,0)

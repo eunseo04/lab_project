@@ -13,7 +13,7 @@ def prepare(root=ROOT, destination=None):
     destination = Path(destination) if destination is not None else root / ".local-configs"
     destination.mkdir(parents=True, exist_ok=True)
     generated = []
-    for label in ("B0", "B1", "B2", "B3", "B4"):
+    for label in ("B0", "B1", "B2", "B3", "B4", "B3-no-support"):
         config = yaml.safe_load((source / f"rollout-{label}.yaml").read_text())
         for field in ('weights','output','pool'):
             if config.get(field):

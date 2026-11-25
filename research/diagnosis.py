@@ -137,3 +137,75 @@ epoch never establish an earlier Remove failure. Joint reward cannot identify a 
 causal contribution. If evidence is insufficient, use empty gradients and is_related=false.
 Do not claim that these checks prove causation. Never insert evidence IDs into Skills.
 '''
+
+
+PROPOSAL_FINDINGS = {
+    'check_call_outcome': {'completed_success', 'completed_failure'},
+    'wait_for_completion': {'pending'},
+    'review_observed_pid': {'observed_pid'},
+    'review_privilege_indicator': {'observed_admin_indicator'},
+    'review_service_observation': {'observed_service_state'},
+}
+
+
+def canonical_proposals(data, validation):
+    """Quarantine prose; only validated facts and model-selected typed hypotheses flow on.
+
+    This is a deliberately limited proposal language. It checks a relationship,
+    not whether the proposed procedure will improve reward or identify a cause.
+    """
+    from .progress import digest
+    facts=[]
+    fields=('component','evidence_id','action','target','finding','phase','as_of_step','restore_epoch','pid','indicator','service','value')
+    for claim in validation.get('valid_claims',[]):
+        fact={k:claim[k] for k in fields if k in claim}
+        fact['fact_id']='F'+digest(fact)[:16]
+        facts.append(fact)
+    by_evidence={(f['component'],f['evidence_id']):f for f in facts}
+    proposals=[];errors=[]
+    for index,proposal in enumerate(data.get('proposals',[])):
+        if not isinstance(proposal,dict):
+            errors.append('invalid_structured_proposal');continue
+        component='execution' if proposal.get('component')=='policy' else proposal.get('component')
+        refs=proposal.get('evidence_ids',[]);kind=proposal.get('operation')
+        support=[by_evidence.get((component,r)) for r in refs] if isinstance(refs,list) else []
+        if component not in COMPONENTS or not support or any(f is None for f in support):
+            errors.append('proposal_without_matching_validated_fact');continue
+        if kind not in PROPOSAL_FINDINGS or any(f['finding'] not in PROPOSAL_FINDINGS[kind] for f in support):
+            errors.append('proposal_unrelated_to_validated_finding');continue
+        if proposal.get('scope')!='same_observed_host_and_epoch' or proposal.get('causal_status')!='untested_hypothesis':
+            errors.append('unbounded_or_causal_proposal');continue
+        if any(proposal.get('observed_action')!=f['action'] for f in support):
+            errors.append('proposal_action_mismatch');continue
+        proposals.append({'proposal_id':f'P{index}','component':component,'operation':kind,
+            'scope':'same_observed_host_and_epoch','causal_status':'untested_hypothesis',
+            'fact_ids':[f['fact_id'] for f in support],
+            'observed_actions':sorted({f['action'] for f in support})})
+    gradients={key:'' for key in COMPONENTS}
+    for proposal in proposals:
+        selected=[f for f in facts if f['fact_id'] in proposal['fact_ids']]
+        payload={'verified_observations':selected,'untested_modification_hypothesis':proposal,
+                 'constraint':'Only the typed observation is verified. No causal or performance claim is established. Do not memorize instance IDs.'}
+        import json
+        gradients[proposal['component']]+=json.dumps(payload,ensure_ascii=False,sort_keys=True)+'\n'
+    return {'passed':bool(proposals) and not errors,'facts':facts,'proposals':proposals,
+            'gradients':gradients,'errors':errors,'raw_prose_forwarded':False,
+            'limitation':'Only a restricted typed relationship is checked. Procedural effectiveness and general natural-language truth remain unverified.'}
+
+
+PROPOSAL_PROMPT = '''
+### Structured proposal boundary
+Free diagnosis and semantic_gradient prose are kept only for audit, not supplied as verified facts.
+Also return proposals, with one entry for each component you propose to change:
+{"component":"policy","evidence_ids":["E0"],"observed_action":"Remove",
+"operation":"check_call_outcome","scope":"same_observed_host_and_epoch",
+"causal_status":"untested_hypothesis"}.
+Allowed operation/finding pairs:
+check_call_outcome -> completed_success or completed_failure;
+wait_for_completion -> pending; review_observed_pid -> observed_pid;
+review_privilege_indicator -> observed_admin_indicator;
+review_service_observation -> observed_service_state.
+Use the actually cited own action, matching component and validated evidence.
+A proposal is an untested procedure hypothesis, never proof of causation or reward gain.
+Do not add unrelated remediation. Unchanged components need no proposal.
+'''

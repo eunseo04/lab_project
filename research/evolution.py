@@ -1,7 +1,10 @@
 """Non-parametric Skill-Pro evolution, preserving official components and modes."""
 from collections import Counter, defaultdict
 from copy import deepcopy
+from contextlib import nullcontext
+from concurrent.futures import ThreadPoolExecutor
 import json
+import heapq
 import time
 import numpy as np
 
@@ -9,45 +12,61 @@ from .upstream import (OriginalEvolution, Experience, ExperiencePool, GoldenExpe
                        build_success_failure_eval_batch, get_priority)
 from .skills import structurally_valid
 from .gate import gate_score
+from .progress import digest, rng_snapshot, rng_restore, BudgetExceeded, IncompleteOptimization
+
+
+def semantic_chunks(experience,config):
+    """The single original chunk planner, shared with the cost audit (no model calls)."""
+    reuse=config.get('schedule')=='paper_batch'
+    width = config.get("semantic_chunk_steps", 8)
+    fields = ("step", "agent", "observation_before", "requested_action", "executed_actions", "action_status",
+              "observation_after", "joint_reward", "skill_id", "skill_version", "skill_terminated",
+              "response", "parse_error", "policy_invoked", "request_applied")
+    records = [{k: t.get(k) for k in fields} for t in experience.transitions]
+    for transition,record in zip(experience.transitions,records):
+        for key in ("behavior_context","behavior_outcome"):
+            if key in transition:record[key]=deepcopy(transition[key])
+    budget = config.get("semantic_chunk_chars", 48000 if reuse else None)
+    chunks, pending, chars = [], [], 0
+    for transition, record in zip(experience.transitions, records):
+        size = len(json.dumps(record, ensure_ascii=False))
+        if pending and (len(pending) >= width or budget is not None and chars + size > budget):
+            chunks.append(pending); pending, chars = [], 0
+        pending.append((transition, record)); chars += size
+    if pending:
+        chunks.append(pending)
+    return chunks
 
 
 class Evolution(OriginalEvolution):
-    def __init__(self, model, config, rollout_validator=None):
+    def __init__(self, model, config, rollout_validator=None, selection_verifier=None):
         super().__init__(model, threshold=config.get("threshold", 6), epsilon=config.get("clip", 0.2))
         self.config = config
+        self.selection_verifier=selection_verifier
         self.gradients = []
         self._gradient_cache = {}
         self.fifo = ExperiencePool(max_size=config.get("experience_capacity", 1000))
         self.golden = GoldenExperiencePool(max_size=config.get("golden_capacity", 20))
+        self._golden_counter=0
         self.rollout_validator=rollout_validator
         self.rollout_attempts=Counter()
+        self.journal=getattr(getattr(model,'client',None),'journal',None)
+        self._iteration=None
+        self._loop_key=None
+        self._parent=None
+        self._candidate_index=None
+        self._trace_hash=None
 
     def _generate_semantic_gradient(self, old_skill, experience):
-        cache_key = (old_skill.name, id(experience))
+        cache_key = digest([old_skill.__dict__, experience.__dict__])
         reuse = self.config.get("schedule") == "paper_batch"
         if reuse and cache_key in self._gradient_cache:
             return deepcopy(self._gradient_cache[cache_key])
         # Every temporal chunk is presented; never replace history with only the
         # final reward. Context overflow/error rejects evolution rather than hiding it.
-        width = self.config.get("semantic_chunk_steps", 8)
-        fields = ("step", "agent", "observation_before", "requested_action", "executed_actions", "action_status",
-                  "observation_after", "joint_reward", "skill_id", "skill_version", "skill_terminated",
-                  "response", "parse_error", "policy_invoked", "request_applied")
-        records = [{k: t.get(k) for k in fields} for t in experience.transitions]
-        for transition,record in zip(experience.transitions,records):
-            for key in ("behavior_context","behavior_outcome"):
-                if key in transition:record[key]=deepcopy(transition[key])
-        budget = self.config.get("semantic_chunk_chars", 48000 if reuse else None)
-        chunks, pending, chars = [], [], 0
-        for transition, record in zip(experience.transitions, records):
-            size = len(json.dumps(record, ensure_ascii=False))
-            if pending and (len(pending) >= width or budget is not None and chars + size > budget):
-                chunks.append(pending); pending, chars = [], 0
-            pending.append((transition, record)); chars += size
-        if pending:
-            chunks.append(pending)
-        gradients = []
-        for chunk in chunks:
+        chunks=semantic_chunks(experience,self.config)
+        prepared = []
+        for chunk_index,chunk in enumerate(chunks):
             transitions = [t for t, _ in chunk]
             visible = [deepcopy(record) for _, record in chunk]
             if reuse and visible:
@@ -70,20 +89,42 @@ class Evolution(OriginalEvolution):
                         "Refine initiation, response sequence and termination using actual outcome transitions rather than copying another agent's action frequencies.")
             local = Experience(reward=experience.reward, skill=experience.skill,
                 trajectory=json.dumps(visible, ensure_ascii=False), transitions=transitions, env_name=experience.env_name)
+            prepared.append((chunk_index,transitions,visible,local))
+        model=self.evolver_model
+        reservations=[model.reserve() for _ in prepared] if hasattr(model,'reserve') else [None]*len(prepared)
+        self._progress('sg_plan:'+old_skill.name+':'+digest(experience.__dict__),{
+            'trace_hash':digest(experience.__dict__),'chunk_steps':[[t['step'] for t in job[1]] for job in prepared],
+            'logical_reservations':reservations,'merge_order':list(range(len(prepared)))})
+        def execute(job):
+            (index,transitions,visible,local),reservation=job
+            key='sg-result:'+digest([self._loop_key,old_skill.__dict__,experience.__dict__,index,
+                                    self.config.get('evidence_verification'),self.config.get('diagnosis_verification')])
+            cached=self.journal.restore(key) if self.journal else None
+            if cached is not None:
+                return cached
+            callback=(lambda prompt:model.invoke(prompt,reservation)) if reservation is not None else model
             audits=[]
-            if self.config.get("evidence_verification",False):
+            if self.config.get('evidence_verification',False):
                 from .semantic_evidence import EvidenceModel
-                original_model=self.evolver_model;verified=EvidenceModel(original_model,visible,
-                    diagnosis_verification=self.config.get('diagnosis_verification',False))
-                self.evolver_model=verified
-                try:gradient,related=super()._generate_semantic_gradient(old_skill,local)
-                finally:self.evolver_model=original_model
-                audits=verified.audits
-            else:gradient, related = super()._generate_semantic_gradient(old_skill, local)
-            self.gradients.append({"skill": old_skill.name, "steps": [t["step"] for t in transitions],
-                                   "gradient": gradient, "related": related,**({"evidence_audits":audits} if audits else {})})
-            if related:
-                gradients.append(gradient)
+                callback=EvidenceModel(callback,visible,diagnosis_verification=self.config.get('diagnosis_verification',False))
+                audits=callback.audits
+            local_evolver=OriginalEvolution(callback,threshold=self.threshold,epsilon=self.epsilon)
+            with self._scope(stage='sg_chunk',chunk=index,logical_counter=reservation['counter'] if reservation else None):
+                gradient,related=OriginalEvolution._generate_semantic_gradient(local_evolver,old_skill,local)
+            result={'skill':old_skill.name,'steps':[t['step'] for t in transitions],
+                    'gradient':gradient,'related':related,**({'evidence_audits':audits} if audits else {})}
+            if self.journal:self.journal.checkpoint(key,result)
+            return result
+        client=getattr(model,'client',None)
+        workers=min(len(prepared),int(getattr(client,'config',{}).get('sg_workers',1))) if prepared else 1
+        # Calls are reserved in original serial order; completion order never sets seeds or merge order.
+        if workers>1 and reservations and reservations[0] is not None:
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                results=list(executor.map(execute,zip(prepared,reservations)))
+        else:
+            results=[execute(item) for item in zip(prepared,reservations)]
+        self.gradients.extend(results)
+        gradients=[r['gradient'] for r in results if r['related']]
         combined = {key: "\n".join(g[key] for g in gradients if g.get(key))
                     for key in ("initiation", "execution", "termination")}
         if reuse:
@@ -99,12 +140,28 @@ class Evolution(OriginalEvolution):
                 return original(prompt+"\nOnly modify components with nonempty evidence-supported gradients. "
                     "Copy every other original initiation/policy/termination component EXACTLY, without paraphrasing. "
                     "Do not include training host instance names, IP addresses or trace citations in the reusable Skill.")
-            self.evolver_model=constrained
-            try:return super()._run_semantic_update(old_skill,gradients_list,evolution_type)
-            finally:self.evolver_model=original
-        return super()._run_semantic_update(old_skill,gradients_list,evolution_type)
+            local=OriginalEvolution(constrained,threshold=self.threshold,epsilon=self.epsilon)
+            with self._scope(stage='aggregation_candidate',logical_stages=['aggregation','candidate_generation']):
+                return OriginalEvolution._run_semantic_update(local,old_skill,gradients_list,evolution_type)
+        with self._scope(stage='aggregation_candidate',logical_stages=['aggregation','candidate_generation']):
+            return super()._run_semantic_update(old_skill,gradients_list,evolution_type)
 
-    def probabilities(self, skill, experiences):
+    def _scope(self,**context):
+        client=getattr(self.evolver_model,'client',None)
+        if client is None or not hasattr(client,'context'):
+            return nullcontext()
+        return client.context(optimizer=True,loop=self._iteration,skill=self._parent,
+                              candidate=self._candidate_index,trace_hash=self._trace_hash,**context)
+
+    def _progress(self,key,value):
+        if self.journal and self._loop_key:
+            self.journal.checkpoint(self._loop_key+':'+key,value)
+
+    def _scored(self,skill,evidence,stage):
+        with self._scope(stage=stage,skill_version=skill.version):
+            return self.probabilities(skill,evidence)
+
+    def probabilities(self, skill, experiences, reference=False):
         samples = []
         for exp in experiences:
             for transition in exp.transitions:
@@ -113,19 +170,100 @@ class Evolution(OriginalEvolution):
                 messages = json.loads(transition["state"])
                 messages[0]["content"] += "\n# ACTIVE SECURITY SKILL\n" + skill.format_for_llm()
                 samples.append({"messages": messages, "token_ids": transition["token_ids"]})
-        values = self.evolver_model.score(samples)
+        values = self.evolver_model.score(samples,reference=True,use_cache=False) if reference else self.evolver_model.score(samples)
         if len(values) != len(samples) or not np.isfinite(values).all():
             raise ValueError("Missing/non-finite exact log probabilities; retain previous skill")
         return values
 
-    def update(self, pool, experiences, baselines, iteration):
+    def verify_post_gate(self,pool,parent,candidate,evidence,gate_evidence,iteration):
+        """Optional Proposed checks run after, and never change, the original PPO score."""
+        checks={}
+        if self.config.get('action_support_verification',False):
+            from .semantic_evidence import action_support
+            checks['action_support']=action_support(parent,candidate,evidence,gate_evidence)
+        if self.config.get('selection_shift_verification',False):
+            if self.selection_verifier is None:raise RuntimeError('Selection verification enabled without a paired-state verifier')
+            from .rollout import proposed_pool
+            proposed,_=proposed_pool(pool,candidate,{'parent':parent.name,'iteration':iteration})
+            checks['selection_shift']=self.selection_verifier(pool.snapshot(),proposed.snapshot())
+        required=any(v.get('requires_rollout',False) for v in checks.values())
+        return {'checks':checks,'requires_rollout':required,
+            'decision':'requires_real_rollout' if required else 'within_measured_support',
+            'action_banned':False,'ppo_gate_unchanged':True}
+
+    def update(self,pool,experiences,baselines,iteration):
+        self._iteration=iteration
+        if self.journal is None:
+            return self._update_impl(pool,experiences,baselines,iteration)
+        if self.config.get('preflight_required'):
+            authorization=self.journal.restore('preflight:'+getattr(self.evolver_model.client,'base_context',{}).get('arm','unknown'))
+            if not authorization or authorization.get('status')!='passed':
+                raise IncompleteOptimization('Pending batch saved; measured optimizer cost preflight is required')
+        model=self.evolver_model
+        context=getattr(getattr(model,'client',None),'base_context',{})
+        self._loop_key='optimizer:'+digest([context,iteration])
+        input_hash=digest([pool.snapshot(),[e.__dict__ for e in experiences],baselines,self.config])
+        state=self.journal.restore(self._loop_key)
+        if state and state['input_hash']!=input_hash:
+            raise ValueError('Optimizer resume inputs, Pool, baseline or algorithm differ')
+        if state is None:
+            base={'pool':pool.snapshot(),'experience':self.snapshot(),
+                  'inputs':[deepcopy(e.__dict__) for e in experiences],
+                  'model':model.snapshot(),'rng':rng_snapshot(),'gradients':deepcopy(self.gradients)}
+            state={'input_hash':input_hash,'base':base,'status':'partial','attempts':0,
+                'context':context,'iteration':iteration}
+        base=state['base']
+        if state['status'].startswith('completed_'):
+            final=state['final'];pool.restore(final['pool']);self.restore(final['experience'])
+            model.restore(final['model']);rng_restore(final['rng'])
+            return deepcopy(state['result'])
+        # Replay deterministic CPU control flow from the same transaction boundary;
+        # completed stochastic responses/scores and SG validation are durable cache hits.
+        pool.restore(base['pool']);self.restore(base['experience']);model.restore(base['model'])
+        self.gradients=deepcopy(base['gradients']);self._gradient_cache.clear();rng_restore(base['rng'])
+        experiences=[Experience(**deepcopy(e)) for e in base['inputs']]
+        state.update(status='partial',attempts=state['attempts']+1)
+        self.journal.checkpoint(self._loop_key,state)
+        try:
+            result=self._update_impl(pool,experiences,baselines,iteration)
+            unfinished=[r for r in self.journal.tasks(('unknown','failed','started','interrupted'))
+                        if r['context'].get('loop')==iteration and r['context'].get('optimizer')
+                        and all(r['context'].get(k)==v for k,v in context.items())]
+            if unfinished or any(r.get('error') for r in result['evolution']):
+                raise IncompleteOptimization('Required optimizer calls or judgments are incomplete')
+            eligible=[r for r in result['evolution'] if not r.get('deferred') and r.get('valid_behavior_decisions',0)]
+            changed=pool.snapshot()!=base['pool']
+            status='completed_no_eligible_skill' if not eligible else 'completed_changed' if changed else 'completed_unchanged'
+            result.update(optimizer_status=status,pool_changed=changed)
+            final={'pool':pool.snapshot(),'experience':self.snapshot(),'model':model.snapshot(),'rng':rng_snapshot()}
+            state.update(status=status,result=result,final=final)
+            self.journal.checkpoint(self._loop_key,state)
+            self._progress('commit',{'status':status,'pool_changed':changed,'result':result,'pool':pool.snapshot()})
+            return result
+        except BaseException as exc:
+            state.update(status='interrupted_budget' if isinstance(exc,BudgetExceeded) else 'failed' if isinstance(exc,Exception) else 'partial',
+                         error=f'{type(exc).__name__}: {exc}',
+                         partial_pool=pool.snapshot(),partial_experience=self.snapshot(),model=model.snapshot(),rng=rng_snapshot())
+            self.journal.checkpoint(self._loop_key,state)
+            pool.restore(base['pool'])
+            raise
+
+    def _update_impl(self, pool, experiences, baselines, iteration):
         started = time.perf_counter()
         logs = []
         paper_batch = self.config.get("schedule") == "paper_batch"
         current_batch = defaultdict(list)
         for exp in experiences:
             self.fifo.add(exp)
+            # The upstream heap's memory-address tie ID cannot survive restart.
+            # Keep its Top-K/reward admission unchanged; use persisted insertion
+            # IDs solely for equal-reward ordering. This pool is not read by the
+            # paper_batch gate, parent selection or candidate tie-break.
+            self._golden_counter+=1
             self.golden.add(exp)
+            self.golden.pool=[(reward,self._golden_counter if item is exp else tie,item)
+                              for reward,tie,item in self.golden.pool]
+            heapq.heapify(self.golden.pool)
             if exp.skill and exp.skill != "None":
                 self.experience_buffer[exp.skill].append(exp)
                 current_batch[exp.skill].append(exp)
@@ -146,8 +284,15 @@ class Evolution(OriginalEvolution):
             ready.sort(key=lambda s:(self.rollout_attempts[getattr(s,'family',s.name)],
                 -sum(t.get("policy_invoked",False) and t.get("request_applied",False)
                 and not t.get("parse_error") for e in current_batch[s.name] for t in e.transitions)))
+        order=[s.name for s in ready]
+        if self.journal:
+            registered=self.journal.restore(self._loop_key+':parent_order')
+            if registered is not None and registered!=order:
+                raise ValueError('Registered parent order changed during resume')
+        self._progress('parent_order',order)
         rollout_checks=0
         for parent in ready:
+            self._parent=parent.name;self._candidate_index=-1
             if rollout_mode:
                 parent=next((s for s in pool.skills if s.name==parent.name),None)
                 if parent is None:continue
@@ -173,18 +318,20 @@ class Evolution(OriginalEvolution):
                 record['deferred']='insufficient_independent_training_episodes'
                 record['additional_training_episodes_needed']=required-record['experience_support']['independent_episode_count']
                 record['pool_changed']=False
-                logs.append(record);continue
+                logs.append(record);self._progress("parent:"+parent.name,record);continue
+            self._trace_hash=digest([e.__dict__ for e in evidence])
             start_gradient = len(self.gradients)
             if rollout_mode and rollout_checks>=self.config.get("maximum_rollout_candidates_per_iteration",1):
                 record["deferred"]="registered_rollout_budget_exhausted; keep previous skill including rare skills"
-                logs.append(record);continue
+                logs.append(record);self._progress("parent:"+parent.name,record);continue
             try:
                 gate_enabled = self.config.get("ppo_gate", True)
                 # Proposed-only: reject unsupported diagnoses before spending
                 # exact-scoring calls. B2's original calculation is unchanged.
-                old = self.probabilities(parent, gate_evidence) if gate_enabled and not self.config.get('evidence_verification',False) else None
+                old = self._scored(parent, gate_evidence,'old_score') if gate_enabled and not self.config.get('evidence_verification',False) else None
                 candidates = []
                 for index in range(self.config.get("best_of_n", 3)):
+                    self._candidate_index=index
                     if self.config.get("semantic_gradient", True):
                         candidate, kind = self.evolve(parent, evidence)
                     else:
@@ -194,6 +341,7 @@ class Evolution(OriginalEvolution):
                     if not structurally_valid(candidate):
                         item["error"] = "invalid_candidate_structure"
                         record["candidates"].append(item)
+                        self._progress('candidate:'+parent.name+':'+str(index),item)
                         continue
                     candidate.family = getattr(parent, "family", parent.name)
                     candidate.allowed_actions = list(getattr(parent, "allowed_actions", []))
@@ -212,24 +360,39 @@ class Evolution(OriginalEvolution):
                             candidate.name = f"{base}_c{index}_{suffix}"
                             suffix += 1
                     item["skill"] = candidate.__dict__.copy()
+                    self._progress('candidate:'+parent.name+':'+str(index),{'status':'parsed_before_scoring',**item})
                     if self.config.get("evidence_verification",False):
                         from .semantic_evidence import candidate_supported
                         support=candidate_supported(parent,candidate,self.gradients[start_gradient:])
                         item['semantic_support']=support
                         if not support['passed']:
                             item['error']='candidate_changes_not_supported_by_observable_evidence'
-                            record['candidates'].append(item);continue
+                            record['candidates'].append(item)
+                            self._progress('candidate:'+parent.name+':'+str(index),item)
+                            continue
                     if gate_enabled:
-                        if old is None:old=self.probabilities(parent,gate_evidence)
-                        new = self.probabilities(candidate, gate_evidence)
+                        if old is None:old=self._scored(parent,gate_evidence,'old_score')
+                        new = self._scored(candidate, gate_evidence,'new_score')
                         value, diagnostics = gate_score(gate_evidence, old, new, baselines,
                             mode=self.config.get("gate_mode", "official_code"), epsilon=self.epsilon)
+                        client=getattr(self.evolver_model,'client',None)
+                        if getattr(client,'config',{}).get('scoring_backend','incremental_reference')!='incremental_reference':
+                            error_bound=getattr(client,'scorer_certificate',{}).get('decision_error_bound',float('inf'))
+                            if abs(value-self.config.get('acceptance_margin',0.0))<=error_bound:
+                                with self._scope(stage='old_score_reference_boundary'):
+                                    exact_old=self.probabilities(parent,gate_evidence,reference=True)
+                                with self._scope(stage='new_score_reference_boundary'):
+                                    exact_new=self.probabilities(candidate,gate_evidence,reference=True)
+                                value,diagnostics=gate_score(gate_evidence,exact_old,exact_new,baselines,
+                                    mode=self.config.get('gate_mode','official_code'),epsilon=self.epsilon)
+                                item['reference_boundary_recheck']=True
                         item.update(score=value, diagnostics=diagnostics)
                     else:
                         value = 0.0
                         item["gate"] = "disabled_no_logprob_calls"
                     candidates.append((value, candidate, item))
                     record["candidates"].append(item)
+                    self._progress('candidate:'+parent.name+':'+str(index),item)
                 if candidates:
                     best = max(candidates, key=lambda x: x[0])
                     if not gate_enabled:
@@ -239,6 +402,12 @@ class Evolution(OriginalEvolution):
                         selected = [best] if best[0] > self.config.get("acceptance_margin", 0.0) else []
                     for value, candidate, item in selected:
                         candidate.maturity = 0
+                        if any(self.config.get(k,False) for k in ('action_support_verification','selection_shift_verification')):
+                            item['ppo_accepted']=True
+                            item['post_gate_verification']=self.verify_post_gate(pool,parent,candidate,evidence,gate_evidence,iteration)
+                            if item['post_gate_verification']['requires_rollout'] and not rollout_mode:
+                                item['deferred']='additional_real_rollout_required'
+                                continue
                         if rollout_mode:
                             item["ppo_accepted"]=True;rollout_checks+=1
                             self.rollout_attempts[getattr(parent,'family',parent.name)]+=1
@@ -255,6 +424,9 @@ class Evolution(OriginalEvolution):
                         record["accepted"] = True
                 current = self.experience_buffer[parent.name]
                 self.experience_buffer[parent.name] = [] if record["accepted"] else current[-max(1, self.threshold//2):]
+            except (BudgetExceeded,IncompleteOptimization):
+                pool.skills,pool._skill_embs=before_skills,before_cache
+                raise
             except Exception as exc:
                 # Probability, context and model failures NEVER count as acceptance.
                 record["error"] = f"{type(exc).__name__}: {exc}"
@@ -264,6 +436,9 @@ class Evolution(OriginalEvolution):
                 pool.skills, pool._skill_embs = before_skills, before_cache
             record["semantic_gradients"] = self.gradients[start_gradient:]
             logs.append(record)
+            self._progress('parent:'+parent.name,{'record':record,'pool':pool.snapshot(),
+                'experience':self.snapshot(),'model':self.evolver_model.snapshot() if hasattr(self.evolver_model,'snapshot') else None,
+                'rng':rng_snapshot()})
         if self.config.get("score_maintenance", True):
             if self.config.get('maintenance_mode','official_code') in ('paper_score', 'paper_algorithm1'):
                 from .paper_algorithm import maintain_paper
@@ -272,6 +447,7 @@ class Evolution(OriginalEvolution):
                 maintenance = pool.maintain()  # actual official-code LCB/semantic pruning
         else:
             maintenance = pool.maintain_fifo()
+        self._progress("maintenance",{'maintenance':maintenance,'pool':pool.snapshot()})
         from .attribution import evolution_statistics
         return {"evolution": logs, "maintenance": maintenance,
                 "skill_experience_statistics":evolution_statistics(experiences,logs),
@@ -281,10 +457,18 @@ class Evolution(OriginalEvolution):
         return {"rollout_attempts":dict(self.rollout_attempts),
                 "buffers": {k: [e.__dict__ for e in v] for k, v in self.experience_buffer.items()},
                 "fifo": [e.__dict__ for e in self.fifo.experiences],
-                "golden": [e.__dict__ for e in self.golden.get_all()]}
+                "golden": [e.__dict__ for e in self.golden.get_all()],
+                "golden_order":[item[1] for item in self.golden.pool],
+                "golden_counter":self._golden_counter}
 
     def restore(self, data):
         self.rollout_attempts=Counter(data.get('rollout_attempts',{}))
         self.experience_buffer = defaultdict(list, {k: [Experience(**e) for e in v] for k, v in data.get("buffers", {}).items()})
+        self.fifo.experiences=[]
+        self.golden.pool=[]
         for e in data.get("fifo", []): self.fifo.add(Experience(**e))
-        for e in data.get("golden", []): self.golden.add(Experience(**e))
+        golden=data.get('golden',[]);order=data.get('golden_order',list(range(1,len(golden)+1)))
+        if len(order)!=len(golden) or len(set(order))!=len(order):raise ValueError('Invalid stored Golden heap order')
+        self.golden.pool=[(e['reward'],tie,Experience(**e)) for e,tie in zip(golden,order)]
+        heapq.heapify(self.golden.pool)
+        self._golden_counter=data.get('golden_counter',max(order,default=0))

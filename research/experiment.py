@@ -22,14 +22,7 @@ from .upstream import configure_encoder, Experience
 from .evolution import Evolution
 from .gate import returns_to_go
 from . import ROOT
-
-
-def atomic_json(path, value):
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(path.name+".tmp")
-    temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False)+"\n")
-    os.replace(temporary, path)
+from .progress import atomic_json, digest as progress_digest, rng_snapshot, rng_restore, BudgetExceeded, implementation_identity
 
 
 def policy_roles(composition):
@@ -52,6 +45,8 @@ def recover_episode(result, config, client, text_model, directory):
     expected = "mock_test" if getattr(client,"is_mock",False) else "real_cage4"
     if result.get("kind") != expected: raise ValueError("Cannot mix mock and real training records")
     rows=[json.loads(line) for line in Path(result["trace"]).open()]
+    if result.get('trace_sha256') and hashlib.sha256(Path(result['trace']).read_bytes()).hexdigest()!=result['trace_sha256']:
+        raise ValueError('Completed training trace hash changed')
     if len(rows) != len(BLUE_AGENTS)*result["joint_transitions"] or any(r["seed"] != result["seed"] for r in rows):
         raise ValueError("Incomplete or misaligned archived training trace")
     seed_everything(result["seed"],config["threads"])
@@ -70,6 +65,15 @@ def recover_episode(result, config, client, text_model, directory):
 
 def run_episode(config, seed, episode_id, client, pool, text_model, directory):
     started = time.perf_counter()
+    journal=getattr(client,'journal',None)
+    episode_task=None
+    if journal:
+        role=getattr(client,'base_context',{}).get('env_stage',config.get('evaluation_role','collection'))
+        episode_task='episode:'+progress_digest([str(directory.resolve()),seed,episode_id,
+            pool.snapshot() if pool else None,getattr(client,'identity',None)])
+        journal.start(episode_task,role,{'seed':seed,'episode_id':episode_id,
+            'arm':config.get('comparison_id',config['arm']),'source':'run_episode','directory':str(directory.resolve())},
+            {'config_digest':digest(config),'pool':pool.snapshot() if pool else None})
     seed_everything(seed, config["threads"])
     text_model.seed, text_model.counter = seed, 0
     env = make_environment(config, seed)
@@ -96,6 +100,7 @@ def run_episode(config, seed, episode_id, client, pool, text_model, directory):
         os.replace(progress, archive/f"{progress.stem}.{time.time_ns()}.jsonl")
     with progress.open("w") as partial:
         for step in range(config["steps"]):
+            if hasattr(client,'_check_budget'):client._check_budget()
             raw = env.raw_observations()
             actions, details = {}, {}
             outgoing = env.paper_messages() if config["communication"] == "paper_projected_keep" else deepcopy(env.msg)
@@ -110,7 +115,10 @@ def run_episode(config, seed, episode_id, client, pool, text_model, directory):
                             "skill_id": active.name if active else None, "skill_version": active.version if active else None}
                     else:
                         policy_seed = int(hashlib.sha256(f"{seed}:{step}:{agent}:policy".encode()).hexdigest()[:8], 16)
-                        actions[agent], details[agent] = policies[agent].decide(state, episode=episode_id, step=step, seed=policy_seed)
+                        from contextlib import nullcontext
+                        scope=client.context(seed=seed,episode_id=episode_id,step=step,agent=agent) if hasattr(client,'context') else nullcontext()
+                        with scope:
+                            actions[agent],details[agent]=policies[agent].decide(state,episode=episode_id,step=step,seed=policy_seed)
                         for event in (details[agent].get("skill_controller") or {}).get("events", []):
                             if event.get("terminated"):
                                 for row in reversed(previous_rows[agent]):
@@ -167,8 +175,12 @@ def run_episode(config, seed, episode_id, client, pool, text_model, directory):
     rtgs = returns_to_go(step_rewards, config["evolution"]["gamma"])
     for row in rows: row["return_to_go"] = rtgs[row["step"]]
     trace = directory/f"episode-{episode_id:04d}.jsonl"
+    if trace.exists():
+        archive=directory/'interrupted';archive.mkdir(exist_ok=True)
+        os.replace(trace,archive/f'{trace.stem}.uncommitted-{time.time_ns()}.jsonl')
     with trace.open("w") as stream:
         for row in rows: stream.write(json.dumps(row, ensure_ascii=False)+"\n")
+        stream.flush();os.fsync(stream.fileno())
     progress.unlink()
     experiences = experiences_from_rows(rows,config,ledger.total,len(step_rewards))
     result = {"status": "completed", "episode_id": episode_id, "seed": seed,
@@ -181,7 +193,8 @@ def run_episode(config, seed, episode_id, client, pool, text_model, directory):
         "automatic_action_counts": dict(automatic), "invalid_json": sum(bool(r.get("parse_error")) for r in rows),
         "model_identity": client.identity if client else None,
         "kind": "mock_test" if getattr(client, "is_mock", False) else "real_cage4",
-        "weights": weights, "trace": str(trace), "calls": deepcopy(client.calls) if client else []}
+        "weights": weights, "trace": str(trace),'trace_sha256':hashlib.sha256(trace.read_bytes()).hexdigest(),
+        "calls": deepcopy(client.calls) if client else []}
     if reward_audit:result.update(reward_audit.finish(ledger.total))
     if config.get('diagnostics',{}).get('skill_attribution',False):
         from .attribution import auxiliary_attribution
@@ -189,7 +202,53 @@ def run_episode(config, seed, episode_id, client, pool, text_model, directory):
         atomic_json(diagnostic,auxiliary_attribution(rows,reward_audit.ticks if reward_audit else []))
         result['auxiliary_attribution']=str(diagnostic)
     atomic_json(directory/f"episode-{episode_id:04d}.json", result)
+    if journal:journal.finish(episode_task,result,{'execution_time_s':result['execution_time_s'],
+        'joint_transitions':result['joint_transitions'],'trace_sha256':result['trace_sha256']})
     return result, experiences
+
+
+def prepare_batch(config,pending_results,pending_experiences,pool,baselines):
+    task = f"{config['composition']}:{config['red']}"
+    average = sum(r["joint_return"] for r in pending_results)/len(pending_results)
+    previous_baseline = baselines.get(task, 0.0)
+    paper_mode = config["evolution"].get("schedule") == "paper_batch"
+    if paper_mode:
+        # Both running baselines are estimated once from training's
+        # complete joint series, including the first batch. Starting
+        # the step baseline at zero would label almost every skill
+        # harmful in an environment whose rewards are penalties.
+        from .paper_algorithm import update_running_baselines
+        update_running_baselines(pending_results, baselines, task, config["evolution"])
+    if pool:
+        by_name = {s.name: s for s in pool.skills}
+        def invocation_count(exp):
+            return sum(1 for t in exp.transitions for event in (t.get("skill_controller") or {}).get("events", [])
+                       if event.get("activated") == exp.skill)
+        def trajectory_key(exp):
+            first = exp.transitions[0] if exp.transitions else {}
+            return first.get("seed"), first.get("agent")
+        total_calls = Counter()
+        for exp in pending_experiences:
+            total_calls[trajectory_key(exp)] += invocation_count(exp)
+        if paper_mode or config['evolution'].get('maintenance_mode','official_code')=='paper_score':
+            from .paper_algorithm import update_online_scores
+            update_online_scores(pool,pending_experiences,baselines.get(task+':step',0.0))
+        else:
+            for exp in pending_experiences:
+                if exp.skill in by_name:
+                    by_name[exp.skill].update_stats(exp.reward, previous_baseline,
+                        max(total_calls[trajectory_key(exp)], 1), invocation_count(exp))
+        pool.update_pool_status()
+    alpha = config["evolution"]["ema_alpha"]
+    if paper_mode:
+        # Updated above, before online score attribution.
+        pass
+    elif config['evolution']['gate_mode']=='paper_rtg':
+        from .paper_algorithm import update_running_baselines
+        update_running_baselines(pending_results, baselines, task, config['evolution'])
+    else:
+        baselines[task] = average if task not in baselines else (1-alpha)*previous_baseline+alpha*average
+    return task,average
 
 
 def run(config, stage="eval", output=None, resume=False, limit=None, client=None):
@@ -204,8 +263,7 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
     try:
         identity_path = output/"manifest.json"
         fingerprint = digest(config)
-        code_paths = sorted((ROOT/"research").glob("*.py")) + [ROOT/"research.sh"]
-        implementation = {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in code_paths}
+        implementation=implementation_identity(ROOT)
         if identity_path.exists():
             previous = json.loads(identity_path.read_text())
             if not resume: raise FileExistsError(f"Existing experiment {output}; use --resume")
@@ -221,12 +279,17 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
                 "implementation_sha256": implementation})
         invocation_id = time.time_ns()
         atomic_json(output/"invocations"/f"{invocation_id}.json", {"config_digest": fingerprint,
-            "resume": resume, "limit": limit, "implementation_sha256": implementation})
+            "resume": resume, "limit": limit, "implementation_sha256": implementation,'config':config})
         if resume and (output/"failure.json").exists():
             archive = output/"interrupted"; archive.mkdir(exist_ok=True)
             os.replace(output/"failure.json", archive/f"failure-{invocation_id}.json")
         needs_llm = config["composition"] in ("hybrid", "all_llm")
-        if client is None and needs_llm: client = ModelClient(config["model"])
+        if client is None and needs_llm:
+            runtime_model={**config['model'],'journal_path':config.get('journal_path',str(output/'journal.sqlite3')),
+                'request_context':{'experiment':config.get('experiment_id',str(output.resolve())),
+                    'arm':config.get('comparison_id',config['arm']),'red':config['red'],
+                    'env_stage':config.get('evaluation_role','frozen_test' if stage=='eval' else 'collection')}}
+            client=ModelClient(runtime_model)
         if client is not None: configure_encoder(client.embed)
         text_model = TextModel(client)
         pool = SecuritySkillPool(config["pool_size"],seed_set=config["skill_seed_set"]) if config["arm"] != "E0" and needs_llm else None
@@ -279,7 +342,10 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
                 "sha256": hashlib.sha256(pool_path.read_bytes()).hexdigest(),
                 "episodes_completed": trained["episodes_completed"],
                 "total_training_episodes": trained.get("total_training_episodes",trained["episodes_completed"]),
-                "training_seeds": trained.get("training_seeds", []), "algorithm": trained.get("algorithm")}
+                "training_seeds": trained.get("training_seeds", []), "algorithm": trained.get("algorithm"),
+                "optimizer_status":trained.get('optimizer_status','unknown'),
+                "pool_changed":trained.get('pool_changed'),
+                'initial_pool_sha256':trained.get('initial_pool_sha256')}
         if pool and pool.seed_set!=config["skill_seed_set"]:
             raise ValueError("Stored skill seed set differs from the declared experiment")
         if stage == "eval" and pool and not (output/"frozen_pool.json").exists():
@@ -288,6 +354,11 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
         if stage == "eval" and pool:
             training_provenance = json.loads((output/"frozen_pool.json").read_text()).get("training_provenance")
         pool_before = pool.snapshot() if pool else None
+        initial_pool_hash=(checkpoint or {}).get('initial_pool_sha256')
+        if initial_pool_hash is None and pool:
+            initial_pool_hash=(training_provenance or {}).get('initial_pool_sha256')
+            if initial_pool_hash is None and (stage=='train' or config['arm']=='E1' or not (training_provenance or {}).get('episodes_completed')):
+                initial_pool_hash=hashlib.sha256(json.dumps(pool_before,sort_keys=True).encode()).hexdigest()
         completed, counter = [], 0
         planned = config["train_episodes"] if stage == "train" else config["episodes"]
         start_seed = config["train_seed"] if stage == "train" else config["eval_seed"]
@@ -317,53 +388,67 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
             completed.append(result); pending_results.append(result); pending_experiences.extend(experiences)
             counter += int(not recovered)
             if stage == "train" and episode+1 in boundaries:
-                task = f"{config['composition']}:{config['red']}"
-                average = sum(r["joint_return"] for r in pending_results)/len(pending_results)
-                previous_baseline = baselines.get(task, 0.0)
-                paper_mode = config["evolution"].get("schedule") == "paper_batch"
-                if paper_mode:
-                    # Both running baselines are estimated once from training's
-                    # complete joint series, including the first batch. Starting
-                    # the step baseline at zero would label almost every skill
-                    # harmful in an environment whose rewards are penalties.
-                    from .paper_algorithm import update_running_baselines
-                    update_running_baselines(pending_results, baselines, task, config["evolution"])
-                if pool:
-                    by_name = {s.name: s for s in pool.skills}
-                    def invocation_count(exp):
-                        return sum(1 for t in exp.transitions for event in (t.get("skill_controller") or {}).get("events", [])
-                                   if event.get("activated") == exp.skill)
-                    def trajectory_key(exp):
-                        first = exp.transitions[0] if exp.transitions else {}
-                        return first.get("seed"), first.get("agent")
-                    total_calls = Counter()
-                    for exp in pending_experiences:
-                        total_calls[trajectory_key(exp)] += invocation_count(exp)
-                    if paper_mode or config['evolution'].get('maintenance_mode','official_code')=='paper_score':
-                        from .paper_algorithm import update_online_scores
-                        update_online_scores(pool,pending_experiences,baselines.get(task+':step',0.0))
-                    else:
-                        for exp in pending_experiences:
-                            if exp.skill in by_name:
-                                by_name[exp.skill].update_stats(exp.reward, previous_baseline,
-                                    max(total_calls[trajectory_key(exp)], 1), invocation_count(exp))
-                    pool.update_pool_status()
-                alpha = config["evolution"]["ema_alpha"]
-                if paper_mode:
-                    # Updated above, before online score attribution.
-                    pass
-                elif config['evolution']['gate_mode']=='paper_rtg':
-                    from .paper_algorithm import update_running_baselines
-                    update_running_baselines(pending_results, baselines, task, config['evolution'])
+                iteration=len(history)+1
+                journal=getattr(client,'journal',None)
+                preparation_key='preparation:'+str(iteration)+':'+config.get('comparison_id',config['arm'])
+                prepared=journal.restore(preparation_key) if journal else None
+                pending_hash=progress_digest([e.__dict__ for e in pending_experiences])
+                if journal:
+                    journal.checkpoint('pending_batch:'+str(iteration)+':'+config.get('comparison_id',config['arm']),{
+                        'trace_hash':pending_hash,'episodes':pending_results,
+                        'experiences':[e.__dict__ for e in pending_experiences],
+                        'environment_episodes_completed':len(completed),'committed_optimizer_loops':len(history)})
+                if prepared and prepared['pending_hash']!=pending_hash:
+                    raise ValueError('Pending training batch changed during optimizer resume')
+                if prepared is None and journal:
+                    prepared={'pending_hash':pending_hash,'status':'before_preparation','before':{
+                        'pool':pool.snapshot() if pool else None,'baselines':deepcopy(baselines),
+                        'evolution':evolution.snapshot() if evolution else None,
+                        'model':text_model.snapshot(),'rng':rng_snapshot()}}
+                    journal.checkpoint(preparation_key,prepared)
+                if prepared:
+                    restore=prepared['ready'] if prepared['status']=='prepared' else prepared['before']
+                    if pool:pool.restore(restore['pool'])
+                    baselines=deepcopy(restore['baselines'])
+                    if evolution:evolution.restore(restore['evolution'])
+                    text_model.restore(restore['model']);rng_restore(restore['rng'])
+                if not prepared or prepared['status']!='prepared':
+                    task,average=prepare_batch(config,pending_results,pending_experiences,pool,baselines)
+                    if journal:
+                        prepared['ready']={'pool':pool.snapshot() if pool else None,'baselines':deepcopy(baselines),
+                            'evolution':evolution.snapshot() if evolution else None,
+                            'model':text_model.snapshot(),'rng':rng_snapshot()}
+                        prepared.update(status='prepared',task=task,average=average)
+                        journal.checkpoint(preparation_key,prepared)
                 else:
-                    baselines[task] = average if task not in baselines else (1-alpha)*previous_baseline+alpha*average
+                    task,average=prepared['task'],prepared['average']
                 ev = {"evolution": [], "maintenance": [], "seconds": 0.0}
                 if evolution and config["evolution"].get("enabled", True):
+                    if config['evolution'].get('selection_shift_verification',False):
+                        from .skills import probe_selection
+                        probe_rows=[]
+                        for result in pending_results:
+                            trace=output/Path(result['trace']).name
+                            probe_rows.extend(json.loads(line) for line in trace.open() if line.strip())
+                        probe_rule={**config['evolution'].get('selection_shift_rule',{}),
+                            'epsilon':config['selector']['epsilon'],
+                            'allowed_seeds':list(range(config['train_seed'],config['train_seed']+config['train_episodes'])),
+                            'forbidden_seeds':list(range(config['eval_seed'],config['eval_seed']+config['episodes']))}
+                        def verify_selector(previous,proposed):
+                            key='selector_probe:'+progress_digest([previous,proposed,probe_rows,probe_rule,client.identity])
+                            cached=journal.restore(key) if journal else None
+                            if cached is not None:return cached
+                            measured=probe_selection(previous,proposed,probe_rows,client,probe_rule,'training')
+                            if journal:journal.checkpoint(key,measured)
+                            return measured
+                        evolution.selection_verifier=verify_selector
                     text_model.purpose = "evolution"
                     call_offset = len(client.calls) if client else 0
-                    ev = evolution.update(pool, pending_experiences, baselines, len(history)+1)
-                    ev["model_calls"] = deepcopy(client.calls[call_offset:]) if client else []
-                    text_model.purpose = "skill_selection"
+                    try:
+                        ev=evolution.update(pool,pending_experiences,baselines,len(history)+1)
+                        ev.setdefault('model_calls',deepcopy(client.calls[call_offset:]) if client else [])
+                    finally:
+                        text_model.purpose='skill_selection'
                 validation=[]
                 if config.get("validation_episodes",0):
                     validation_dir=output/f"validation-iteration-{len(history)+1:04d}"
@@ -385,9 +470,17 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
                     "training_seeds": sorted(set(inherited_seeds)|set(range(start_seed, start_seed+episode+1))),
                     "model_identity": client.identity if client else None, "baselines": baselines,
                     "experience": evolution.snapshot() if evolution else {}, "history": history,
-                    "config_digest": fingerprint, "algorithm": config["evolution"]}
+                    "config_digest": fingerprint, "algorithm": config["evolution"],
+                    'optimizer_status':ev.get('optimizer_status','completed_unchanged'),
+                    'initial_pool_sha256':initial_pool_hash,
+                    'pool_changed':ev.get('pool_changed',False),
+                    'text_model_state':text_model.snapshot(),'rng_state':rng_snapshot()}
                 atomic_json(output/f"pool-iteration-{len(history):04d}.json", snapshot)
                 atomic_json(checkpoint_path, snapshot)
+                if journal:
+                    journal.checkpoint('loop_commit:'+str(len(history))+':'+config.get('comparison_id',config['arm']),{
+                        'optimizer_status':snapshot['optimizer_status'],'pool_changed':snapshot['pool_changed'],
+                        'checkpoint_sha256':hashlib.sha256(checkpoint_path.read_bytes()).hexdigest()})
                 pending_experiences, pending_results = [], []
             elif stage == "train":
                 # Persist the pending batch too, so a one-episode batch invocation
@@ -400,7 +493,8 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
                     "model_identity":client.identity if client else None, "baselines":baselines,
                     "experience":evolution.snapshot() if evolution else {}, "history":history,
                     "pending_experiences":[e.__dict__ for e in pending_experiences],
-                    "pending_results":pending_results, "algorithm":config["evolution"]})
+                    "pending_results":pending_results, "algorithm":config["evolution"],
+                    "initial_pool_sha256":initial_pool_hash})
             atomic_json(output/"summary.json", {"status": "partial", "stage": stage, "config": config,
                 "episodes": completed, "metrics": aggregate_episodes(completed),
                 "result_kind": "mock_test" if getattr(client, "is_mock", False) else "real_cage4", "history": history, "planned_episodes": planned})
@@ -412,13 +506,19 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
             "history": history, "planned_episodes": planned, "pool_frozen": stage == "eval",
             "model_identity": client.identity if client else None,
             "training_provenance": training_provenance,
+            'comparison_initial_pool_sha256':initial_pool_hash,
             "pool_sha256": hashlib.sha256(json.dumps(pool.snapshot() if pool else None, sort_keys=True).encode()).hexdigest(),
             "initial_pool_sha256": hashlib.sha256(json.dumps(pool_before, sort_keys=True).encode()).hexdigest()}
         atomic_json(output/"summary.json", summary)
         print(json.dumps({"output": str(output), "status": summary["status"], "metrics": summary["metrics"]}), flush=True)
         return summary
     except BaseException as exc:
-        atomic_json(output/"failure.json", {"status": "failed", "error": f"{type(exc).__name__}: {exc}",
+        active_journal=getattr(client,'journal',None)
+        if active_journal:
+            for task in active_journal.tasks(('started',)):
+                if task['context'].get('source')=='run_episode' and task['context'].get('directory')==str(output.resolve()):
+                    active_journal.mark(task['id'],'interrupted' if isinstance(exc,BudgetExceeded) else 'unknown',{'error':str(exc)})
+        atomic_json(output/"failure.json", {"status": "interrupted_budget" if isinstance(exc,BudgetExceeded) else "failed", "error": f"{type(exc).__name__}: {exc}",
             "model": config["model"], "no_fallback_model": True})
         raise
     finally:

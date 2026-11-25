@@ -6,7 +6,7 @@ episodes: 100
 train_episodes: 6
 iterations: 3
 train_seed: 91000
-eval_seed: 101000
+eval_seed: 201000
 validation_seed: 99000
 validation_episodes: 0
 threads: 1
@@ -63,6 +63,7 @@ diagnostics:
   skill_attribution: true
 comparison_id: B4
 rollout_validation:
+  minimum_pairs: 20
   seeds:
   - 97000
   - 97001
@@ -100,4 +101,4 @@ rollout_validation:
   - 8
   - 16
   - 32
-experiment_version: cage4-skillpro-full
+experiment_version: cage4-skillpro-durable-full

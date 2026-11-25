@@ -52,7 +52,8 @@ class PublicationTests(unittest.TestCase):
             self.assertIn('Qwen/Qwen3-8B',copied)
             self.assertIn('minimum_win_rate: 0.6',copied)
             self.assertEqual(source.read_text(),original)
-            self.assertEqual(len(result),5)
+            self.assertEqual(len(result),6)
+            self.assertEqual(yaml.safe_load((output/'rollout-B3-no-support.yaml').read_text())['comparison_id'],'B3-no-support')
 
     def test_shared_initial_pool_preserves_the_fixed_skill_snapshot(self):
         pool=json.loads((ROOT/'artifacts/initial_pool.json').read_text())

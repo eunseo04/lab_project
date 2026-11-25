@@ -214,3 +214,111 @@ def test_catalog_reference_resolves_exact_step_actor_and_outcome():
 def test_catalog_cannot_invent_records_agents_or_hidden_fields(update):
     data,rows=refs();ref={'component':'policy','evidence_id':'E0','field':'action_status'};ref.update(update)
     data['evidence']=[ref];assert not audit_references(data,rows)['passed']
+
+
+def test_asv_tracks_gate_scope_and_requires_rollout_for_previously_named_unexecuted_action():
+    from research.semantic_evidence import action_support
+    parent=Skill('NetworkContainment','Observe connections',['Reassess before BlockTrafficZone'],'After review')
+    candidate=Skill('NetworkContainment_v2','Observe connections',['Immediately BlockTrafficZone when justified'],'After review')
+    exp=experience();exp.transitions[0].update(requested_action='Sleep',executed_actions=[{'name':'Sleep'}],action_status='TRUE')
+    exp.transitions[1].update(requested_action='Analyse h1',executed_actions=[{'name':'Analyse'}],action_status='TRUE')
+    support=action_support(parent,candidate,[exp],[exp])
+    assert support['gate_evaluated_requested_actions']=={'Sleep':1,'Analyse':1}
+    assert support['newly_named_actions']==[]
+    assert support['actions_outside_empirical_execution_support']==['BlockTrafficZone']
+    assert support['requires_rollout'] and support['forbidden_actions']==[]
+    assert support['observable_context_rows']==0
+
+
+def test_asv_does_not_confuse_requested_primitive_with_executed_action():
+    from research.semantic_evidence import action_support
+    parent=Skill('p','i',['Sleep'],'t');candidate=Skill('c','i',['Remove'],'t')
+    exp=experience(count=1);exp.transitions[0].update(requested_action='Remove h1',request_applied=False,
+        executed_actions=[{'name':'Sleep'}],action_status='IN_PROGRESS')
+    support=action_support(parent,candidate,[exp],[])
+    assert support['actual_started_actions']=={} and support['requires_rollout']
+
+
+def test_asv_includes_later_busy_completion_of_an_accepted_async_request():
+    from research.semantic_evidence import action_support
+    parent=Skill('p','i',['Analyse'],'t');candidate=Skill('c','i',['Remove'],'t')
+    exp=experience(count=2)
+    exp.transitions[0].update(requested_action='Remove h1',executed_actions=[{'name':'Sleep'}],action_status='IN_PROGRESS')
+    exp.transitions[1].update(policy_invoked=False,request_applied=False,requested_action='Sleep',
+        action_status='TRUE',behavior_outcome={'completed_action':{'name':'Remove','target':'h1','started_at':0,'completed_at':2,'status':'TRUE'}})
+    report=action_support(parent,candidate,[exp],[])
+    assert report['actual_started_actions']=={'Remove':1} and report['observed_completed_actions']=={'Remove':{'TRUE':1}}
+
+
+def test_asv_is_separate_from_original_gate_and_defers_without_forbidding_action(offline,monkeypatch):
+    pool=SecuritySkillPool(24);before=deepcopy(pool.snapshot());candidate=Skill('new','i',['BlockTrafficZone'],'t')
+    ev=Evolution(offline,{'schedule':'paper_batch','gate_mode':'paper_rtg',
+        'maintenance_mode':'paper_algorithm1','best_of_n':1,'action_support_verification':True})
+    monkeypatch.setattr(ev,'evolve',lambda *args:(candidate,'REFINE'))
+    monkeypatch.setattr(ev,'probabilities',lambda skill,exps:[0.]*sum(len(e.transitions) for e in exps))
+    item=ev.update(pool,[experience()],{'test':0},1)['evolution'][0]['candidates'][0]
+    assert item['score']>0 and item['ppo_accepted'] and item['deferred']=='additional_real_rollout_required'
+    assert not item['post_gate_verification']['action_banned'] and pool.snapshot()==before
+
+
+def test_new_verification_requires_a_named_version_and_original_B2_remains_disabled():
+    from research.config import variant_config
+    assert not variant_config('B2')['evolution'].get('action_support_verification',False)
+    assert variant_config('B2-ASV')['comparison_id']=='B2-ASV'
+    for comparison in ('B2',None):
+        with pytest.raises(ValueError,match='distinct ablation'):
+            validate({'comparison_id':comparison,'experiment_version':'fixture','evolution':{'action_support_verification':True}})
+
+
+def test_reject_only_screen_never_approves_and_boundary_matches_full_rule():
+    from research.rollout import reject_screen
+    r={**rule(),'reject_screen_pairs':2,'reject_screen_only':True}
+    assert reject_screen(episodes()[:2],episodes(20)[:2],r)['decision_type']=='deferred'
+    assert not reject_screen(episodes()[:2],episodes(20)[:2],r)['accepted']
+    assert reject_screen(episodes()[:1],episodes(-50)[:1],r)['decision_type']=='deferred'
+    assert reject_screen(episodes()[:1],episodes(-51)[:1],r)['decision_type']=='rejected'
+
+
+def test_early_rejection_preserves_pool_and_stops_remaining_pairs(offline):
+    pool=SecuritySkillPool(24);before=pool.snapshot();calls=[]
+    r={**rule(),'reject_screen_pairs':2,'reject_screen_only':True}
+    def pair(a,b,seed):
+        calls.append(seed);return episodes()[0],episodes(-51)[0]
+    result=verify_transaction(pool,Skill('c','i',['p'],'t'),lambda *args:pytest.fail('no full approval'),r,pair)
+    assert result['reason']=='failed_registered_worst_seed_early' and len(calls)==1
+    assert pool.snapshot()==before and 'verified_pool' not in result
+
+
+def test_screen_prefix_followed_by_full_twenty_pairs_is_required_for_approval(offline):
+    pool=SecuritySkillPool(24);calls=[];r={**rule(),'reject_screen_pairs':2}
+    def pair(a,b,seed):
+        i=r['seeds'].index(seed);return episodes()[i],episodes(10)[i]
+    def full(snapshot,role):
+        calls.append(role);return episodes(0 if role=='previous' else 10)
+    result=verify_transaction(pool,Skill('c','i',['p'],'t'),full,r,pair)
+    assert result['accepted'] and calls==['previous','candidate'] and len(result['seeds'])==20
+
+
+def test_catalog_completed_action_alias_resolves_only_an_actual_completed_record():
+    data,rows=refs();rows[0]['behavior_outcome']={'completed_action':{'name':'Remove','target':'h1','status':'FALSE','started_at':3,'completed_at':6}}
+    data['evidence']=[{'component':'policy','evidence_id':'E0','field':'completed_action'}]
+    result=audit_references(data,rows)
+    assert result['passed'] and 'h1' in result['valid_references'][0]['quote']
+    rows[0]['behavior_outcome']={}
+    assert not audit_references(data,rows)['passed']
+
+
+def test_reward_diagnostics_handle_inactive_red_and_green_without_observations(tmp_path):
+    from types import SimpleNamespace
+    from research.reward_audit import RewardAudit
+    from CybORG.Simulator.Actions import Sleep
+    called=[]
+    calc=SimpleNamespace(calculate_reward=lambda *args:(called.append(args) or 0),get_phase_rewards=lambda phase:{})
+    controller=SimpleNamespace(team_reward_calculators={'Blue':{'BlueRewardMachine':calc}},reward={'Blue':{'action_cost':0}})
+    audit=RewardAudit(SimpleNamespace(env=SimpleNamespace(environment_controller=controller)),tmp_path/'events.jsonl')
+    state=SimpleNamespace(mission_phase=0,ip_addresses={},hostname_subnet_map={},
+        sessions={'green_0':{0:SimpleNamespace(active=False)},'red_0':{0:SimpleNamespace(active=False)}})
+    actions={'green_0':[Sleep()],'red_0':[Sleep()]};obs={a:SimpleNamespace(observations=[]) for a in actions}
+    assert calc.calculate_reward(None,actions,obs,False,state)==0 and called[0][1] is actions
+    audit.capture(0,0,True);audit.finish(0)
+    assert all(r['status']=='NOT_OBSERVED' and not r['active_session'] and not r['policy_input'] for r in audit.environment_actions)

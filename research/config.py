@@ -7,6 +7,27 @@ from . import ROOT
 
 ARMS = ("E0", "E1", "E2", "E3")
 REDS = ("finite", "aggressive", "stealthy", "impact", "degrade")
+VERIFICATION_VARIANTS = ('B2-ASV','B2-SSV','B2-ASV-SSV','B2-ASV-SSV-RV',
+                         'B2-ASV-SSV-RV-screen','B4-ASV','B4-SSV','B4-ASV-SSV')
+
+
+def variant_config(name):
+    """Named overrides of existing configs; no copied YAML or silent B2/B3/B4 redefinition."""
+    if name not in VERIFICATION_VARIANTS:return load(ROOT/f'research_configs/rollout-{name}.yaml')
+    base='B4' if name.startswith('B4-') else 'B2'
+    c=load(ROOT/f'research_configs/rollout-{base}.yaml')
+    c.update(train_seed=212000,eval_seed=211000,validation_seed=214000)
+    c['evolution'].update(action_support_verification='ASV' in name,
+                          selection_shift_verification='SSV' in name)
+    if '-RV' in name:
+        c['evolution']['rollout_verification']=True
+        c['rollout_validation']=load(ROOT/'research_configs/rollout-B4.yaml')['rollout_validation']
+    if name.endswith('-screen'):
+        c['rollout_validation'].update(reject_screen_pairs=2,reject_screen_only=True,
+            procedure_version='necessary-worst-seed-rejection-v1')
+    if c['evolution'].get('rollout_verification'):c['rollout_validation']['seeds']=list(range(213000,213020))
+    c.update(comparison_id=name,experiment_version='cage4-support-shift-v1',base_comparison_id=base)
+    return validate(c)
 
 
 def load(path):
@@ -80,6 +101,17 @@ def validate(config):
         raise ValueError('minimum_independent_episodes must be a nonnegative integer')
     if minimum and not e.get('evidence_verification',False):
         raise ValueError('Experience support gating is a Proposed ablation, not original B2')
+    for key in ('action_support_verification','selection_shift_verification'):
+        if key in e and type(e[key]) is not bool:raise ValueError(key+' must be boolean')
+    if any(e.get(k,False) for k in ('action_support_verification','selection_shift_verification')):
+        if not c.get('comparison_id') or c.get('comparison_id') in ('B0','B1','B2','B3','B4','B3-no-support'):
+            raise ValueError('New verification needs a distinct ablation ID; preserve original arm definitions')
+        if not c.get('experiment_version'):raise ValueError('New verification requires an explicit experiment version')
+    shift=e.get('selection_shift_rule',{})
+    if type(shift.get('maximum_states',24)) is not int or shift.get('maximum_states',24)<1:
+        raise ValueError('Positive selector probe state count required')
+    for key,default in (('maximum_disagreement',.25),('maximum_total_variation',.2),('maximum_share_increase',.2)):
+        if not 0<=shift.get(key,default)<=1:raise ValueError('Invalid selector shift threshold')
     if e["gate_mode"] not in ("official_code", "paper_rtg"): raise ValueError("Invalid PPO gate mode")
     if e["maintenance_mode"] not in ("official_code", "paper_score", "paper_algorithm1"):
         raise ValueError("Invalid maintenance mode")
@@ -99,6 +131,9 @@ def validate(config):
     if c["profile"] == "paper-compatible" and c["skip_busy_policy"]:
         raise ValueError("Paper-compatible mode requires skip_busy_policy: false")
     if c["model"].get("temperature", 1.0) <= 0: raise ValueError("Positive policy temperature required")
+    for key in ('sg_workers','score_batch_size'):
+        if key in c['model'] and (type(c['model'][key]) is not int or c['model'][key]<1):
+            raise ValueError(key+' must be a positive integer')
     if c['selector'].get('domain_verification_revision','v4') not in ('v4','v5'):
         raise ValueError('Invalid domain verification revision')
     if e.get('rollout_verification',False):
@@ -108,11 +143,19 @@ def validate(config):
         seeds=rule.get('seeds',[])
         if not seeds or len(set(seeds))!=len(seeds) or any(type(s) is not int for s in seeds):
             raise ValueError('Explicit unique rollout validation seeds required')
+        if 'minimum_pairs' in rule and (type(rule['minimum_pairs']) is not int or rule['minimum_pairs']<20 or len(seeds)<rule['minimum_pairs']):
+            raise ValueError('Registered rollout approval needs at least 20 paired seeds')
         if set(seeds)&(train_seeds|eval_seeds|validation_seeds):
             raise ValueError('Rollout validation seeds overlap other splits')
         required=('minimum_mean_gain','minimum_win_rate','minimum_median_gain','maximum_seed_loss',
             'maximum_mean_lwf_loss','maximum_mean_asf_loss','maximum_std_ratio','maximum_std_increase','ports')
         if any(k not in rule for k in required):raise ValueError('Incomplete registered rollout approval rule')
+        count=rule.get('reject_screen_pairs',0)
+        if type(count) is not int or not 0<=count<=len(seeds):raise ValueError('Invalid predeclared reject-screen prefix')
+        if count:
+            if not rule.get('procedure_version') or c.get('comparison_id')=='B4':
+                raise ValueError('Early rejection needs a separate procedure version/ablation')
+            if c.get('comparison_id') in ('B0','B1','B2','B3'):raise ValueError('Reject-screen cannot relabel a baseline')
     if not c["model"].get("model") or not c["model"].get("revision"):
         raise ValueError("Explicit model ID and pinned revision are required; no model fallback")
     for key in ("weights", "output", "pool"):
@@ -130,4 +173,7 @@ def compatible_digest(config):
     """Normalize newly explicit defaults without changing a recorded manifest."""
     c = validate(config)
     c.pop("maintenance_mode", None)  # former unused top-level default
+    for key in ('endpoint','scoring_endpoints','generation_endpoints','sg_workers','score_batch_size','timeout_seconds'):
+        c['model'].pop(key,None)
+    if 'rollout_validation' in c:c['rollout_validation'].pop('ports',None)
     return digest(c)

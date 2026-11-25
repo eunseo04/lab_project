@@ -1,5 +1,7 @@
 """Validation provenance must reflect completed episodes and inherited experience."""
 import json
+import pytest
+from research.progress import BudgetExceeded
 from research.config import validate
 from research.rollout_execution import EnvironmentVerifier
 from research.skills import SecuritySkillPool
@@ -14,13 +16,15 @@ def snapshot_at_first_boundary(tmp_path,offline,monkeypatch,warm=None):
     config['rollout_validation']={'seeds':[43000],'ports':[8018],'deadline_unix':0}
     pool=SecuritySkillPool()
     def incomplete(pool,candidate,evaluate,rule):
-        assert evaluate(pool.snapshot(),'previous')==[]
+        evaluate(pool.snapshot(),'previous')
         return {'accepted':False,'reason':'incomplete_validation'}
     monkeypatch.setattr('research.rollout_execution.verify_transaction',incomplete)
     verifier=EnvironmentVerifier(config,tmp_path,offline.identity)
     prior_iterations=len(json.loads(warm.read_text()).get('history',[])) if warm else 0
-    verifier(pool,Skill('candidate','i',['p'],'t'),{'parent':pool.skills[0].name,
-        'iteration':prior_iterations+1,'valid_behavior_decisions':5,'evidence_trajectories':2})
+    with pytest.raises(BudgetExceeded):
+        verifier(pool,Skill('candidate','i',['p'],'t'),{'parent':pool.skills[0].name,
+            'iteration':prior_iterations+1,'valid_behavior_decisions':5,'evidence_trajectories':2})
+    assert not list(tmp_path.glob('rollout-verification/*/decision.json'))
     return json.loads(next(tmp_path.glob('rollout-verification/*/previous-pool.json')).read_text())
 
 
