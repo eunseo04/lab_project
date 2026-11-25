@@ -13,7 +13,108 @@ import time
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-from research.progress import Journal,atomic_json,digest
+from research.progress import Journal,atomic_json,digest,IncompleteOptimization,optimizer_batch_identity
+from research.config import REDS
+from research.rollout import approval_seeds
+
+
+STARTUP_SHUTDOWN_SECONDS = 390
+SHUTDOWN_SECONDS = 120
+PROFILE_SECONDS = 270
+# Historical B2 phase timings. These are provisional units for every unprofiled
+# update, including B3/B4; no current optimizer time is implied.
+HISTORICAL_OPTIMIZER_SECONDS = {
+    'sg': 43.6*60, 'aggregation_best_of_n': 1.8*60, 'old_new_score': 43.2*60,
+}
+
+
+def rollout_work(config, iterations):
+    evolution=config.get('evolution',{})
+    if not evolution.get('rollout_verification'):
+        return 0,0
+    pairs=len(approval_seeds(config['rollout_validation']))
+    attempts=evolution.get('maximum_rollout_candidates_per_iteration',1)*iterations
+    return pairs,attempts
+
+
+def campaign_reservation(protocol, replicas, *, progress=None, usage=None, starting=True):
+    """Forecast occupied time for all outstanding work required by this protocol."""
+    progress=progress or {}
+    core=protocol['core_evaluation_labels']
+    required=protocol.get('all_arms_required',False)
+    labels=protocol['requested_training_arms'] if required else ['B2']
+    episode=(protocol['core_evaluation_reservation']['episode_upper_seconds'])
+    observed=progress.get('episode_upper_seconds')
+    if observed is not None:
+        episode=max(episode or 0,observed)
+    if episode is None:
+        return {'status':'deferred','reason':'Comparable completed environment episode cost is missing',
+                'projected_occupied_gpu_hours':None,'projected_upper_wall_seconds':None}
+    n=len(protocol['pilot_test_seeds'])
+    blocks={'core':core}
+    for label in labels:
+        if label not in core:
+            static=protocol.get('controller_baselines',{}).get(label)
+            blocks[label]=[static,label] if static else [label]
+    evaluated=set(progress.get('evaluated_blocks',[]))
+    counts={'training_episodes':0,'optimizer_updates':0,'paired_validation_episodes':0,
+            'frozen_test_episodes':0,'transfer_episodes':0,'optimizer_profiles':0}
+    seconds={k:0. for k in ('collection','profiling',*HISTORICAL_OPTIMIZER_SECONDS,
+        'paired_candidate_validation','iteration_validation','frozen_paired_test','transfer_test')}
+    by_arm={}
+    for label in labels:
+        config=protocol['configs'][label]
+        iterations=config['iterations']-progress.get('updates',{}).get(label,0)
+        training=config['train_episodes']-progress.get('collected',{}).get(label,0)
+        if min(iterations,training)<0:
+            raise ValueError('Committed work exceeds the registered training plan')
+        forecast=progress.get('profiles',{}).get(label) or {}
+        optimizer=forecast.get('parts_seconds') or HISTORICAL_OPTIMIZER_SECONDS
+        profiled_current=int(bool(iterations and forecast.get('iteration')==config['iterations']-iterations+1))
+        profiles=iterations-profiled_current
+        pairs,attempts=rollout_work(config,iterations)
+        auxiliary=config.get('validation_episodes',0)*iterations
+        counts['training_episodes']+=training
+        counts['optimizer_updates']+=iterations
+        counts['optimizer_profiles']+=profiles
+        counts['paired_validation_episodes']+=2*pairs*attempts
+        seconds['collection']+=training*episode
+        seconds['profiling']+=profiles*PROFILE_SECONDS
+        for stage,proxy in HISTORICAL_OPTIMIZER_SECONDS.items():
+            seconds[stage]+=optimizer[stage]*profiled_current+max(proxy,optimizer[stage])*profiles
+        seconds['paired_candidate_validation']+=2*math.ceil(pairs/replicas)*attempts*episode
+        seconds['iteration_validation']+=auxiliary*episode
+        by_arm[label]={'training_episodes':training,'optimizer_updates':iterations,'optimizer_profiles':profiles,
+            'rollout_pairs_per_candidate':pairs,'rollout_candidates_reserved':attempts,
+            'paired_validation_episodes':2*pairs*attempts,'iteration_validation_episodes':auxiliary,
+            'optimizer_cost_per_update_seconds':optimizer,
+            'optimizer_cost_source':'this arm\'s latest batch forecast' if forecast else 'historical B2 proxy; this arm unmeasured'}
+    for key,block in blocks.items():
+        if key not in evaluated:
+            count=len(block)*n
+            counts['frozen_test_episodes']+=count
+            seconds['frozen_paired_test']+=math.ceil(count/replicas)*episode
+    evaluation_labels=list(dict.fromkeys(label for block in blocks.values() for label in block))
+    if required and protocol.get('generalization_requested') and 'transfer' not in evaluated:
+        count=len(evaluation_labels)*len(protocol['generalization_seeds'])*len(REDS[1:])
+        counts['transfer_episodes']=count
+        seconds['transfer_test']=math.ceil(count/replicas)*episode
+    seconds['startup_shutdown_margin' if starting else 'checkpoint_shutdown_margin']=(
+        STARTUP_SHUTDOWN_SECONDS if starting else SHUTDOWN_SECONDS)
+    wall=sum(seconds.values())
+    occupied=wall*replicas/3600
+    usage=usage or {'gpu_hours':0,'wall_seconds':0}
+    remaining_gpu=protocol['budget_gpu_hours']-usage['gpu_hours']
+    remaining_wall=protocol['maximum_wall_seconds']-usage['wall_seconds']
+    total_environment=sum(counts[k] for k in ('training_episodes','paired_validation_episodes',
+        'frozen_test_episodes','transfer_episodes'))+sum(a['iteration_validation_episodes'] for a in by_arm.values())
+    return {'status':'passed' if occupied<=remaining_gpu and wall<=remaining_wall else 'deferred',
+        'training_arms':labels,'evaluation_labels':evaluation_labels,'replicas':replicas,
+        'counts':{**counts,'total_environment_episodes':total_environment},'arms':by_arm,'parts_seconds':seconds,
+        'episode_upper_seconds':episode,'projected_upper_wall_seconds':wall,
+        'projected_occupied_gpu_hours':occupied,'remaining_gpu_hours':remaining_gpu,
+        'remaining_wall_seconds':remaining_wall,'gpu_hour_shortfall':max(0.,occupied-remaining_gpu),
+        'wall_second_shortfall':max(0.,wall-remaining_wall),'forecast_is_not_completion_guarantee':True}
 
 
 def distribution(values):
@@ -320,24 +421,37 @@ def profile_fixed_update(directory,protocol,client,trained,pending,preparation,t
     return report
 
 
-def profile_optimizer(directory,label,pending,port):
-    """Small real-Qwen cost sample. Profile requests are separate from optimizer RNG."""
+def profile_optimizer(directory,label,pending,port,*,iteration=1,deadline=None):
+    """Price a registered pending batch without changing the optimizer's sampling."""
     from research.client import ModelClient,stable_seed
     from research.upstream import Experience,OriginalEvolution,Skill,configure_encoder
     from research.skills import SecuritySkillPool
     directory=Path(directory);protocol=json.loads((directory/'protocol.json').read_text())
     cfg=deepcopy(protocol['configs'][label]);journal=Journal(directory/'journal.sqlite3')
-    cached=journal.restore('profile:'+label)
-    if cached:
-        audit_path=directory/f'report/{label}-prompt_audit.json'
-        if audit_path.exists() and 'planned_sg_input_tokens' not in cached:
-            cached={**cached,'planned_sg_input_tokens':[r['input_tokens'] for r in json.loads(audit_path.read_text()) if r.get('eligible')]}
-        return cached
+    identity=optimizer_batch_identity(pending)
+    if digest(pending['experiences'])!=pending['trace_hash']:
+        raise ValueError('Profiler experience rows differ from the saved optimizer batch')
+    preparation=journal.restore(f'preparation:{iteration}:{label}')
+    if (not preparation or preparation.get('status')!='prepared'
+            or preparation.get('pending_hash')!=pending['trace_hash']
+            or preparation.get('resume_identity')!=pending['resume_identity']):
+        raise IncompleteOptimization('A cost profile requires the exact prepared optimizer batch')
+    key=f'profile:{label}:{iteration}'
     runtime={**cfg['model'],'endpoint':f'http://127.0.0.1:{port}','journal_path':str(journal.path),
-        'request_context':{'experiment':str(directory),'arm':label,'env_stage':'profile'}}
+        'request_context':{'experiment':str(directory),'arm':label,'env_stage':'profile',
+            'loop':iteration,'profile_batch':identity}}
+    if deadline is not None:
+        runtime['deadline_unix']=deadline
     client=ModelClient(runtime);configure_encoder(client.embed)
-    preparation=journal.restore('preparation:1:'+label) or journal.restore('preparation:1')
-    snapshot=preparation['ready']['pool'] if preparation else json.loads((ROOT/'artifacts/initial_pool.json').read_text())['pool']
+    if client.identity!=pending['resume_identity']['run']['model_identity']:
+        raise ValueError('Profiler model identity differs from the acting model')
+    cached=journal.restore(key)
+    if cached:
+        if cached.get('batch_identity')!=identity or cached.get('model_identity')!=client.identity:
+            raise ValueError('Saved cost profile belongs to another optimizer batch')
+        return cached
+    snapshot=preparation['ready']['pool']
+    filename=label if iteration==1 else f'{label}-iteration-{iteration:04d}'
     experiences=[Experience(**e) for e in pending['experiences']]
     rendered,parents=render_sg(cfg,snapshot,experiences)
     eligible=[r for r in rendered if r['eligible']]
@@ -346,10 +460,10 @@ def profile_optimizer(directory,label,pending,port):
         t=client._tokens([{'role':'user','content':r['prompt']}])
         tokens.append({k:v for k,v in r.items() if k not in ('prompt','evidence_rows')}|{'input_tokens':t['prompt_tokens'],
             'reserved_output_tokens':768,'max_context':t['max_context'],'fits':t['prompt_tokens']+768<=t['max_context']})
-    atomic_json(directory/f'report/{label}-prompt_audit.json',tokens)
+    atomic_json(directory/f'report/{filename}-prompt_audit.json',tokens)
     if any(not t['fits'] for t in tokens if t['eligible']):
         return {'status':'context_overflow','prompt_audit':tokens,'measured_stage_costs':{},'planned_sg_chunks':len(eligible)}
-    sampled=[];grads=[];new_data=None
+    sampled=[];grads=defaultdict(list);new_data=None
     ordered=sorted(eligible,key=lambda r:len(r['prompt']))
     indices=sorted({0,len(ordered)//2,len(ordered)-1}) if ordered else []
     for index in indices:
@@ -364,43 +478,50 @@ def profile_optimizer(directory,label,pending,port):
             parsed=json.loads(boundary('Profile uses the same canonical boundary as the optimizer'))
         gradient=parsed.get('semantic_gradient',{})
         if parsed.get('is_related'):
-            grads.append({'initiation':str(gradient.get('initiation','')),'execution':str(gradient.get('policy',gradient.get('execution',''))),'termination':str(gradient.get('termination',''))})
+            grads[r['skill']].append({'initiation':str(gradient.get('initiation','')),'execution':str(gradient.get('policy',gradient.get('execution',''))),'termination':str(gradient.get('termination',''))})
         sampled.append({'stage':'sg_chunk','input_tokens':response['prompt_tokens'],'output_tokens':response['output_tokens'],
                         'seconds':response['seconds'],'timing':response.get('timing',{})})
-    if ordered:
+    parent_name=next(iter(grads),ordered[0]['skill'] if ordered and not cfg['evolution'].get('evidence_verification') else None)
+    if parent_name:
         # The final aggregate does not exist until all SG chunks finish. This small
         # partial-gradient profile is explicitly a representative cost probe.
         def call(prompt):
-            with client.context(stage='profile_aggregation_candidate',skill=ordered[0]['skill']):
+            with client.context(stage='profile_aggregation_candidate',skill=parent_name):
                 response=client.generate([{'role':'user','content':prompt}],seed=stable_seed(label,'aggregate-profile'),purpose='evolution',max_tokens=768)
             sampled.append({'stage':'aggregation_candidate','input_tokens':response['prompt_tokens'],'output_tokens':response['output_tokens'],
                 'seconds':response['seconds'],'timing':response.get('timing',{}),'representative_partial_gradient_prompt':True})
             return response['text']
         from research.evolution import Evolution
-        new_data=Evolution(call,cfg['evolution'])._run_semantic_update(parents[ordered[0]['skill']],grads,'REFINE')
-    score_samples=[];score_parents=[];old_missing=0;valid_count=0
-    for exp in experiences:
+        new_data=Evolution(call,cfg['evolution'])._run_semantic_update(parents[parent_name],grads[parent_name],'REFINE')
+    score_samples=[];score_parents=[];old_score_keys=[]
+    eligible_parents={r['skill'] for r in eligible}
+    for exp in sorted(experiences,key=lambda e:e.skill!=parent_name):
         parent=parents.get(exp.skill)
-        if parent is None:continue
+        if parent is None or parent.name not in eligible_parents:continue
         valid=[t for t in exp.transitions if t.get('policy_invoked') and t.get('request_applied') and not t.get('parse_error') and t.get('token_ids')]
-        valid_count+=len(valid)
+        samples=[]
         for transition in valid:
             messages=json.loads(transition['state']);messages[0]['content']+='\n# ACTIVE SECURITY SKILL\n'+parent.format_for_llm()
-            key=client._score_key({'messages':messages,'token_ids':transition['token_ids']})
-            old_missing+=journal.cache_get('score:'+key) is None
-        for t in (valid[:1]+valid[-1:] if valid else []):
-            messages=json.loads(t['state']);messages[0]['content']+='\n# ACTIVE SECURITY SKILL\n'+parent.format_for_llm()
-            score_samples.append({'messages':messages,'token_ids':t['token_ids']});score_parents.append(parent.name)
+            sample={'messages':messages,'token_ids':transition['token_ids']}
+            old_score_keys.append(client._score_key(sample))
+            samples.append(sample)
+        for sample in samples[:1]+(samples[-1:] if len(samples)>1 else []):
+            score_samples.append(sample);score_parents.append(parent.name)
     score_samples=score_samples[:12];score_parents=score_parents[:12]
     def measured_score(samples,stage,backend='incremental_reference'):
         context={**client.base_context,'stage':'profile_'+stage}
-        ids=[digest([context,backend,s]) for s in samples]
+        ids=[digest([context,backend,client._fingerprint(),cfg['model']['temperature'],s]) for s in samples]
         if backend=='incremental_reference':
             result=[]
             for sample,key in zip(samples,ids):
                 response=client._request('score',{'samples':[sample],'temperature':cfg['model']['temperature'],
                     'backend':backend,'request_ids':[key],'request_context':context})
-                result.extend(response['scores'])
+                client._validate_scorer(response['identity'])
+                item,=response['scores']
+                if len(item['token_logprobs'])!=len(sample['token_ids']) or not math.isfinite(item['sum']):
+                    raise ValueError('Profile scorer did not return aligned exact-token probabilities')
+                client._remember_score(client._score_key(sample,reference=True),item['sum'])
+                result.append(item)
         else:
             result=client._request('score',{'samples':samples,'temperature':cfg['model']['temperature'],
                 'backend':backend,'request_ids':ids,'request_context':context})['scores']
@@ -412,9 +533,9 @@ def profile_optimizer(directory,label,pending,port):
         sampled.append({'stage':'old_score','samples':len(score_samples),'seconds':time.perf_counter()-began,
                         'target_tokens':sum(len(s['token_ids']) for s in score_samples)})
     new_score_measured=False
-    if isinstance(new_data,dict) and new_data and ordered:
+    if isinstance(new_data,dict) and new_data and parent_name:
         from research.skills import structurally_valid
-        parent=parents[ordered[0]['skill']]
+        parent=parents[parent_name]
         candidate=Skill(name=re.sub(r'_v\d+$','',parent.name)+f'_v{parent.version+1}',
             initiation=new_data.get('initiation',''),policy=new_data.get('policy',[]),termination=new_data.get('termination',''),
             parent_id=parent.name,version=parent.version+1)
@@ -446,28 +567,33 @@ def profile_optimizer(directory,label,pending,port):
         except Exception as exc:parity.update(status='failed',error=str(exc))
     elif reference:
         parity.update(status='not_run_resource_minimized',reason='Experimental batch scorer probe disabled; production remains incremental_reference')
-    atomic_json(directory/'report/scorer_parity.json',parity)
+    atomic_json(directory/('report/scorer_parity.json' if iteration==1 else f'report/{filename}-scorer_parity.json'),parity)
     physical=journal.tasks()
     for sample in sampled:
         if sample['stage'] in ('old_score','new_score'):
             measured=[(t['metrics'] or {}).get('processing_seconds') for t in physical
                 if t['id'].startswith('server:') and t['kind']=='profile_'+sample['stage'] and t['status']=='completed'
-                and t['context'].get('arm')==label]
+                and t['context'].get('profile_batch')==identity]
             measured=[v for v in measured if v is not None]
             if measured:sample['seconds']=sum(measured)
     times=[e['execution_time_s'] for e in pending['episodes']]
     episode_upper=max(times)*1.5 if times else None
-    if episode_upper:journal.checkpoint('episode_cost_upper_seconds',episode_upper)
-    result={'status':'measured','arm':label,'model_identity':client.identity,'samples':sampled,'episode_seconds':distribution(times),
-        'planned_old_score_cache_misses':old_missing,'old_score_samples':valid_count,
+    if episode_upper:
+        journal.checkpoint('episode_cost_upper_seconds',max(episode_upper,journal.restore('episode_cost_upper_seconds') or 0.))
+    result={'status':'measured','arm':label,'iteration':iteration,'batch_identity':identity,
+        'model_identity':client.identity,'samples':sampled,'episode_seconds':distribution(times),
+        'planned_old_score_cache_misses':sum(journal.cache_get('score:'+key) is None for key in set(old_score_keys)),
+        'old_score_samples':len(old_score_keys),
         'episode_upper_seconds':episode_upper,'planned_sg_chunks':len(eligible),'planned_parents':len({r['skill'] for r in eligible}),
-        'planned_valid_decisions':sum(bool(t.get('policy_invoked') and t.get('request_applied') and not t.get('parse_error') and t.get('token_ids')) for e in experiences for t in e.transitions),
+        'planned_valid_decisions':len(old_score_keys),
         'best_of_n':cfg['evolution']['best_of_n'],'prompt_input_tokens':distribution([t['input_tokens'] for t in tokens]),
         'planned_sg_input_tokens':[t['input_tokens'] for t in tokens if t['eligible']],
         'context_overflows_measured':sum(not t['fits'] for t in tokens),'aggregate_final_prompt_measured':False,
         'aggregate_context_risk':'Final actual aggregate must be tokenized on submission; partial-gradient profile does not prove it fits.',
-        'new_score_measured':new_score_measured,'uncertainty':'At most three SG samples and a partial-gradient aggregate. Maximum observed cost scaled by context and reserved output, plus 50% margin. Not a p95 confidence bound.'}
-    journal.checkpoint('profile:'+label,result);atomic_json(directory/f'report/{label}-cost_profile.json',result)
+        'new_score_measured':new_score_measured,'profile_generation_reused_in_optimizer':False,
+        'exact_reference_score_cache_uses_same_model_prompt_and_target_tokens':True,
+        'uncertainty':'At most three SG samples and a partial-gradient aggregate. Maximum observed cost scaled by context and reserved output, plus 50% margin. Not a p95 confidence bound.'}
+    journal.checkpoint(key,result);atomic_json(directory/f'report/{filename}-cost_profile.json',result)
     return result
 
 
@@ -499,12 +625,18 @@ def generation_cost_upper(samples,maximum_prompt,maximum_output=768):
     return max(estimates)
 
 
-def preflight(protocol,measurement,usage,gpu_count,label,include_collection=False,evaluation_labels=None):
+def optimizer_forecast(measurement):
+    """Price one pending update from its own measured stages."""
     if measurement.get('status')!='measured' or measurement.get('episode_upper_seconds') is None:
         return {'status':'deferred','reason':'Actual end-to-end cost samples are missing','measurement':measurement}
+    if measurement.get('planned_parents')==0 and measurement.get('planned_sg_chunks')==0:
+        zero={key:0. for key in HISTORICAL_OPTIMIZER_SECONDS}
+        return {'status':'estimated','parts_seconds':zero,'full_capacity_seconds':0.,
+                'forecast_output_tokens':{'sg':0,'aggregation_candidate':0},'reason':'No eligible parent in this batch',
+                'measured_stages':[]}
     stages=defaultdict(list)
     for s in measurement['samples']:stages[s['stage']].append(s)
-    if not stages['sg_chunk'] or not stages['old_score']:
+    if not stages['sg_chunk'] or (measurement['planned_valid_decisions'] and not stages['old_score']):
         return {'status':'deferred','reason':'SG/scorer cost measurement missing'}
     # Forecast every actual SG prompt length, retaining the 768-token capacity
     # separately from an empirical, padded output-length forecast. Neither value
@@ -518,40 +650,52 @@ def preflight(protocol,measurement,usage,gpu_count,label,include_collection=Fals
     aggregate_count=measurement['planned_parents']*measurement['best_of_n']
     aggregate=generation_cost_upper(kernels,24576-768,aggregate_outputs)*aggregate_count
     aggregate_capacity=generation_cost_upper(kernels,24576-768,768)*aggregate_count
-    score_upper=max(s['seconds']/s['samples'] for s in stages['old_score']+stages['new_score'])*1.5
+    score_upper=max((s['seconds']/s['samples'] for s in stages['old_score']+stages['new_score']),default=0.)*1.5
+    scoring=(measurement.get('planned_old_score_cache_misses',measurement['planned_valid_decisions'])
+             +measurement['planned_valid_decisions']*measurement['best_of_n'])*score_upper
+    return {'status':'estimated','parts_seconds':{'sg':sg,'aggregation_best_of_n':aggregate,'old_new_score':scoring},
+        'full_capacity_seconds':sg_capacity+aggregate_capacity+scoring,
+        'forecast_output_tokens':{'sg':sg_outputs,'aggregation_candidate':aggregate_outputs},
+        'measured_stages':sorted({s['stage'] for s in measurement['samples']})}
+
+
+def preflight(protocol,measurement,usage,gpu_count,label,include_collection=False,evaluation_labels=None,
+              completed_updates=0):
+    forecast=optimizer_forecast(measurement)
+    if forecast['status']!='estimated':
+        return forecast
     ep=measurement['episode_upper_seconds'];n=protocol['statistics']['pilot_n']
-    cfg=protocol.get('configs',{}).get(label,{});loops=cfg.get('iterations',1)
-    rollout=cfg.get('evolution',{}).get('rollout_verification',label=='B4')
-    attempts=cfg.get('evolution',{}).get('maximum_rollout_candidates_per_iteration',1)*loops
-    planned_rollouts=40*attempts if rollout else 0
+    cfg=protocol['configs'][label];loops=cfg['iterations']-completed_updates
+    pairs,attempts=rollout_work(cfg,loops)
+    planned_rollouts=2*pairs*attempts
     reused=measurement.get('completed_identical_rollout_episodes',0) if measurement.get('rollout_reuse_identity_verified') else 0
     if type(reused) is not int or not 0<=reused<=planned_rollouts:raise ValueError('Invalid verified rollout reuse count')
     labels=evaluation_labels if evaluation_labels is not None else protocol.get('core_evaluation_labels',['B0','B1','B2'])
     collected=measurement.get('collected_training_episodes',measurement.get('episode_seconds',{}).get('n',2))
-    collection=cfg.get('train_episodes',2) if include_collection else max(0,cfg.get('train_episodes',2)-collected)
+    collection=cfg['train_episodes'] if include_collection else max(0,cfg['train_episodes']-collected)
     parts={'collection':collection*ep,
-        'sg':sg*loops,
-        'aggregation_best_of_n':aggregate*loops,
-        'old_new_score':(measurement.get('planned_old_score_cache_misses',measurement['planned_valid_decisions'])
-                         +measurement['planned_valid_decisions']*measurement['best_of_n'])*score_upper*loops,
-        'paired_candidate_validation':(planned_rollouts-reused)*ep/gpu_count,
-        'frozen_paired_test':len(labels)*n*ep/gpu_count,
-        'checkpoint_shutdown_margin':120}
+        'profiling':max(0,loops-int(not include_collection))*PROFILE_SECONDS,
+        **{key:value*loops for key,value in forecast['parts_seconds'].items()},
+        'paired_candidate_validation':(math.ceil((planned_rollouts-reused)/gpu_count) if reused
+                                      else 2*attempts*math.ceil(pairs/gpu_count))*ep,
+        'iteration_validation':cfg.get('validation_episodes',0)*loops*ep,
+        'frozen_paired_test':math.ceil(len(labels)*n/gpu_count)*ep,
+        'checkpoint_shutdown_margin':SHUTDOWN_SECONDS}
     wall=sum(parts.values());remaining_gpu=usage['gpu_hour_cap']-usage['gpu_hours'];remaining_wall=usage['wall_second_cap']-usage['wall_seconds']
-    capacity=wall-sg*loops-aggregate*loops+(sg_capacity+aggregate_capacity)*loops
+    capacity=wall+(forecast['full_capacity_seconds']-sum(forecast['parts_seconds'].values()))*loops
     return {'status':'passed' if wall<=remaining_wall and wall*gpu_count/3600<=remaining_gpu else 'deferred',
         'arm':label,'projected_upper_wall_seconds':wall,'projected_occupied_gpu_hours':wall*gpu_count/3600,
         'remaining_gpu_hours':remaining_gpu,'remaining_wall_seconds':remaining_wall,'parts_seconds':parts,
-        'estimated_not_measured':True,'uncertainty':measurement['uncertainty'],
+        'estimated_not_measured':True,'uncertainty':measurement.get('uncertainty'),
         'generation_cost_model':'nearest adequate measured context, actual prompt-length grid; observed maximum output plus 50% and timing plus 50%, with full-capacity forecast separately retained',
-        'forecast_output_tokens':{'sg':sg_outputs,'aggregation_candidate':aggregate_outputs},
+        'forecast_output_tokens':forecast['forecast_output_tokens'],
         'actual_generation_max_tokens_unchanged':768,'full_768_token_capacity_wall_seconds':capacity,
         'full_768_token_capacity_gpu_hours':capacity*gpu_count/3600,
         'full_capacity_fits':capacity<=remaining_wall and capacity*gpu_count/3600<=remaining_gpu,
         'forecast_is_not_completion_guarantee':True,
-        'b4_pairs':20 if rollout else 0,'rollout_candidate_attempts_reserved':attempts if rollout else 0,
+        'b4_pairs':pairs,'rollout_candidate_attempts_reserved':attempts,
         'planned_validation_episodes':planned_rollouts,'reused_validation_episodes':reused,
-        'training_plan':{'episodes':cfg.get('train_episodes',2),'iterations':loops},
+        'training_plan':{'episodes':cfg['train_episodes'],'iterations':loops},
         'evaluation_labels_reserved':labels,'thresholds_unchanged':True}
 
 

@@ -75,8 +75,15 @@ class ModelClient:
         serialized=time.perf_counter()-began
         request = urllib.request.Request((endpoint or self.endpoint)+'/'+route, data=data,
                                          headers={'Content-Type': 'application/json'})
+        timeout=self.config.get('timeout_seconds',180)
+        deadline=self.config.get('deadline_unix')
+        if deadline is not None:
+            remaining=deadline-time.time()
+            if remaining<=0:
+                raise BudgetExceeded('Model request deadline reached')
+            timeout=min(timeout,remaining)
         try:
-            with urllib.request.urlopen(request, timeout=self.config.get('timeout_seconds', 180)) as response:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
                 result=json.load(response)
                 if isinstance(result,dict) and route in ('generate','score','embed','tokenize'):
                     result['transport']={'serialization_seconds':serialized,

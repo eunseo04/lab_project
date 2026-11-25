@@ -48,9 +48,12 @@ def test_single_rollout_budget_rotates_between_supported_skill_families(offline,
     assert any(row.get('deferred') for row in second['evolution'])
 
 
-def test_campaign_cost_preflight_counts_40_validation_rollouts_and_independent_caps():
+@pytest.mark.parametrize('pair_count',[20,23])
+def test_campaign_cost_preflight_counts_registered_validation_rollouts_and_independent_caps(pair_count):
     from scripts.audit_training_cost import preflight
-    protocol={'statistics':{'pilot_n':4},'requested_training_arms':['B2','B4']}
+    protocol={'statistics':{'pilot_n':4},'requested_training_arms':['B2','B4'],
+        'configs':{'B4':{'train_episodes':2,'iterations':1,'evolution':{'rollout_verification':True},
+            'rollout_validation':{'minimum_pairs':20,'seeds':list(range(pair_count))}}}}
     measured={'status':'measured','episode_upper_seconds':100,'prompt_input_tokens':{'maximum':100},
         'planned_sg_chunks':1,'planned_parents':1,'best_of_n':2,'planned_valid_decisions':2,'uncertainty':'fixture',
         'samples':[{'stage':'sg_chunk','seconds':1,'input_tokens':100,'output_tokens':768},
@@ -58,11 +61,65 @@ def test_campaign_cost_preflight_counts_40_validation_rollouts_and_independent_c
                    {'stage':'old_score','seconds':1,'samples':1}]}
     usage={'gpu_hour_cap':8,'gpu_hours':1,'wall_second_cap':10000,'wall_seconds':0}
     result=preflight(protocol,measured,usage,2,'B4')
-    assert result['parts_seconds']['paired_candidate_validation']==40*100/2
-    assert result['b4_pairs']==20 and result['status']=='passed'
+    assert result['planned_validation_episodes']==2*pair_count
+    assert result['parts_seconds']['paired_candidate_validation']==2*((pair_count+1)//2)*100
+    assert result['b4_pairs']==pair_count and result['status']=='passed'
     # A wall-hour cap cannot authorize more GPU-hours.
     exhausted={**usage,'gpu_hours':7.99,'wall_second_cap':1000000}
     assert preflight(protocol,measured,exhausted,2,'B4')['status']=='deferred'
+
+
+@pytest.mark.parametrize('with_b4,environment,updates',[(False,12,2),(True,56,3)])
+def test_required_reservation_counts_all_work_and_reprices_remaining_arms(with_b4,environment,updates):
+    from scripts.audit_training_cost import campaign_reservation
+    labels=['B2','B3']+(['B4'] if with_b4 else [])
+    configs={label:{'train_episodes':2,'iterations':1} for label in labels}
+    if with_b4:
+        configs['B4'].update(evolution={'rollout_verification':True},
+            rollout_validation={'minimum_pairs':20,'seeds':list(range(20))})
+    protocol={'requested_training_arms':labels,'core_evaluation_labels':['B0','B1','B2'],
+        'all_arms_required':True,'configs':configs,'pilot_test_seeds':[31,32],'budget_gpu_hours':30.,
+        'maximum_wall_seconds':110000.,'core_evaluation_reservation':{'episode_upper_seconds':100.}}
+    reservation=campaign_reservation(protocol,1)
+    assert reservation['counts']['optimizer_updates']==updates
+    assert reservation['counts']['total_environment_episodes']==environment
+    assert reservation['counts']['optimizer_profiles']==updates
+    assert reservation['parts_seconds']['sg']>0 and reservation['parts_seconds']['old_new_score']>0
+    transfer=campaign_reservation({**protocol,'generalization_requested':True,'generalization_seeds':[99]},1)
+    assert transfer['counts']['transfer_episodes']==(len(labels)+2)*4
+    progress={'updates':{'B2':1},'collected':{'B2':2,'B3':2},'evaluated_blocks':['core'],
+        'profiles':{'B3':{'iteration':1,'parts_seconds':{
+            'sg':100000.,'aggregation_best_of_n':10000.,'old_new_score':20000.}}}}
+    updated=campaign_reservation(protocol,1,progress=progress,usage={'gpu_hours':1.,'wall_seconds':3600},starting=False)
+    assert updated['counts']['optimizer_updates']==updates-1
+    assert updated['counts']['paired_validation_episodes']==(40 if with_b4 else 0)
+    assert updated['status']=='deferred' and updated['gpu_hour_shortfall']>0
+
+
+def test_launch_defers_required_work_before_gpu_access(tmp_path,monkeypatch):
+    import json,sys
+    from research.progress import LEGACY_GPU_AUTHORIZATION
+    from scripts import run_campaign as campaign
+    ledger=tmp_path/'carry-in.json'
+    ledger.write_text(json.dumps({'new_campaign_usage':{'gpu_hours':0.,'sessions':[]}}))
+    out=tmp_path/'research_outputs'/'work'
+    protocol={'schema':'durable-campaign-v1','gpu_authorization':LEGACY_GPU_AUTHORIZATION,
+        'budget_gpu_hours':.5,'maximum_wall_seconds':1800,'maximum_servers':1,
+        'prior_physical_usage':{'sources':[str(ledger)]},'configs':{
+            label:{'train_episodes':2,'iterations':1} for label in ('B2','B3')},
+        'requested_training_arms':['B2','B3'],'core_evaluation_labels':['B0','B1','B2'],
+        'all_arms_required':True,'pilot_test_seeds':[71,72],
+        'core_evaluation_reservation':{'episode_upper_seconds':100.,'gpu_seconds_estimate':600.},
+        'required_work_reservations':[]}
+    monkeypatch.setattr(campaign,'ROOT',tmp_path)
+    monkeypatch.setattr(campaign,'make_protocol',lambda *args:protocol)
+    monkeypatch.setattr(campaign,'available_gpus',lambda *args:pytest.fail('accessed GPU before full reservation'))
+    monkeypatch.setattr(sys,'argv',['run_campaign.py','--output',str(out),'--gpu-hours','.5','--wall-hours','.5'])
+    campaign.main()
+    completion=json.loads((out/'completion.json').read_text())
+    assert completion['status']=='deferred_budget'
+    assert completion['new_campaign_usage']['sessions']==[]
+    assert completion['required_work_reservations'][0]['counts']['total_environment_episodes']==12
 
 
 def test_seed_plan_blocks_exposed_holdout_and_marks_development_reuse():
@@ -124,6 +181,41 @@ def test_cumulative_budget_ledgers_deduplicate_sessions_and_discover_later_usage
     assert prior==2 and ledger['unique_sessions']==2
 
 
+def test_explicit_gpu_authorization_extends_same_ledger_without_reset(tmp_path,monkeypatch):
+    import json
+    from types import SimpleNamespace
+    from research.progress import Journal, LEGACY_GPU_AUTHORIZATION
+    from scripts.run_campaign import campaign_budget
+    monkeypatch.setattr('scripts.run_campaign.ROOT',tmp_path)
+    runs=tmp_path/'research_outputs'
+    old=runs/'old';later=runs/'later';old.mkdir(parents=True);later.mkdir()
+    completion={'new_campaign_usage':{'gpu_hours':1.,'sessions':[{
+        'id':'old','start':0.,'stop':3600.,'gpu_count':1}]}}
+    (old/'completion.json').write_text(json.dumps(completion))
+    (later/'protocol.json').write_text(json.dumps({'gpu_authorization':LEGACY_GPU_AUTHORIZATION}))
+    db=Journal(later/'journal.sqlite3');db.budget_configure(1,3600,now=0)
+    db.budget_start('later',1,now=10)
+    grant=tmp_path/'approval.json'
+    grant.write_text(json.dumps({'scope':LEGACY_GPU_AUTHORIZATION['scope'],'gpu_hour_cap':36.,
+        'approval_reference':'synthetic approval fixture','ledger_sources':[str(old)]}))
+    args=SimpleNamespace(gpu_hours=34.,wall_hours=36.,usage_ledger=[old],plan_only=False)
+    with pytest.raises(ValueError,match='exceeds'):campaign_budget(args,exclude=later)
+    args.authorization=grant
+    with pytest.raises(ValueError,match='without a completion ledger'):campaign_budget(args)
+    db.budget_heartbeat('later',stop=True,now=3610)
+    (later/'completion.json').write_text(json.dumps({'new_campaign_usage':db.budget_usage(now=3610)}))
+    prior,ledger=campaign_budget(args)
+    assert prior==2. and ledger['unique_sessions']==2
+    authorization=ledger['authorization']
+    assert authorization['gpu_hour_cap']==36. and authorization['sha256']
+    args.gpu_hours=34.1
+    with pytest.raises(ValueError,match='exceeds'):campaign_budget(args)
+    journal=Journal(runs/'future'/'journal.sqlite3')
+    journal.budget_configure(34.,125000.,authorization=authorization,prior_gpu_hours=prior)
+    with pytest.raises(ValueError,match='change the GPU authorization'):
+        journal.budget_configure(34.,125000.,authorization={**authorization,'gpu_hour_cap':40.},prior_gpu_hours=prior)
+
+
 def test_optional_budget_deferral_does_not_erase_completed_core(tmp_path,monkeypatch):
     import json,threading
     from scripts.run_campaign import run_training_study
@@ -131,21 +223,65 @@ def test_optional_budget_deferral_does_not_erase_completed_core(tmp_path,monkeyp
     class Journal:
         def restore(self,key):return states.get(key)
         def checkpoint(self,key,value):states[key]=value
-        def budget_usage(self):return {}
-    protocol={'configs':{'B2':{'train_episodes':2,'iterations':1}},'requested_training_arms':['B2','B4'],
-        'pilot_test_seeds':[800001],'core_evaluation_labels':['B0','B1','B2'],'statistics':{'pilot_n':1}}
+        def budget_usage(self):return {'gpu_hours':0.,'wall_seconds':0.}
+    protocol={'configs':{'B2':{'train_episodes':2,'iterations':1},
+                         'B4':{'train_episodes':6,'iterations':3}},
+        'requested_training_arms':['B2','B4'],'pilot_test_seeds':[800001],
+        'core_evaluation_labels':['B0','B1','B2'],'statistics':{'pilot_n':1},'budget_gpu_hours':2.,
+        'maximum_wall_seconds':7200.,'core_evaluation_reservation':{'episode_upper_seconds':1.}}
     def worker(label,stage,port,seed=None,red='finite',pool=None):
         calls.append((label,stage));dest=tmp_path/'runs'/label;dest.mkdir(parents=True,exist_ok=True)
         if stage=='train':
             (dest/'checkpoint.json').write_text(json.dumps({'history':[{}],'episodes_completed':2,
                 'optimizer_status':'completed_unchanged','training_completed':True}))
+        else:
+            (dest/'summary.json').write_text(json.dumps({'status':'completed'}))
         return dest,{'status':'completed','summary_status':'completed'}
-    monkeypatch.setattr('scripts.audit_training_cost.preflight',lambda *a,**k:{'status':'deferred','reason':'fixture cost'})
     monkeypatch.setattr('scripts.audit_training_cost.audit',lambda *a:None)
     run_training_study(protocol,tmp_path,Journal(),[{'port':8418}],worker,lambda:100,lambda _:None,threading.Event())
     assert calls==[('B2','train'),('B0','evaluate'),('B1','evaluate'),('B2','evaluate')]
     assert json.loads((tmp_path/'core_comparison.json').read_text())['status']=='completed'
     assert json.loads((tmp_path/'extension_status.json').read_text())['B4']['status']=='deferred_budget'
+
+
+def test_each_required_update_is_profiled_and_frozen_after_its_own_batch(tmp_path,monkeypatch):
+    import json, threading
+    from research.progress import Journal, optimizer_batch_identity
+    from scripts.run_campaign import run_training_study
+    journal=Journal(tmp_path/'journal.sqlite3')
+    protocol={'configs':{label:{'train_episodes':4,'iterations':2} for label in ('B2','B3')},
+        'requested_training_arms':['B2','B3'],'all_arms_required':True,'pilot_test_seeds':[800001],
+        'core_evaluation_labels':['B0','B1','B2'],'budget_gpu_hours':8.,'maximum_wall_seconds':28800.,
+        'core_evaluation_reservation':{'episode_upper_seconds':10.}}
+    committed={'B2':0,'B3':0};profiled=[]
+    def worker(label,stage,port,seed=None,red='finite',pool=None):
+        dest=tmp_path/'runs'/f'{label}-{stage}';dest.mkdir(parents=True,exist_ok=True)
+        if stage=='evaluate':
+            (dest/'summary.json').write_text(json.dumps({'status':'completed','seed':seed}))
+            return dest,{'status':'completed','summary_status':'completed'}
+        for iteration in range(committed[label]+1,3):
+            pending={'trace_hash':f'{label}-{iteration}','resume_identity':{'iteration':iteration},
+                'environment_episodes_completed':2*iteration}
+            journal.checkpoint(f'pending_batch:{iteration}:{label}',pending)
+            approval=journal.restore(f'preflight:{label}:{iteration}')
+            if not approval:
+                return dest,{'status':'incomplete','failure_status':'waiting_for_cost_preflight'}
+            assert approval['batch_identity']==optimizer_batch_identity(pending)
+            committed[label]=iteration
+            (dest/'checkpoint.json').write_text(json.dumps({'history':[{}]*iteration,'episodes_completed':2*iteration,
+                'optimizer_status':'completed_unchanged','training_completed':iteration==2}))
+        return dest,{'status':'completed'}
+    def profile(out,label,pending,port,*,iteration,deadline):
+        profiled.append((label,iteration))
+        return {'status':'measured','episode_upper_seconds':12.,'planned_parents':0,'planned_sg_chunks':0}
+    monkeypatch.setattr('scripts.audit_training_cost.profile_optimizer',profile)
+    monkeypatch.setattr('scripts.audit_training_cost.audit',lambda _:None)
+    run_training_study(protocol,tmp_path,journal,[{'port':8418}],worker,lambda:28000,lambda _:None,threading.Event())
+    assert profiled==[('B2',1),('B2',2),('B3',1),('B3',2)]
+    state=journal.restore('campaign_cost_progress')
+    assert state['updates']==committed=={'B2':2,'B3':2}
+    assert set(state['evaluation_receipts'])=={'core','B3'}
+    assert json.loads((tmp_path/'extension_status.json').read_text())['B3']['status']=='completed'
 
 
 def test_campaign_cleanup_checks_process_identity_before_signaling(tmp_path):

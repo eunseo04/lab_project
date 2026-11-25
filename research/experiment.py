@@ -25,7 +25,8 @@ from .upstream import configure_encoder, Experience
 from .evolution import Evolution
 from .gate import returns_to_go
 from . import ROOT
-from .progress import atomic_json, digest as progress_digest, rng_snapshot, rng_restore, BudgetExceeded, implementation_identity
+from .progress import (atomic_json, digest as progress_digest, rng_snapshot, rng_restore,
+                       BudgetExceeded, OptimizerPreflightRequired, implementation_identity)
 
 
 def policy_roles(composition):
@@ -599,7 +600,9 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
             for task in active_journal.tasks(('started',)):
                 if task['context'].get('source')=='run_episode' and task['context'].get('directory')==str(output.resolve()):
                     active_journal.mark(task['id'],'interrupted' if isinstance(exc,BudgetExceeded) else 'unknown',{'error':str(exc)})
-        atomic_json(output/"failure.json", {"status": "interrupted_budget" if isinstance(exc,BudgetExceeded) else "failed", "error": f"{type(exc).__name__}: {exc}",
+        status=("waiting_for_cost_preflight" if isinstance(exc,OptimizerPreflightRequired)
+                else "interrupted_budget" if isinstance(exc,BudgetExceeded) else "failed")
+        atomic_json(output/"failure.json", {"status": status, "error": f"{type(exc).__name__}: {exc}",
             "model": config["model"], "no_fallback_model": True})
         raise
     finally:

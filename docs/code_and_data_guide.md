@@ -204,7 +204,7 @@ B3/B4의 원문 diagnosis/free gradient는 후보 입력에서 격리한다. 검
 
 기본 scorer는 incremental reference다. 실험용 full-sequence backend는 CPU indexing 검사만으로 채택하지 않는다. 실제 BF16 Qwen의 token 합·PPO objective·최종 판정·EOS/mixed-length/긴 prompt까지 검증한 인증과 경계 reference 재확인이 필요하다.
 
-이전 4개 GPU의 8 GPU-hour 설정은 120 wall분이었다. 현재 관리자는 기본 1 GPU이며 기동·idle·정리까지 합산한다. `--usage-ledger`는 누적 기록의 session을 중복 제거하고 연결된 후속 사용도 반영한다. 새 output이나 resume은 새 8시간 승인이 아니다. B2 완료 후 B0/B1/B2의 core 동결 평가를 먼저 수행한다. 선택적 후속 군만 예산에 맞지 않으면 deferred_budget이며 core 결과는 남긴다. 모든 군이 필수인 계획은 별도 flag로 구분한다.
+이전 4개 GPU의 8 GPU-hour 설정은 120 wall분이었다. 현재 관리자는 기본 1 GPU이며 기동·idle·정리까지 합산한다. `--authorization`은 명시적으로 승인된 누적 cap과 scope를 해시로 고정하며, 같은 scope에서 `--usage-ledger`의 물리 세션과 후속 사용을 대조한다. `--require-all-arms`는 모든 필수 수집·update·평가·검증을 먼저 예약하고 각 준비된 배치의 비용을 측정한 뒤 남은 경로 전체를 다시 확인한다. B2 완료 후 core 동결 평가부터 실행하며, 선택 확장이 예산에 맞지 않으면 `deferred_budget`과 core 결과를 함께 보존한다.
 
 새 캠페인은 `--seed-plan` JSON에 train/validation/final_test/transfer와 목적(final_evaluation/development/reproduction)을 명시한다. manifest·완료 episode·partial trace·제공된 이전 이력으로 노출을 확인한다. 201000/201001, 211000/211001, 215000과 validation 213000/213001을 새 holdout으로 사용할 수 없다. 101000–101099·102000 등의 이전 개발 자료도 포함한다. validation 재사용과 반복 평가를 새 독립 표본으로 세지 않는다. 미사용 reserved 목록에서는 과거 노출 및 현재 pilot 배정 시드를 뺀다. 기존 YAML은 legacy_reproduction이다. 새로운 고정 숫자로 자동 치환하지 않는다.
 

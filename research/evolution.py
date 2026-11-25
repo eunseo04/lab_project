@@ -14,7 +14,8 @@ from .upstream import (OriginalEvolution, Experience, ExperiencePool, GoldenExpe
                        build_success_failure_eval_batch, get_priority)
 from .skills import structurally_valid
 from .gate import gate_score
-from .progress import digest, rng_snapshot, rng_restore, BudgetExceeded, IncompleteOptimization
+from .progress import (digest, rng_snapshot, rng_restore, BudgetExceeded, IncompleteOptimization,
+                       OptimizerPreflightRequired, optimizer_batch_identity)
 
 
 def semantic_chunks(experience,config):
@@ -214,9 +215,12 @@ class Evolution(OriginalEvolution):
         if self.journal is None:
             return self._update_impl(pool,experiences,baselines,iteration)
         if self.config.get('preflight_required'):
-            authorization=self.journal.restore('preflight:'+getattr(self.evolver_model.client,'base_context',{}).get('arm','unknown'))
-            if not authorization or authorization.get('status')!='passed':
-                raise IncompleteOptimization('Pending batch saved; measured optimizer cost preflight is required')
+            label=getattr(self.evolver_model.client,'base_context',{}).get('arm','unknown')
+            pending=self.journal.restore(f'pending_batch:{iteration}:{label}')
+            authorization=self.journal.restore(f'preflight:{label}:{iteration}')
+            if (not pending or not authorization or authorization.get('status')!='passed'
+                    or authorization.get('batch_identity')!=optimizer_batch_identity(pending)):
+                raise OptimizerPreflightRequired('Pending batch saved; measured optimizer cost preflight is required')
         model=self.evolver_model
         context=getattr(getattr(model,'client',None),'base_context',{})
         self._loop_key='optimizer:'+digest([context,iteration])

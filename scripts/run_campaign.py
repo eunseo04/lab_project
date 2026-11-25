@@ -1,26 +1,31 @@
-"""Bounded, resumable Qwen campaign. One B2 update precedes optional extensions."""
+"""Bounded, resumable Qwen campaign with registered training and evaluation work."""
 import argparse
 from copy import deepcopy
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import queue
 import signal
 import socket
+import sqlite3
 import subprocess
 import sys
 import threading
 import time
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
+from types import SimpleNamespace
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-from research.progress import Journal,atomic_json,BudgetExceeded,IncompleteOptimization,digest,implementation_identity
+from research.progress import (Journal,atomic_json,BudgetExceeded,IncompleteOptimization,digest,
+    implementation_identity,LEGACY_GPU_AUTHORIZATION,validate_budget_limits,optimizer_batch_identity)
 from research.config import (load,validate,variant_config,apply_seed_plan,validate_seed_plan,
-    seed_exposure_history,split_seeds,VERIFICATION_VARIANTS,CONTROLLER_VARIANTS,COMPLETED_OPTIMIZER_STATUSES,
+    seed_exposure_history,split_seeds,VERIFICATION_VARIANTS,CONTROLLER_VARIANTS,COMPLETED_OPTIMIZER_STATUSES,REDS,
     execution_config,policy_interface,check_pool_interface,read_policy_manifest,read_training_manifest)
+from scripts.audit_training_cost import campaign_reservation, STARTUP_SHUTDOWN_SECONDS
 
 PORTS=[8418,8419,8420,8421]
 write=atomic_json
@@ -65,20 +70,24 @@ def process_identity(pid,wait_seconds=0):
         stat=(path/'stat').read_text().split(') ',1)[1].split()
         if stat[0]=='Z':return None
         return {'pid':pid,'uid':path.stat().st_uid,'start_ticks':stat[19],
-                'command':command,'pgid':os.getpgid(pid)}
+                'command':command,'pgid':os.getpgid(pid),'cwd':os.readlink(path/'cwd')}
     except (OSError,IndexError):return None
 
 
 def stop_owned(entry):
     """Only this recorded session leader and its children; reject reused/foreign PIDs."""
-    current=process_identity(entry['pid'])
-    if current is None:return {'pid':entry['pid'],'status':'already_stopped'}
-    if any(current[k]!=entry[k] for k in ('uid','start_ticks','command','pgid')) or current['uid']!=os.getuid() or current['pgid']!=entry['pid']:
-        raise RuntimeError('Process ownership/identity is ambiguous; not stopping PID '+str(entry['pid']))
+    def owned_process():
+        current=process_identity(entry['pid'])
+        if current and (any(current[k]!=entry[k] for k in ('uid','start_ticks','command','pgid'))
+                or current['uid']!=os.getuid() or current['pgid']!=entry['pid']
+                or current['cwd']!=entry.get('cwd',str(ROOT))):
+            raise RuntimeError('Process ownership/identity is ambiguous; not stopping PID '+str(entry['pid']))
+        return current
+    if not owned_process():return {'pid':entry['pid'],'status':'already_stopped'}
     os.killpg(entry['pid'],signal.SIGTERM)
     until=time.monotonic()+8
     while process_identity(entry['pid']) and time.monotonic()<until:time.sleep(.1)
-    if process_identity(entry['pid']):
+    if owned_process():
         os.killpg(entry['pid'],signal.SIGKILL)
         until=time.monotonic()+3
         while process_identity(entry['pid']) and time.monotonic()<until:time.sleep(.1)
@@ -126,18 +135,64 @@ def recorded_gpu_usage(paths):
         if usage.get('gpu_hours',0) and not usage.get('sessions'):raise ValueError('GPU ledger lacks physical session identities')
         for s in usage.get('sessions',[]):
             if s.get('stop') is None:raise ValueError('Prior reservation is not closed; resolve its accounting first')
-            key=(s['id'],s['start'],s['gpu_count'])
-            if key in sessions and sessions[key]!=s['stop']:raise ValueError('Conflicting physical GPU interval')
-            sessions[key]=s['stop']
-    return {'gpu_hours':sum((end-start)*count/3600 for (_,start,count),end in sessions.items()),
+            start,stop,count=s['start'],s['stop'],s['gpu_count']
+            if (not all(type(t) in (int,float) and math.isfinite(t) for t in (start,stop))
+                    or stop<start or type(count) is not int or count<1):
+                raise ValueError('Invalid physical GPU interval')
+            interval=(start,stop,count)
+            if s['id'] in sessions and sessions[s['id']]!=interval:raise ValueError('Conflicting physical GPU interval')
+            sessions[s['id']]=interval
+    return {'gpu_hours':sum((end-start)*count/3600 for start,end,count in sessions.values()),
         'unique_sessions':len(sessions),'sources':[str(Path(p).resolve()) for p in paths]}
 
 
-def campaign_budget(args):
+def read_gpu_authorization(path):
+    if path is None:
+        return dict(LEGACY_GPU_AUTHORIZATION)
+    source=Path(path).resolve()
+    raw=source.read_bytes()
+    grant=json.loads(raw)
+    if not isinstance(grant,dict) or not isinstance(grant.get('approval_reference'),str) or not grant['approval_reference'].strip():
+        raise ValueError('GPU authorization file needs an explicit approval reference')
+    ledger_sources=grant.get('ledger_sources',[])
+    if not isinstance(ledger_sources,list) or any(not isinstance(p,str) or not p.strip() for p in ledger_sources):
+        raise ValueError('Authorization ledger_sources must be a list of completion paths')
+    authorization={'scope':grant.get('scope'),'gpu_hour_cap':grant.get('gpu_hour_cap'),
+        'approval_reference':grant['approval_reference'],'file':str(source),
+        'sha256':hashlib.sha256(raw).hexdigest(),
+        'ledger_sources':[str((source.parent/p).resolve()) for p in ledger_sources]}
+    validate_budget_limits(0,1,authorization)
+    return authorization
+
+
+def campaign_budget(args, *, authorization=None, exclude=None):
+    authorization=authorization if authorization is not None else read_gpu_authorization(getattr(args,'authorization',None))
     ledgers=getattr(args,'usage_ledger',None) or []
     def key(value):
         path=Path(value);return str((path/'completion.json' if path.is_dir() else path).resolve())
-    closure={key(p) for p in ledgers}
+    omitted=key(exclude) if exclude is not None else None
+    closure={key(p) for p in [*ledgers,*authorization.get('ledger_sources',[])]}-{omitted}
+    protocols={};linked_registrations={}
+    for path in (ROOT/'research_outputs').rglob('protocol.json'):
+        if 'report' not in path.relative_to(ROOT/'research_outputs').parts:
+            protocols[key(path.parent)]=json.loads(path.read_text())
+    # New scope-tagged campaigns count even when their output was not supplied
+    # explicitly. Plan-only directories have no physical reservations.
+    for path,protocol in protocols.items():
+        if path==omitted or (protocol.get('gpu_authorization') or {}).get('scope')!=authorization['scope']:
+            continue
+        database=Path(path).parent/'journal.sqlite3'
+        if database.is_file():
+            with sqlite3.connect(database.as_uri()+'?mode=ro',uri=True) as db:
+                rows=db.execute('SELECT id,start,stop,gpu_count FROM budget_sessions').fetchall()
+            if rows:
+                if not Path(path).is_file():
+                    raise ValueError('A registered campaign has physical sessions without a completion ledger: '+path)
+                recorded=json.loads(Path(path).read_text()).get('new_campaign_usage',{}).get('sessions',[])
+                if {(s['id'],s['start'],s.get('stop'),s['gpu_count']) for s in recorded}!=set(rows):
+                    raise ValueError('A registered campaign completion does not match its physical journal: '+path)
+        if Path(path).is_file():
+            closure.add(path)
     # A later child ledger may already have spent part of this same authorization.
     # Discover descendants so reusing an old carry-in command cannot reset usage.
     changed=True
@@ -147,26 +202,43 @@ def campaign_budget(args):
         # protocol points to the cumulative ancestry. Follow both directions.
         for value in list(closure):
             protocol=Path(value).parent/'protocol.json'
-            if not protocol.exists():continue
-            sources=(json.loads(protocol.read_text()).get('prior_physical_usage') or {}).get('sources',[])
+            registration=protocols.get(value)
+            if registration is None and protocol.is_file():registration=json.loads(protocol.read_text())
+            if registration is None:continue
+            linked_registrations[value]=registration
+            recorded_scope=(registration.get('gpu_authorization') or {}).get('scope')
+            if recorded_scope and recorded_scope!=authorization['scope']:
+                raise ValueError('GPU usage ledger belongs to a different authorization scope: '+value)
+            sources=(registration.get('prior_physical_usage') or {}).get('sources',[])
             for source in sources:
                 ancestor=key(source)
+                if ancestor==omitted:continue
                 if not Path(ancestor).is_file():raise ValueError('Missing prior GPU accounting dependency: '+ancestor)
                 if ancestor not in closure:closure.add(ancestor);changed=True
-        for completion in (ROOT/'research_outputs').glob('*/completion.json'):
-            protocol=completion.parent/'protocol.json'
-            if not protocol.exists() or str(completion.resolve()) in closure:continue
-            parent_sources=(json.loads(protocol.read_text()).get('prior_physical_usage') or {}).get('sources',[])
+        for completion,registration in protocols.items():
+            if completion==omitted or completion in closure or not Path(completion).is_file():continue
+            parent_sources=(registration.get('prior_physical_usage') or {}).get('sources',[])
             if closure & {key(p) for p in parent_sources}:
-                closure.add(str(completion.resolve()));changed=True
+                closure.add(completion);changed=True
     ledgers=sorted(closure)
     measured=recorded_gpu_usage(ledgers)
-    prior=max(getattr(args,'prior_gpu_hours',None) or 0,measured['gpu_hours'])
-    if prior<0 or prior>=8 or args.gpu_hours>8-prior+1e-9:
-        raise ValueError('Carry-in plus this cap exceeds the existing eight GPU-hour authorization')
-    if not ledgers and not getattr(args,'plan_only',False):
-        raise ValueError('Existing authorization requires --usage-ledger; a new output cannot reset GPU usage')
-    return prior,measured
+    stated=getattr(args,'prior_gpu_hours',None)
+    if stated is not None:
+        validate_budget_limits(0,1,authorization,stated)
+    carry_floor=max(((p.get('prior_physical_usage') or {}).get('unitemized_gpu_hour_floor',0.)
+                     for p in linked_registrations.values()),default=0.)
+    prior=max(stated or 0,measured['gpu_hours']+carry_floor)
+    validate_budget_limits(args.gpu_hours,getattr(args,'wall_hours',1)*3600,authorization,prior)
+    if not (ledgers and (getattr(args,'usage_ledger',None) or authorization.get('ledger_sources'))) and not getattr(args,'plan_only',False):
+        raise ValueError('GPU authorization needs a linked usage ledger before launch')
+    return prior,{**measured,'unitemized_gpu_hour_floor':prior-measured['gpu_hours'],'authorization':authorization}
+
+
+def registered_budget(prior,ledger):
+    authorization=ledger.get('authorization',LEGACY_GPU_AUTHORIZATION)
+    return {'previous_campaign_gpu_hours':prior,'prior_physical_usage':ledger,
+        'gpu_authorization':authorization,'combined_authorization_gpu_hours':authorization['gpu_hour_cap'],
+        'previous_usage_is_not_new_budget':True}
 
 
 def campaign_seed_plan(args):
@@ -175,6 +247,8 @@ def campaign_seed_plan(args):
     plan=validate_seed_plan(json.loads(Path(args.seed_plan).read_text()),history)
     if not getattr(args,'diagnosis_probes_only',False) and not plan['final_test']:
         raise ValueError('Core comparison requires registered final-test seeds')
+    if getattr(args,'generalization',False) and not plan['transfer']:
+        raise ValueError('Generalization requires registered transfer seeds')
     if getattr(args,'train_episodes',None) is not None and args.train_episodes!=len(plan['train']):
         raise ValueError('--train-episodes differs from the explicit seed plan')
     if getattr(args,'test_episodes',None) is not None and args.test_episodes!=len(plan['final_test']):
@@ -221,12 +295,11 @@ def make_protocol(args,out):
         reservation=core_cost_reservation(plan['final_test'])
         if reservation['episode_upper_seconds'] is None:
             raise ValueError('A comparable measured episode cost is required before reserving both policies')
-        reservation.update(episodes=2,gpu_seconds_estimate=2*reservation['episode_upper_seconds']+390)
+        reservation.update(episodes=2,gpu_seconds_estimate=2*reservation['episode_upper_seconds']+STARTUP_SHUTDOWN_SECONDS)
         return {'schema':'durable-campaign-v1','registered_unix':time.time(),'experiment_id':str(out),
             'protocol_kind':'exploratory-frozen-policy-pair-v1','source_sha256':source_identity(),'configs':configs,
             'seed_plan':plan,'seed_exposure_history':history,'pilot_test_seeds':plan['final_test'],
-            'budget_gpu_hours':args.gpu_hours,'maximum_wall_seconds':args.wall_hours*3600,
-            'previous_campaign_gpu_hours':prior,'prior_physical_usage':ledger,'combined_authorization_gpu_hours':8.,
+            'budget_gpu_hours':args.gpu_hours,'maximum_wall_seconds':args.wall_hours*3600,**registered_budget(prior,ledger),
             'maximum_servers':1,'minimum_free_mib':args.minimum_free_mib,'profile_full_sequence':False,
             'core_evaluation_reservation':reservation,'required_evaluation_labels':labels,
             'initial_pool_file_sha256':sha(ROOT/'artifacts/initial_pool.json'),
@@ -249,7 +322,7 @@ def make_protocol(args,out):
                    output=str(out),journal_path=str(out/'journal.sqlite3'))
         cfg['evolution']['preflight_required']=True
         configs[label]=apply_seed_plan(cfg,plan,history)
-    return {'registered_unix':time.time(),'schema':'durable-campaign-v1','experiment_id':str(out),
+    protocol={'registered_unix':time.time(),'schema':'durable-campaign-v1','experiment_id':str(out),
         'source_sha256':source_identity(),'configs':configs,'requested_training_arms':requested,
         'protocol_kind':'strict-input-preserving-pilot','seed_plan':plan,'seed_exposure_history':history,
         'historical_performance_reference':historical_reference(args),
@@ -261,8 +334,7 @@ def make_protocol(args,out):
         'controller_baselines':controller_baselines,
         'core_evaluation_reservation':core_cost_reservation(plan['final_test']),
         'all_arms_required':getattr(args,'require_all_arms',False),
-        'budget_gpu_hours':args.gpu_hours,'maximum_wall_seconds':args.wall_hours*3600,
-        'previous_campaign_gpu_hours':prior,'prior_physical_usage':ledger,'previous_usage_is_not_new_budget':True,
+        'budget_gpu_hours':args.gpu_hours,'maximum_wall_seconds':args.wall_hours*3600,**registered_budget(prior,ledger),
         'maximum_servers':args.max_gpus,'minimum_free_mib':args.minimum_free_mib,
         'profile_full_sequence':getattr(args,'profile_full_sequence',False),
         'resource_policy':'One pinned BF16 model per selected GPU; serial model requests by default; KEEP, encoder and simulator stay on CPU. No quantization or input reduction.',
@@ -271,10 +343,14 @@ def make_protocol(args,out):
                       'interval':'paired percentile 95%; independent training counts require artifact provenance'},
         'initial_pool_file_sha256':sha(ROOT/'artifacts/initial_pool.json'),
         'locks':{n:sha(ROOT/n) for n in ('research_sources.lock.json','research_models.lock.json','sources.lock.json','requirements.lock.txt','requirements-model.lock.txt')},
+        'keep_weights_sha256':json.loads((ROOT/'research_sources.lock.json').read_text())['published_weights_sha256'],
+        'policy_interface_sha256':{label:digest(policy_interface(config)) for label,config in configs.items()},
         'legacy_allocation':'Previously four GPUs used deadline=start+gpu_hours*3600/4; eight GPU-hours meant 120 wall minutes, training 85 minutes and rollout 83.5 minutes, including startup.',
-        'allocation':'Prioritize one B2 update; every later arm needs a fresh measured remaining-cost check. B4 reserves 20 old+20 candidate episodes. Generalization follows the main paired comparison.',
+        'allocation':'Reserve mandatory collection, profiling, updates, paired validation, final/required transfer and shutdown before launch. Refresh with each pending batch.',
         'scorer':'incremental_reference; experimental full-sequence cannot be adopted without a real-Qwen parity certificate',
         'selection':'Freeze completed_changed/completed_unchanged/completed_no_eligible_skill only. An interrupted pool is untrained_control, never a trained policy.'}
+    protocol['required_work_reservations']=[campaign_reservation(protocol,count) for count in range(1,args.max_gpus+1)]
+    return protocol
 
 
 def historical_batch(protocol,root=None,*,require_manifest=False):
@@ -370,8 +446,7 @@ def make_fixed_protocol(args,out):
         'generalization_seeds':plan['transfer'],
         'generalization_red':'aggressive','generalization_requested':args.generalization,
         'budget_gpu_hours':args.gpu_hours,'maximum_wall_seconds':args.wall_hours*3600,
-        'previous_campaign_gpu_hours':prior,'prior_physical_usage':ledger,'combined_authorization_gpu_hours':8.,
-        'previous_usage_is_not_new_budget':True,'maximum_servers':1,'minimum_free_mib':args.minimum_free_mib,
+        **registered_budget(prior,ledger),'maximum_servers':1,'minimum_free_mib':args.minimum_free_mib,
         'profile_full_sequence':args.profile_full_sequence,'maximum_profile_seconds':900.,
         'selector_probe':{'maximum_states':24,'include_controls':True,'epsilon':configs['B2']['selector']['epsilon'],
             'allowed_seeds':plan['train'],
@@ -415,7 +490,8 @@ def run_fixed_study(protocol,out,journal,servers,worker,remaining_seconds,switch
     episode_upper=max(measured)*1.1 if measured else 1100.
     required=(3*len(protocol['pilot_test_seeds'])+2*len(protocol['reject_only_prefix']))*episode_upper+900+90
     preflight={'episode_upper_seconds':episode_upper,'primary_and_reject_screen_seconds':required,
-        'remaining_seconds':remaining_seconds(),'full_twenty_pair_validation_gpu_hours':40*episode_upper/3600,
+        'remaining_seconds':remaining_seconds(),
+        'full_registered_validation_gpu_hours':2*len(protocol['rollout_validation_seeds'])*episode_upper/3600,
         'full_B3_B4_new_training':'deferred; no new training loop is claimed in this fixed-update study',
         'status':'passed' if required<=remaining_seconds() else 'deferred'}
     write(out/'preflight.json',preflight)
@@ -526,41 +602,109 @@ def run_fixed_study(protocol,out,journal,servers,worker,remaining_seconds,switch
     write(out/'historical_inputs_unchanged.json',{'passed':True,'files_sha256':protocol['fixed_update_source']['files_sha256']})
 
 
+def read_cost_progress(journal):
+    progress=journal.restore('campaign_cost_progress') or {}
+    for receipt in progress.get('evaluation_receipts',{}).values():
+        if any(not Path(path).is_file() or sha(Path(path))!=value for path,value in receipt.items()):
+            raise ValueError('A completed evaluation record changed after it was reserved as complete')
+    return progress
+
+
 def run_training_study(protocol,out,journal,servers,worker,remaining_seconds,switch_phase,abort):
-    """Complete the registered core first; budget-only optional deferrals retain it."""
-    from scripts.audit_training_cost import audit,profile_optimizer,preflight
-    core=protocol.get('core_evaluation_labels',['B0','B1','B2']);extensions={};trained_labels=[]
+    """Refresh the complete outstanding reservation before every pending update."""
+    from scripts.audit_training_cost import audit,profile_optimizer,optimizer_forecast,SHUTDOWN_SECONDS
+    core=protocol['core_evaluation_labels'];extensions={};trained_labels=[]
+    progress=read_cost_progress(journal)
+    for key in ('updates','collected','profiles','evaluation_receipts'):
+        progress.setdefault(key,{})
+    progress['evaluated_blocks']=list(progress['evaluation_receipts'])
+    all_required=protocol.get('all_arms_required',False)
     def evaluation_block(label):
         if label=='B2':return core
         static=protocol.get('controller_baselines',{}).get(label)
         return [static,label] if static else [label]
+    def save_progress():
+        journal.checkpoint('campaign_cost_progress',progress)
+    def reserve(label,phase):
+        scope=protocol
+        if not all_required and label!='B2':
+            scope={**protocol,'all_arms_required':True,'requested_training_arms':[label],
+                   'core_evaluation_labels':evaluation_block(label),'generalization_requested':False}
+            state={**progress,'evaluated_blocks':['core'] if label in progress['evaluated_blocks'] else []}
+        else:
+            state=progress
+        result=campaign_reservation(scope,len(servers),progress=state,usage=journal.budget_usage(),starting=False)
+        journal.checkpoint('remaining_required_work',result)
+        write(out/f'remaining-work-{time.time_ns()}.json',{'phase':phase,'arm':label,**result})
+        if result['status']!='passed':
+            raise BudgetExceeded(f'Outstanding required work does not fit during {phase}: {label}')
+        return result
     def train(label):
         switch_phase('training_'+label)
-        dest,job=worker(label,'train',servers[0]['port']);checkpoint=dest/'checkpoint.json'
-        if not checkpoint.exists() or not json.loads(checkpoint.read_text()).get('history'):
-            pending=journal.restore('pending_batch:1:'+label) or journal.restore('pending_batch:1')
-            if not pending:raise IncompleteOptimization('No complete pending training batch for '+label)
-            measurements=profile_optimizer(out,label,pending,servers[0]['port'])
-            estimate=preflight(protocol,measurements,journal.budget_usage(),len(servers),label,
-                evaluation_labels=evaluation_block(label))
-            journal.checkpoint('preflight:'+label,estimate);write(out/('preflight-'+label+'.json'),estimate)
-            if estimate['status']!='passed':raise BudgetExceeded('Measured training plus reserved evaluation does not fit: '+label)
+        reserve(label,'collection')
+        cfg=protocol['configs'][label]
+        while True:
             dest,job=worker(label,'train',servers[0]['port'])
-        if job['status']!='completed':raise IncompleteOptimization('Optimizer did not finish: '+label)
-        trained=json.loads(checkpoint.read_text());cfg=protocol['configs'][label]
+            checkpoint=dest/'checkpoint.json'
+            trained=json.loads(checkpoint.read_text()) if checkpoint.is_file() else {}
+            completed=len(trained.get('history',[]))
+            progress['updates'][label]=completed
+            if job['status']=='completed':
+                break
+            iteration=completed+1
+            if job.get('failure_status')!='waiting_for_cost_preflight' or iteration>cfg['iterations']:
+                raise IncompleteOptimization('Optimizer did not finish: '+label)
+            pending=journal.restore(f'pending_batch:{iteration}:{label}')
+            if not pending:
+                raise IncompleteOptimization('No complete pending training batch for '+label)
+            batch=optimizer_batch_identity(pending)
+            key=f'preflight:{label}:{iteration}'
+            previous=journal.restore(key)
+            if previous and previous.get('status')=='passed':
+                raise IncompleteOptimization('Worker is waiting on a previously approved optimizer batch: '+label)
+            progress['collected'][label]=pending['environment_episodes_completed']
+            save_progress()
+            reserve(label,'before_cost_profile')
+            deadline=time.time()+remaining_seconds()-SHUTDOWN_SECONDS
+            measurements=profile_optimizer(out,label,pending,servers[0]['port'],iteration=iteration,deadline=deadline)
+            forecast=optimizer_forecast(measurements)
+            if forecast['status']!='estimated':
+                write(out/f'preflight-{label}-{iteration:04d}.json',{'batch_identity':batch,**forecast})
+                raise BudgetExceeded('An actual optimizer cost forecast is unavailable: '+label)
+            progress['episode_upper_seconds']=max(progress.get('episode_upper_seconds',0),
+                measurements['episode_upper_seconds'])
+            progress['profiles'][label]={'iteration':iteration,'batch_identity':batch,**forecast}
+            save_progress()
+            try:
+                estimate=reserve(label,'after_cost_profile')
+            except BudgetExceeded:
+                estimate=journal.restore('remaining_required_work')
+                journal.checkpoint(key,{'batch_identity':batch,**estimate})
+                write(out/f'preflight-{label}-{iteration:04d}.json',{'batch_identity':batch,**estimate})
+                raise
+            approval={'batch_identity':batch,'profile':forecast,**estimate}
+            journal.checkpoint(key,approval)
+            write(out/f'preflight-{label}-{iteration:04d}.json',approval)
         if (trained.get('pending_experiences') or trained.get('optimizer_status') not in COMPLETED_OPTIMIZER_STATUSES or
                 trained.get('training_completed') is False or trained.get('episodes_completed',0)<cfg['train_episodes'] or
                 len(trained.get('history',[]))<cfg['iterations']):
             raise IncompleteOptimization('No completed registered training plan: '+label)
+        progress['collected'][label]=trained['episodes_completed']
+        save_progress()
         frozen=out/'frozen'/f'{label}.json'
         if frozen.exists() and sha(frozen)!=sha(checkpoint):raise ValueError('Frozen policy changed')
         if not frozen.exists():write(frozen,trained)
-    def evaluate(labels,seeds,reds=('finite',)):
-        estimate=journal.restore('episode_cost_upper_seconds')
+    def evaluate(block,labels,seeds,reds=('finite',)):
+        if block in progress['evaluated_blocks']:
+            return
+        if block!='transfer' or all_required:
+            reserve('B2' if block in ('core','transfer') else block,'before_frozen_evaluation')
+        estimate=max((protocol['core_evaluation_reservation']['episode_upper_seconds'] or 0),
+                     (progress.get('episode_upper_seconds') or 0))
         required=len(labels)*len(seeds)*len(reds)
-        if estimate is None or required*estimate/len(servers)+60>remaining_seconds():
+        if not estimate or math.ceil(required/len(servers))*estimate+60>remaining_seconds():
             raise BudgetExceeded('Complete predeclared evaluation block does not fit')
-        pending=queue.Queue()
+        pending=queue.Queue();records={};records_lock=threading.Lock()
         for red in reds:
             for seed in seeds:
                 for label in labels:pending.put((label,seed,red))
@@ -571,43 +715,47 @@ def run_training_study(protocol,out,journal,servers,worker,remaining_seconds,swi
                 try:
                     static=label=='B1' or CONTROLLER_VARIANTS.get(label)=='B1'
                     pool=None if label=='B0' else ROOT/'artifacts/initial_pool.json' if static else out/'frozen'/f'{label}.json'
-                    _,job=worker(label,'evaluate',port,seed,red,pool)
+                    dest,job=worker(label,'evaluate',port,seed,red,pool)
                     if job['status']!='completed' or job.get('summary_status')!='completed':raise IncompleteOptimization('Required evaluation incomplete')
+                    summary=dest/'summary.json'
+                    with records_lock:records[str(summary)]=sha(summary)
                 except BaseException:abort.set();raise
                 finally:pending.task_done()
         with ThreadPoolExecutor(max_workers=len(servers)) as executor:
             for future in [executor.submit(queue_worker,s['port']) for s in servers]:future.result()
-    train('B2');switch_phase('core_frozen_test');evaluate(core,protocol['pilot_test_seeds'])
+        if len(records)!=required:
+            raise IncompleteOptimization('Evaluation block has unverified episode receipts')
+        progress['evaluation_receipts'][block]=records
+        progress['evaluated_blocks']=list(progress['evaluation_receipts'])
+        save_progress()
+    train('B2');switch_phase('core_frozen_test');evaluate('core',core,protocol['pilot_test_seeds'])
     write(out/'core_comparison.json',{'status':'completed','labels':core,'seeds':protocol['pilot_test_seeds'],
         'actual_episodes':len(core)*len(protocol['pilot_test_seeds']),'optional_arms_not_selected_by_reward':True})
     for label in protocol['requested_training_arms']:
         if label=='B2':continue
-        first=journal.restore('profile:B2') or {}
-        estimate=preflight(protocol,first,journal.budget_usage(),len(servers),label,
-            include_collection=True,evaluation_labels=evaluation_block(label))
-        journal.checkpoint('extension_plan:'+label,estimate)
-        if estimate['status']!='passed':
-            extensions[label]={'status':'deferred_budget','estimate':estimate};write(out/'extension_status.json',extensions)
-            if protocol.get('all_arms_required'):raise BudgetExceeded('Required extension does not fit: '+label)
-            continue
-        try:train(label);switch_phase('optional_frozen_test_'+label);evaluate(evaluation_block(label),protocol['pilot_test_seeds'])
+        try:
+            train(label);switch_phase('extension_frozen_test_'+label)
+            evaluate(label,evaluation_block(label),protocol['pilot_test_seeds'])
         except BudgetExceeded as exc:
             extensions[label]={'status':'deferred_budget','reason':str(exc)};write(out/'extension_status.json',extensions)
-            if protocol.get('all_arms_required'):raise
+            if all_required:raise
             continue
         trained_labels.extend(evaluation_block(label));extensions[label]={'status':'completed'};write(out/'extension_status.json',extensions)
     if protocol.get('generalization_requested'):
         switch_phase('generalization_test')
-        try:evaluate(core+trained_labels,protocol['generalization_seeds'],('aggressive','stealthy','impact','degrade'))
-        except BudgetExceeded as exc:write(out/'generalization_preflight.json',{'status':'deferred_budget','reason':str(exc)})
+        try:evaluate('transfer',core+trained_labels,protocol['generalization_seeds'],REDS[1:])
+        except BudgetExceeded as exc:
+            write(out/'generalization_preflight.json',{'status':'deferred_budget','reason':str(exc)})
+            if all_required:raise
     audit(out)
 
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output',type=Path,required=True)
-    parser.add_argument('--gpu-hours',type=float,default=8.)
+    parser.add_argument('--gpu-hours',type=float,default=LEGACY_GPU_AUTHORIZATION['gpu_hour_cap'])
     parser.add_argument('--wall-hours',type=float,default=8.)
+    parser.add_argument('--authorization',type=Path,help='Explicit approved cumulative GPU cap and usage-ledger scope')
     parser.add_argument('--max-gpus',type=int,choices=range(1,5),default=1)
     parser.add_argument('--minimum-free-mib',type=int,default=21000)
     parser.add_argument('--profile-full-sequence',action='store_true',help='Opt in to the memory-intensive experimental scorer probe; reference scoring is unchanged')
@@ -622,8 +770,8 @@ def main():
     parser.add_argument('--diagnosis-probe-count',type=int,default=6,choices=range(1,13))
     parser.add_argument('--train-episodes',type=int,help='Must equal the explicit training seed count')
     parser.add_argument('--iterations',type=int,default=1,help='Actual training optimizer iterations; full six/three requires explicit plan')
-    parser.add_argument('--require-all-arms',action='store_true',help='Treat all registered arms as required rather than optional extensions')
-    parser.add_argument('--prior-gpu-hours',type=float,default=None,help='Carry-in from the existing eight GPU-hour authorization; required for --fixed-update-from')
+    parser.add_argument('--require-all-arms',action='store_true',help='Reserve all registered training/evaluation arms up front')
+    parser.add_argument('--prior-gpu-hours',type=float,default=None,help='Recorded GPU carry-in floor for the same authorization')
     parser.add_argument('--test-episodes',type=int,default=None,choices=range(1,101))
     parser.add_argument('--arms',nargs='+',choices=['B2','B3-no-support','B3','B4',*VERIFICATION_VARIANTS,
         *[name for name,base in CONTROLLER_VARIANTS.items() if base=='B3']],default=['B2'])
@@ -634,7 +782,8 @@ def main():
     args=parser.parse_args()
     if args.frozen_policy_pilot and (args.fixed_update_from or args.diagnosis_probes_only):raise ValueError('Frozen pilot and historical diagnosis are separate protocols')
     if args.diagnosis_probes_only and not args.fixed_update_from:raise ValueError('Diagnosis probes require the exact historical training source')
-    if not 0<args.gpu_hours<=8 or args.wall_hours<=0:raise ValueError('New authorized cap is at most eight GPU-hours; wall cap is independent')
+    if not math.isfinite(args.gpu_hours) or args.gpu_hours<=0 or not math.isfinite(args.wall_hours) or args.wall_hours<=0:
+        raise ValueError('Positive finite GPU-hour and wall-hour caps are required')
     if args.minimum_free_mib<18000:raise ValueError('Do not lower the pinned BF16 model memory requirement to use a busy GPU')
     out=args.output.resolve();out.mkdir(parents=True,exist_ok=True)
     # Serialize campaign ownership, including resume and cleanup.
@@ -650,6 +799,10 @@ def main():
         if not args.cleanup_only:
             if source_identity()!=protocol['source_sha256']:raise ValueError('Source changed: use a new experiment ID')
             if (args.gpu_hours,args.wall_hours*3600)!=(protocol['budget_gpu_hours'],protocol['maximum_wall_seconds']):raise ValueError('Resume cannot reset budget caps')
+            registered=protocol.get('gpu_authorization',LEGACY_GPU_AUTHORIZATION)
+            source=args.authorization or registered.get('file')
+            if read_gpu_authorization(source)!=registered:
+                raise ValueError('Resume must retain the registered GPU authorization')
     else:
         if args.cleanup_only:return
         protocol=make_protocol(args,out)
@@ -674,21 +827,55 @@ def main():
         write(out/'cleanup.json',{'stopped':cleanup,**verify_release(registry)});return
     reservation=protocol.get('core_evaluation_reservation',{})
     required=reservation.get('gpu_seconds_estimate')
+    planned_work=protocol.get('required_work_reservations')
     if args.plan_only:
         labels=protocol.get('required_evaluation_labels',[])
         write(out/'preflight.json',{'status':'not_measured','reason':'No GPU calls in plan-only mode','budget':journal.budget_usage(),
             'planned_first_arm':labels[0] if labels else 'B2',
             'reserved_evaluation_gpu_seconds':required,
             'reservation_fits_gpu_cap':required<=protocol['budget_gpu_hours']*3600 if required is not None else None,
+            'required_work_reservations':planned_work,
+            'required_work_fits_caps':any(r['status']=='passed' for r in planned_work) if planned_work is not None else None,
             'later_arms':'deferred_until_measured_cost_fits'})
         print(json.dumps({'status':'planned','output':str(out)}));return
     completed=out/'completion.json'
     if completed.exists() and json.loads(completed.read_text()).get('status')=='completed':
         print(json.dumps({'status':'reused_completed_campaign','new_gpu_sessions':0,'output':str(out)}));return
-    if required is not None and required>protocol['budget_gpu_hours']*3600:
-        write(out/'completion.json',{'status':'deferred_budget','reason':'Reserved mandatory core evaluation alone exceeds the cap',
+    authorization=protocol.get('gpu_authorization',LEGACY_GPU_AUTHORIZATION)
+    def defer_launch(reason, estimates=None):
+        write(out/'completion.json',{'status':'deferred_budget','reason':reason,'required_work_reservations':estimates,
             'core_reservation':reservation,'new_campaign_usage':journal.budget_usage(),'all_owned_resources_released':True})
-        print(json.dumps({'status':'deferred_budget','new_gpu_sessions':0,'output':str(out)}));return
+        print(json.dumps({'status':'deferred_budget','new_gpu_sessions':0,'output':str(out)}))
+    if planned_work is None and required is not None and (
+            required>protocol['budget_gpu_hours']*3600 or required>protocol['maximum_wall_seconds']):
+        defer_launch('Reserved mandatory evaluation exceeds the GPU-hour or wall cap')
+        return
+    # Reconcile under a shared lease immediately before a real launch/resume.
+    # A new output and an older carry-in record cannot independently spend the
+    # same remaining scope.
+    budget_root=ROOT/'research_outputs'
+    budget_root.mkdir(parents=True,exist_ok=True)
+    scope_lease=(budget_root/('.gpu-budget-'+digest(authorization['scope'])[:16]+'.lock')).open('a')
+    try:fcntl.flock(scope_lease,fcntl.LOCK_EX|fcntl.LOCK_NB)
+    except BlockingIOError:raise RuntimeError('A campaign is already using this GPU authorization scope')
+    carry=SimpleNamespace(gpu_hours=protocol['budget_gpu_hours'],wall_hours=protocol['maximum_wall_seconds']/3600,
+        usage_ledger=(protocol.get('prior_physical_usage') or {}).get('sources',[]),
+        prior_gpu_hours=protocol.get('previous_campaign_gpu_hours',0))
+    _,live_ledger=campaign_budget(carry,authorization=authorization,exclude=out)
+    write(out/f'authorization-check-{time.time_ns()}.json',live_ledger)
+    def fitting_replicas(limit):
+        if planned_work is None:
+            return limit,None
+        progress=read_cost_progress(journal)
+        usage=journal.budget_usage()
+        estimates=[campaign_reservation(protocol,count,progress=progress,usage=usage) for count in range(1,limit+1)]
+        fit=max((r['replicas'] for r in estimates if r['status']=='passed'),default=0)
+        write(out/f'required-work-preflight-{time.time_ns()}.json',{'selected_replicas':fit,'estimates':estimates})
+        return fit,estimates
+    replica_count,estimates=fitting_replicas(protocol['maximum_servers'])
+    if not replica_count:
+        defer_launch('Complete required work cannot be reserved within both caps',estimates)
+        return
     available,all_gpus=available_gpus(protocol['minimum_free_mib'])
     write(out/'resource_check.json',{'checked_unix':time.time(),'gpus':all_gpus,'eligible':available})
     if not available:
@@ -710,9 +897,14 @@ def main():
         write(out/'completion.json',{'status':'blocked_resources','reason':'GPU capacity changed during CPU asset verification',
             'new_campaign_usage':journal.budget_usage(),'all_owned_resources_released':True})
         print(json.dumps({'status':'blocked_resources','output':str(out)}));return
-    journal.budget_configure(protocol['budget_gpu_hours'],protocol['maximum_wall_seconds'])
+    replica_count,estimates=fitting_replicas(min(len(available),protocol['maximum_servers']))
+    if not replica_count:
+        defer_launch('Complete required work cannot be reserved with the available GPU count',estimates)
+        return
+    journal.budget_configure(protocol['budget_gpu_hours'],protocol['maximum_wall_seconds'],
+        authorization=authorization,prior_gpu_hours=protocol.get('previous_campaign_gpu_hours',0))
     journal.check_budget()
-    available=available[:protocol['maximum_servers']]
+    available=available[:replica_count]
     servers=[];processes=[];jobs=json.loads((out/'jobs.json').read_text()) if (out/'jobs.json').exists() else [];failure=None
     abort=threading.Event()
     phases=journal.restore('resource_phases') or []
@@ -773,8 +965,15 @@ def main():
         finally:
             if process.poll() is None:stop_owned(entry);process.wait()
         job.update(status='completed' if process.returncode==0 else 'incomplete',returncode=process.returncode,finished_unix=time.time())
+        if process.returncode and (dest/'failure.json').is_file():
+            job['failure_status']=json.loads((dest/'failure.json').read_text()).get('status')
         if (dest/'summary.json').exists():
             summary=json.loads((dest/'summary.json').read_text());job.update(summary_status=summary['status'],completed_episodes=len(summary.get('episodes',[])))
+            if stage=='evaluate' and job['status']=='completed':
+                episodes=summary.get('episodes',[])
+                if (summary.get('result_kind')!='real_cage4' or len(episodes)!=1 or episodes[0].get('seed')!=seed
+                        or episodes[0].get('status')!='completed' or episodes[0].get('kind')!='real_cage4'):
+                    job['status']='incomplete'
         write(out/'jobs.json',jobs)
         return dest,job
     def interrupted(signum,frame):
@@ -814,7 +1013,8 @@ def main():
                 pool=None if label=='B0' else ROOT/'artifacts/initial_pool.json'
                 for seed in protocol['pilot_test_seeds']:
                     _,job=worker(label,'evaluate',servers[0]['port'],seed,pool=pool)
-                    if job.get('summary_status')!='completed':raise IncompleteOptimization('Required exploratory episode incomplete; no paired claim')
+                    if job.get('status')!='completed' or job.get('summary_status')!='completed':
+                        raise IncompleteOptimization('Required exploratory episode incomplete; no paired claim')
             return
         if protocol['protocol_kind'] in ('fixed-committed-update-verification-v1','historical-diagnosis-probes-v1'):
             run_fixed_study(protocol,out,journal,servers,worker,remaining_seconds,switch_phase)
@@ -822,6 +1022,9 @@ def main():
         run_training_study(protocol,out,journal,servers,worker,remaining_seconds,switch_phase,abort)
     except BaseException as exc:
         failure={'type':type(exc).__name__,'error':str(exc)}
+        previous=out/'failure.json'
+        if previous.exists():
+            previous.replace(out/f'failure-{time.time_ns()}.json')
         write(out/'failure.json',failure)
     finally:
         # Ignore a second interrupt while stopping owned children and persisting accounting.
@@ -841,7 +1044,8 @@ def main():
         release=verify_release(registry)
         switch_phase('stopped')
         write(out/'cleanup.json',{'stopped':cleanup,**release})
-        write(out/'completion.json',{'status':'partial' if failure else 'completed','failure':failure,
+        status='deferred_budget' if failure and failure['type']=='BudgetExceeded' else 'partial' if failure else 'completed'
+        write(out/'completion.json',{'status':status,'failure':failure,
             'new_campaign_usage':journal.budget_usage(),'job_statuses':jobs,**release})
         for sig,handler in previous_handlers.items():signal.signal(sig,handler)
         from scripts.report_experiment import report_experiment

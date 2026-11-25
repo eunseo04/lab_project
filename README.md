@@ -59,19 +59,22 @@ python3 scripts/recompute_public_metrics.py --episodes research_outputs/new/repo
 
 B2–B4의 학습 후 성능은 완료한 훈련 Pool로 평가한다. 초기 Pool을 명시해 평가한 경우 새 비교 도구는 `untrained_control`로 분리한다. 기존 출력 경로를 덮어쓰지 말고 새 실험 경로를 지정한다. 생성한 결과는 Git에서 제외한다.
 
-예산 관리자는 완료한 B2의 **B0/B1/B2 동결 평가를 먼저 확보**하고 선택적 군을 실행한다. 선택 확장이 예산에 맞지 않으면 해당 군만 `deferred_budget`이며, 모든 군이 필수인 계획은 `--require-all-arms`로 구분한다. 기본 GPU는 1개다. GPU-hour는 기동·idle·정리까지 합산하며 wall cap과 독립이다. 새 디렉터리는 새 8시간 승인이 아니다. `--usage-ledger`의 물리적 session을 중복 제거하고 이후 연결된 사용 기록까지 반영한다. resume은 등록된 cap을 초기화하지 않는다.
+예산 관리자는 필수군의 수집·비용 측정·optimizer·후보 검증·동결 평가·정리를 GPU 시작 전에 예약한다. `--require-all-arms`이면 요청한 모든 군과 등록된 전이 평가를 포함한다. 선택 확장이 예산에 맞지 않으면 해당 군은 `deferred_budget`이고 B0/B1/B2 결과는 남는다. 기본 GPU는 1개다. GPU-hour는 기동·idle·정리까지 합산하며 wall cap과 독립이다.
+
+별도 승인 파일이 없으면 기존 `cage4-research`의 누적 8 GPU-hour가 적용된다. `--authorization`은 실제 승인된 `scope`, 누적 `gpu_hour_cap`, `approval_reference`를 가진 JSON을 받는다. 파일에 `ledger_sources`를 넣거나 `--usage-ledger`로 기존 completion을 연결한다. 같은 scope를 연장하면 이미 쓴 시간도 포함한다. `--gpu-hours`는 이번 실행 예약이며 `--wall-hours`는 별도 제한이다. 계획과 journal에 승인 파일 해시·물리 세션·carry-in을 기록하고 재개에서 같은 제한을 사용한다.
 
 이전 실행기의 4-GPU `--gpu-hours 8`은 8 wall-hour가 아니라 전체 120분이었다. 학습 마감은 85분, 후보 검증 마감은 83.5분이고 기동도 그 안에 포함됐다. 현 실행기는 이 고정 35분 분할 대신 실제 수집·SG·집계/Best-of-N·score 표본으로 남은 경로를 검사한다. B4는 이전 Pool 20회 + 후보 Pool 20회와 최종 비교 비용을 확보해야 한다.
 
 ```bash
 # SEED_PLAN은 아래 스키마의 명시적 JSON, PRIOR_COMPLETION은 기존 사용 ledger다.
-# 계획만 저장: GPU 사용 없음. GPU cap은 실제 잔여 한도 이하로 지정한다.
+# GPU 없이 B0–B3 1-update 계획 저장. GPU cap은 승인 장부의 잔여 안에서 지정한다.
 .venv/bin/python scripts/run_campaign.py --output "$PWD/research_outputs/pilot-new" \
   --seed-plan "$SEED_PLAN" --usage-ledger "$PRIOR_COMPLETION" \
-  --gpu-hours 1 --wall-hours 1 --max-gpus 1 --arms B2 --iterations 1 --plan-only
+  --gpu-hours "$CAMPAIGN_GPU_HOURS" --wall-hours "$CAMPAIGN_WALL_HOURS" \
+  --max-gpus 1 --arms B2 B3 --require-all-arms --iterations 1 --test-episodes 2 --plan-only
 # 같은 계획 실행/재개. 여유 GPU가 없으면 다른 사용자 작업을 건드리지 않고 기록 후 종료
 .venv/bin/python scripts/run_campaign.py --output "$PWD/research_outputs/pilot-new" \
-  --gpu-hours 1 --wall-hours 1 --resume
+  --gpu-hours "$CAMPAIGN_GPU_HOURS" --wall-hours "$CAMPAIGN_WALL_HOURS" --resume
 # 확장하려면 별도 계획을 사전등록: --arms B2 B3-no-support B3 B4
 # 기존 캠페인의 소유 PID만 확인해 정리: 위 실행기에 --cleanup-only --resume
 ./research.sh report research_outputs/pilot-new --reasoning
@@ -127,7 +130,7 @@ v2 재현 묶음은 현재 output 밖의 과거 checkpoint/journal/훈련 trace/
 
 보고기의 `bottleneck_report.json`, `optimizer_progress.json`, `resume_verification.json`, `diagnosis_evaluation.json`, `performance.md`/`metrics.json`, `skill_changes.json`, `reproducibility_manifest.json`과 압축 bundle을 확인한다. compact episode 지표만으로는 optimizer나 원시 prompt를 복원할 수 없다. 캠페인은 성공·예산 종료·예외·TERM 모두에서 기록된 자기 PID/자식 worker만 종료하고 GPU PID·메모리·포트를 확인한다. 이 작업은 Git commit/push나 외부 업로드를 자동 실행하지 않는다.
 
-비용 예측은 실측 길이가 가까운 prompt 표본과 전체 SG token 길이 목록을 사용한다. 실측 최대 출력에 여유를 더한 보수적 예상과 모든 호출이 768 token을 채우는 용량 추정을 별도로 기록하며, 실제 생성 상한은 유지한다. 예상이 빗나가면 동일 누적 GPU/wall cap에서 저장 후 중단한다.
+비용 예측은 배치마다 해당 arm의 실제 입력 길이, SG·후보 표본, exact-token scoring, 수집 시간을 사용한다. 같은 모델·prompt·target token의 exact score는 저장한 값을 재사용한다. 비용 측정용 생성은 별도 seed를 쓰며 optimizer 입력에서 분리한다. 첫 예약에서 미측정 optimizer는 과거 계수인 추정치로 표시하고, 배치별 측정 뒤 모든 필수군의 잔여 경로를 다시 계산한다. 예상이 빗나가면 동일 GPU/wall cap에서 journal과 checkpoint를 보존한다.
 
 새 검증은 `--variant B2-ASV`, `B2-SSV`, `B2-ASV-SSV`, `B2-ASV-SSV-RV` 및 `B4-ASV`, `B4-SSV`, `B4-ASV-SSV`로 선택한다. 기존 B2/B3/B4의 정의와 설정 파일은 복제하지 않는다. ASV는 PPO가 평가한 행동, 실제 시작·완료, 관찰 조건을 구분하고 변경된 절차의 지원 범위 밖 행동에는 실제 rollout을 요구한다. SSV는 같은 훈련 관찰에서 기존 upstream selector를 호출하고 선택 변화·집중·사라진 Skill을 기록한다. 원래 Python RNG와 live 모델 counter를 보존하며 재생 선택을 환경 보상으로 해석하지 않는다.
 

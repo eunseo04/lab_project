@@ -2,6 +2,7 @@
 from contextlib import contextmanager
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import random
@@ -12,12 +13,33 @@ import time
 import zlib
 
 
+LEGACY_GPU_AUTHORIZATION = {'scope': 'cage4-research', 'gpu_hour_cap': 8.0}
+
+
+def validate_budget_limits(gpu_hours, wall_seconds, authorization, prior_gpu_hours=0.0):
+    cap = authorization.get('gpu_hour_cap')
+    scope = authorization.get('scope')
+    if not isinstance(scope, str) or not scope.strip():
+        raise ValueError('GPU authorization needs an explicit ledger scope')
+    for value in (gpu_hours, wall_seconds, prior_gpu_hours, cap):
+        if type(value) not in (int, float) or not math.isfinite(value):
+            raise ValueError('GPU reservation, authorization, carry-in and wall cap must be finite')
+    if gpu_hours < 0 or wall_seconds <= 0 or prior_gpu_hours < 0 or cap <= 0:
+        raise ValueError('Positive authorization and wall cap and nonnegative GPU usage are required')
+    if gpu_hours + prior_gpu_hours > cap + 1e-9:
+        raise ValueError(f'Prior usage plus the campaign reservation exceeds the {cap:g} GPU-hour authorization for {scope}')
+
+
 class BudgetExceeded(RuntimeError):
     pass
 
 
 class IncompleteOptimization(RuntimeError):
     pass
+
+
+class OptimizerPreflightRequired(IncompleteOptimization):
+    """A saved training batch is waiting for its measured cost reservation."""
 
 
 class TaskInProgress(RuntimeError):
@@ -40,6 +62,10 @@ def canonical(value):
 
 def digest(value):
     return hashlib.sha256(canonical(value).encode()).hexdigest()
+
+
+def optimizer_batch_identity(pending):
+    return digest([pending['trace_hash'],pending['resume_identity']])
 
 
 def implementation_identity(root):
@@ -242,16 +268,26 @@ class Journal:
         return [dict(zip(('seq','task_id','kind','status','context','metrics','created'),
                          [r[0],r[1],r[2],r[3],_unpack(r[4]),_unpack(r[5]),r[6]])) for r in rows]
 
-    def budget_configure(self, gpu_hours, wall_seconds, now=None):
-        if not 0 < gpu_hours <= 8 or wall_seconds <= 0:
-            raise ValueError('An explicit cap of at most eight GPU-hours and positive wall cap are required')
+    def budget_configure(self, gpu_hours, wall_seconds, now=None, *, authorization=None, prior_gpu_hours=0.0):
+        authorization = dict(LEGACY_GPU_AUTHORIZATION if authorization is None else authorization)
+        validate_budget_limits(gpu_hours, wall_seconds, authorization, prior_gpu_hours)
+        if gpu_hours == 0:
+            raise ValueError('A positive campaign GPU reservation is required to start a session')
+        provenance = {'authorization': authorization, 'prior_gpu_hours': prior_gpu_hours}
         now = time.time() if now is None else now
         with self.transaction() as db:
             previous = db.execute('SELECT gpu_hours,wall_seconds,created FROM budget_limits WHERE id=1').fetchone()
             if previous and (previous[0],previous[1]) != (gpu_hours,wall_seconds):
                 raise ValueError('Resume cannot reset or silently change registered budget limits')
+            registered = db.execute("SELECT value FROM checkpoints WHERE key='budget_authorization'").fetchone()
+            if registered and _unpack(registered[0]) != provenance:
+                raise ValueError('Resume cannot change the GPU authorization or its carry-in')
+            if previous and not registered and authorization != LEGACY_GPU_AUTHORIZATION:
+                raise ValueError('An existing legacy journal cannot be moved to another GPU authorization')
             if previous is None:
                 db.execute('INSERT INTO budget_limits VALUES(1,?,?,?)',(gpu_hours,wall_seconds,now))
+            if not registered:
+                db.execute('INSERT INTO checkpoints VALUES(?,?,?)',('budget_authorization',_pack(provenance),now))
 
     def budget_start(self, session_id, gpu_count, metadata=None, now=None):
         if gpu_count < 1:
@@ -271,10 +307,12 @@ class Journal:
         now = time.time() if now is None else now
         with self.lock:
             limit = self.db.execute('SELECT gpu_hours,wall_seconds,created FROM budget_limits WHERE id=1').fetchone()
+            authorization = self.db.execute("SELECT value FROM checkpoints WHERE key='budget_authorization'").fetchone()
             rows = self.db.execute('SELECT id,pid,start,last,stop,gpu_count,metadata FROM budget_sessions ORDER BY start').fetchall()
         seconds = sum(((r[4] if r[4] is not None else now)-r[2])*r[5] for r in rows)
         return {'gpu_hours':seconds/3600,'gpu_hour_cap':limit[0] if limit else None,
                 'wall_seconds':now-limit[2] if limit else 0,'wall_second_cap':limit[1] if limit else None,
+                'budget_authorization':_unpack(authorization[0]) if authorization else None,
                 'sessions':[{'id':r[0],'pid':r[1],'start':r[2],'heartbeat':r[3],'stop':r[4],'gpu_count':r[5],'metadata':_unpack(r[6])} for r in rows]}
 
     def check_budget(self, now=None):
