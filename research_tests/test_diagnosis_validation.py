@@ -230,6 +230,56 @@ def test_current_sleep_decision_is_not_the_previous_completed_remove():
     assert result['verified_facts'][0]['target'] is None
 
 
+def test_rendered_evidence_field_list_is_the_verifiers_actual_contract():
+    import re
+    from research.semantic_evidence import FIELDS
+    data,rows=sleep_decision_evidence();captured=[]
+    def model(prompt):captured.append(prompt);return json.dumps(data)
+    wrapper=EvidenceModel(model,rows,diagnosis_verification=True)
+    result=json.loads(wrapper('SG prompt'))
+    options=re.search(r'"field":"([^"\n]*\|[^"\n]*)"',captured[0]).group(1).split('|')
+    assert set(options)==set(FIELDS)
+    assert {'requested_decision','completed_or_pending_operation'}<=set(options)
+    assert result['is_related'] and wrapper.audits[-1]['passed']
+
+
+@pytest.mark.parametrize('previous,current,busy',[
+    ('Restore','Sleep',False),('Remove','Sleep',False),('Restore','Analyse h2',False),
+    ('Analyse','Sleep',True)])
+def test_claim_copied_from_actual_prompt_uses_its_own_target_and_epoch(previous,current,busy):
+    row={'step':5,'agent':'blue_agent_4','requested_action':current,
+        'policy_invoked':not busy,'request_applied':not busy,'action_status':'UNKNOWN',
+        'observation_before':{},'observation_after':{},'behavior_context':{}}
+    if busy:
+        row['action_status']='IN_PROGRESS'
+        row['behavior_context']['pending_action']={'name':previous,'target':'h1','started_at':3}
+    else:
+        row['behavior_outcome']={'completed_action':{'name':previous,'target':'h1',
+            'status':'TRUE','started_at':1,'completed_at':5}}
+    displayed=[]
+    def model(prompt):
+        text=prompt.split('# Actual recorded evidence IDs:\n',1)[1]
+        catalog=json.JSONDecoder().raw_decode(text)[0][0];displayed.append(catalog)
+        key='completed_or_pending_operation' if busy else 'requested_decision';op=catalog[key]
+        finding='pending' if busy else 'recorded_decision'
+        kind='wait_for_completion' if busy else 'review_recorded_decision'
+        return json.dumps({'is_related':True,'diagnosis_status':'supported','reward_attribution':'unknown',
+            'semantic_gradient':{'policy':'Review only the recorded fact.'},
+            'evidence':[{'component':'policy','evidence_id':'E0','field':key}],
+            'claims':[{'component':'policy','evidence_id':'E0','action':op['name'],'target':op['target'],
+                'finding':finding,'phase':'after','as_of_step':op['as_of_after'],
+                'restore_epoch':op['restore_epoch_after'],'causal_attribution':'unknown'}],
+            'proposals':[{'component':'policy','evidence_ids':['E0'],'observed_action':op['name'],
+                'operation':kind,'scope':'same_observed_host_and_epoch' if busy else 'same_observed_decision',
+                'causal_status':'untested_hypothesis'}]})
+    wrapper=EvidenceModel(model,[row],diagnosis_verification=True)
+    result=json.loads(wrapper('Original SG input'))
+    assert result['is_related'] and wrapper.audits[-1]['passed']
+    assert displayed[0]['requested_decision']['restore_epoch_after']==-1
+    if previous=='Restore':assert displayed[0]['completed_or_pending_operation']['restore_epoch_after']==5
+    if busy:assert not displayed[0]['requested_decision']['policy_invoked']
+
+
 def controlled_native_diagnosis_cases():
     """Real partial CAGE4 records under scripted actions, not an LLM performance run."""
     from research.adapter import make_environment,plain,BLUE_AGENTS

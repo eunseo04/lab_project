@@ -6,7 +6,8 @@ from collections import Counter, defaultdict
 
 COMPONENTS=('initiation','execution','termination')
 FIELDS=('requested_action','observation_before','observation_after','action_status','behavior_context','behavior_outcome',
-        'executed_actions','skill_terminated','policy_invoked','request_applied','joint_reward','parse_error','response','completed_action')
+        'executed_actions','skill_terminated','policy_invoked','request_applied','joint_reward','parse_error','response','completed_action',
+        'requested_decision','completed_or_pending_operation')
 
 
 def action_support(parent, candidate, experiences, gate_experiences):
@@ -63,7 +64,11 @@ def action_support(parent, candidate, experiences, gate_experiences):
     for key in accepted&executed:started[key[2]]+=1
     uncovered=sorted(a for a in referenced if not started[a] or not sum(completed[a].values()))
     unobserved_conditions=sorted(a for a in referenced if a in families and not conditions[a])
-    return {'schema':'action-support-v1','changed_components':changed,
+    # Literal mentions identify coverage, never the semantics of a changed rule.
+    # Unclassified prose (including indirect isolation) must not become approval.
+    unclassified=[field for field in changed if not mentioned(' '.join(getattr(candidate,field))
+        if isinstance(getattr(candidate,field),list) else getattr(candidate,field))]
+    return {'schema':'action-support-v2','changed_components':changed,
         'parent_named_actions':sorted(old_actions),'candidate_named_actions':sorted(new_actions),
         'newly_named_actions':sorted(new_actions-old_actions),'changed_guidance_actions':sorted(referenced),
         'gate_evaluated_requested_actions':dict(evaluated),'actual_started_actions':dict(started),
@@ -73,27 +78,79 @@ def action_support(parent, candidate, experiences, gate_experiences):
         'observable_condition_counts':dict(conditions),'observable_context_rows':context_rows,
         'changed_actions_without_observed_condition':unobserved_conditions,
         'actions_outside_empirical_execution_support':uncovered,
-        'requires_rollout':bool(uncovered or unobserved_conditions),'forbidden_actions':[],
+        'unclassified_changes':unclassified,'unverified_condition_procedure_termination':changed,
+        'semantic_status':'unknown' if changed else 'unchanged',
+        'requires_rollout':bool(changed or uncovered or unobserved_conditions),'forbidden_actions':[],
         'effect_verification':'Observed call outcomes and PPO likelihood do not establish defensive benefit; only a separate registered real-pool rollout can test it.',
         'intent_limit':'Explicit primitive mentions with simple direct negation handling; indirect natural-language intent is not fully classified.'}
 
 
-def candidate_supported(parent,candidate,gradient_records):
+def candidate_supported(parent,candidate,gradient_records,links=None):
     supported={component for item in gradient_records if item.get('related')
         for component,value in item['gradient'].items() if value.strip()}
     changed={component for component,field in [('initiation','initiation'),('execution','policy'),('termination','termination')]
         if getattr(parent,field)!=getattr(candidate,field)}
-    text=' '.join([candidate.initiation,*candidate.policy,candidate.termination])
-    instance=bool(re.search(r'_(?:user|server)_host_\d+|\b(?:\d{1,3}\.){3}\d{1,3}\b|\bF[a-f0-9]{16}\b|\bE\d+\b',text))
-    return {'passed':bool(changed) and changed<=supported and not instance,
+    text=' '.join([candidate.name,candidate.initiation,*candidate.policy,candidate.termination])
+    instance=bool(re.search(r'_(?:user|server)_host_\d+|\b(?:\d{1,3}\.){3}\d{1,3}\b|\b[FP][a-f0-9]{16}\b|\bE\d+\b',text))
+    proposals={};facts={}
+    for record in gradient_records:
+        for audit in record.get('evidence_audits',[]):
+            if not audit.get('passed'):continue
+            structured=audit.get('structured_proposals') or {}
+            facts.update({f['fact_id']:f for f in structured.get('facts',[])})
+            proposals.update({p['proposal_id']:p for p in structured.get('proposals',[])})
+    elements={}
+    for component,field in [('initiation','initiation'),('execution','policy'),('termination','termination')]:
+        if component not in changed:continue
+        after=getattr(candidate,field)
+        for index,value in enumerate(after if isinstance(after,list) else [after]):
+            # Keep unchanged individual policy steps outside the requested change.
+            before=getattr(parent,field)
+            if isinstance(after,list) and index<len(before) and before[index]==value:continue
+            elements[(component,index if isinstance(after,list) else None)]=value
+        if isinstance(after,list):
+            for index in range(len(after),len(before)):elements[(component,index)]=''
+    linked={};errors=[]
+    if links is not None and not isinstance(links,list):errors.append('invalid_change_links')
+    for link in links if isinstance(links,list) else []:
+        if not isinstance(link,dict):errors.append('invalid_change_link');continue
+        component='execution' if link.get('component')=='policy' else link.get('component')
+        if link.get('element') is not None and type(link.get('element')) is not int:
+            errors.append('invalid_candidate_element');continue
+        key=(component,link.get('element'));ids=link.get('proposal_ids',[])
+        selected=[proposals.get(p) if isinstance(p,str) else None for p in ids] if isinstance(ids,list) else []
+        if key not in elements or link.get('candidate_text')!=elements[key]:
+            errors.append('candidate_element_mismatch');continue
+        if not selected or any(p is None or p['component']!=component or
+                any(f not in facts for f in p['fact_ids']) for p in selected):
+            errors.append('candidate_without_validated_proposal');continue
+        linked[key]={'component':component,'element':key[1],'proposal_ids':ids,
+            'candidate_text_sha256':hashlib.sha256(elements[key].encode()).hexdigest(),
+            'fact_ids':sorted({f for p in selected for f in p['fact_ids']})}
+    if set(linked)!=set(elements):errors.append('unlinked_candidate_changes')
+    # A narrow contradiction of the pinned Remove implementation, not an NLP proof.
+    contradictions=[]
+    for sentence in re.split(r'[.!?\n]',text):
+        if re.search(r'\b(?:not|never|cannot|can.t)\b',sentence,re.I):continue
+        if re.search(r'\bRemove\b.*\b(?:TRUE|success\w*)\b.*\b(?:proves?|guarantees?|means)\b.*\b(?:all|every)\b.*\b(?:privileged|root|admin)\b.*\b(?:eliminat\w*|clear\w*|remov\w*|gone)\b',sentence,re.I):
+            contradictions.append('Remove_TRUE_does_not_prove_privileged_persistence_eliminated')
+    passed=bool(changed) and changed<=supported and not instance and not errors and not contradictions
+    from . import ROOT
+    rule_path=ROOT/'runtime/CybORG/Simulator/Actions/AbstractActions/Remove.py'
+    return {'passed':passed,'schema':'candidate-proposal-links-v2','scope':'typed linkage and narrow rules only',
         'changed_components':sorted(changed),'supported_components':sorted(supported),
-        'instance_specific_identifier':instance}
+        'instance_specific_identifier':instance,'change_links':list(linked.values()),'linkage_errors':errors,
+        'known_rule_contradictions':contradictions,'semantic_status':'contradiction' if contradictions else 'unknown',
+        'known_rule_source':{'path':str(rule_path),'sha256':hashlib.sha256(rule_path.read_bytes()).hexdigest() if rule_path.is_file() else None},
+        'semantics_verified':False,'requires_rollout':bool(changed),
+        'limitation':'A matching explicit link does not prove arbitrary prose agrees with the proposal or improves reward.'}
 
 
 def audit_references(data,rows):
     # completed_action is displayed in the catalogue; resolve it to the exact
     # recorded outcome rather than rejecting a field that our own prompt exposes.
-    resolved=[{**r,**({'completed_action':r['behavior_outcome']['completed_action']}
+    from .diagnosis import canonical_operations
+    resolved=[{**r,**canonical_operations(r,rows),**({'completed_action':r['behavior_outcome']['completed_action']}
         if (r.get('behavior_outcome') or {}).get('completed_action') else {})} for r in rows]
     lookup={(r['step'],r['agent']):r for r in resolved};valid=[];errors=[]
     catalog={f'E{i}':r for i,r in enumerate(resolved)}
@@ -137,13 +194,11 @@ class EvidenceModel:
         self.model,self.rows,self.audits=model,rows,[]
         self.diagnosis_verification=diagnosis_verification
     def __call__(self,prompt):
-        from .diagnosis import operation,restore_boundary
+        from .diagnosis import canonical_operations
         catalog=[{'evidence_id':f'E{i}',**{key:r.get(key) for key in
             ('step','agent','requested_action','action_status','policy_invoked','skill_terminated')},
             'completed_action':(r.get('behavior_outcome') or {}).get('completed_action'),
-            'own_operation':operation(r),'as_of_before':r['step'],'as_of_after':r['step']+1,
-            'restore_epoch_before':restore_boundary(self.rows,r['agent'],operation(r).get('target'),r['step']),
-            'restore_epoch_after':restore_boundary(self.rows,r['agent'],operation(r).get('target'),r['step']+1)}
+            **canonical_operations(r,self.rows)}
             for i,r in enumerate(self.rows)]
         # Keep the original three semantic-gradient components, and put the
         # provenance field IN the concrete output schema rather than only prose.
@@ -152,13 +207,18 @@ class EvidenceModel:
 ### Required evidence audit (Proposed extension)
 For EACH nonempty semantic_gradient component add an entry in a separate top-level
 evidence list: {"component":"initiation|policy|termination", "evidence_id":"E0",
-"field":"requested_action|observation_before|observation_after|action_status|completed_action|behavior_context|behavior_outcome|skill_terminated"}.
+"field":"'''+('|'.join(FIELDS))+'''"}.
 Use ONLY IDs from the actual-record catalog below. The verifier resolves each ID
 to the original step, acting Blue and exact field value. Do not reconstruct long
 JSON quotes. Cite a relevant record field for EVERY changed component.
 These IDs index the same execution trace; they supply no additional hidden state.
-Use the displayed own_operation, as_of_before/as_of_after and restore_epoch values
-exactly. A completed_action citation refers to behavior_outcome.completed_action.
+Use the displayed requested_decision for recorded_decision and the separate
+completed_or_pending_operation for completion/pending findings. Copy the as_of
+and restore_epoch from the chosen object; never copy another target's epoch.
+Prefer an evidence citation to requested_decision for a decision claim and to
+completed_or_pending_operation for completion/pending, or the exact observation
+field for PID/file/service findings. The field list above is shared with the verifier.
+A completed_action citation refers to behavior_outcome.completed_action.
 Sleep with UNKNOWN status has no completed-failure evidence. Omit unsupported components.
 Do not invent hidden sessions/service health or treat busy waiting as a failed
 decision. Negative JOINT reward does not establish which agent caused it.
@@ -178,6 +238,8 @@ Use actual IDs, not the schema placeholders. Omit entries for unchanged componen
         if self.diagnosis_verification:
             from .diagnosis import PROMPT,PROPOSAL_PROMPT
             prompt += PROMPT+PROPOSAL_PROMPT
+        if hasattr(self.model,'capture_evidence_rows'):
+            self.model.capture_evidence_rows(self.rows)
         raw=self.model(prompt)
         from .upstream import OriginalEvolution
         data=OriginalEvolution._parse_json_safely(self,raw)

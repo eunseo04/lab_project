@@ -15,7 +15,7 @@ from CybORG.Simulator.Actions import Sleep
 from .adapter import (BLUE_AGENTS, DefensePolicy, make_state, make_environment,
                       executed_actions, plain)
 from .client import ModelClient, TextModel
-from .config import digest, compatible_digest
+from .config import digest, compatible_digest, split_seeds
 from .metrics import JointRewardLedger, aggregate_episodes
 from .skills import SecuritySkillPool
 from .upstream import configure_encoder, Experience
@@ -253,6 +253,7 @@ def prepare_batch(config,pending_results,pending_experiences,pool,baselines):
 
 def run(config, stage="eval", output=None, resume=False, limit=None, client=None):
     if stage not in ("train","eval"): raise ValueError("Stage must be train or eval")
+    if stage=='eval' and config.get('evaluation_disabled'):raise ValueError('No evaluation seeds registered for this probe-only plan')
     if stage == "train" and (config["arm"] not in ("E2","E3") or config["composition"] not in ("hybrid","all_llm")):
         raise ValueError("Skill learning requires E2/E3 with hybrid/all_llm defenders")
     output = Path(output or Path(config["output"])/f"{config['arm']}-{config['composition']}-{config['red']}"/stage)
@@ -275,8 +276,12 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
                 raise ValueError("Implementation changed; use a new experiment directory: " + ", ".join(changed))
         else:
             atomic_json(identity_path, {"config": config, "config_digest": fingerprint, "stage": stage,
+                "training_run_id":hashlib.sha256((str(output.resolve())+':'+str(time.time_ns())).encode()).hexdigest() if stage=='train' else None,
+                "comparison_run_id":config.get('comparison_run_id',config.get('experiment_id',str(output.parent.resolve()))),
                 "sources": json.loads((ROOT/"research_sources.lock.json").read_text()),
                 "implementation_sha256": implementation})
+        manifest=json.loads(identity_path.read_text())
+        training_run_id=manifest.get('training_run_id')
         invocation_id = time.time_ns()
         atomic_json(output/"invocations"/f"{invocation_id}.json", {"config_digest": fingerprint,
             "resume": resume, "limit": limit, "implementation_sha256": implementation,'config':config})
@@ -301,6 +306,7 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
         checkpoint = json.loads(checkpoint_path.read_text()) if checkpoint_path.exists() else None
         training_provenance = None
         inherited = None
+        lineage_id=(checkpoint or {}).get('training_lineage_id') or training_run_id
         inherited_seeds = list((checkpoint or {}).get("inherited_training_seeds", []))
         inherited_episodes = (checkpoint or {}).get("inherited_training_episodes", 0)
         if stage == "train" and config.get("pool") and checkpoint is None:
@@ -311,15 +317,18 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
             if any(inherited["model_identity"].get(k) != client.identity.get(k) for k in ("model","revision")):
                 raise ValueError("Warm-start policy model differs")
             inherited_seeds = inherited.get("training_seeds", [])
-            if set(inherited_seeds) & set(range(config["eval_seed"],config["eval_seed"]+config["episodes"])):
+            if set(inherited_seeds) & set(split_seeds(config,'final_test')):
                 raise ValueError("Warm-start training/evaluation seeds overlap")
-            if set(inherited_seeds) & set(range(config["validation_seed"],config["validation_seed"]+config["validation_episodes"])):
+            if set(inherited_seeds) & set(split_seeds(config,'validation')):
                 raise ValueError("Warm-start training/validation seeds overlap")
             inherited_episodes = inherited.get("total_training_episodes",inherited["episodes_completed"])
+            lineage_id=inherited.get('training_lineage_id') or inherited.get('training_run_id') or 'historical:'+hashlib.sha256(initial_path.read_bytes()).hexdigest()
             pool.restore(inherited["pool"])
             if evolution: evolution.restore(inherited.get("experience",{}))
             training_provenance = {"path":str(initial_path.resolve()),
-                "sha256":hashlib.sha256(initial_path.read_bytes()).hexdigest(),"total_training_episodes":inherited_episodes}
+                "sha256":hashlib.sha256(initial_path.read_bytes()).hexdigest(),"total_training_episodes":inherited_episodes,
+                'initial_pool_sha256':inherited.get('initial_pool_sha256'),
+                'segment_initial_pool_sha256':hashlib.sha256(json.dumps(inherited['pool'],sort_keys=True).encode()).hexdigest()}
             atomic_json(output/"initial_pool.json",{"pool":pool.snapshot(),"training_provenance":training_provenance})
         if checkpoint and checkpoint.get("pool") is not None:
             pool.restore(checkpoint["pool"])
@@ -335,7 +344,7 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
                 raise ValueError("Training has an uncommitted evolution batch; resume training before frozen evaluation")
             if any(trained["model_identity"].get(k) != client.identity.get(k) for k in ("model","revision")):
                 raise ValueError("Skill pool was trained with another policy model")
-            if set(trained.get("training_seeds", [])) & set(range(config["eval_seed"], config["eval_seed"]+config["episodes"])):
+            if set(trained.get("training_seeds", [])) & set(split_seeds(config,'final_test')):
                 raise ValueError("Training/evaluation seeds overlap with the loaded pool")
             pool.restore(trained["pool"])
             training_provenance = {"path": str(pool_path.resolve()),
@@ -345,6 +354,14 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
                 "training_seeds": trained.get("training_seeds", []), "algorithm": trained.get("algorithm"),
                 "optimizer_status":trained.get('optimizer_status','unknown'),
                 "pool_changed":trained.get('pool_changed'),
+                'training_run_id':trained.get('training_run_id'),
+                'training_lineage_id':trained.get('training_lineage_id'),
+                'planned_training_episodes':trained.get('planned_training_episodes'),
+                'planned_optimizer_iterations':trained.get('planned_optimizer_iterations'),
+                'training_completed':trained.get('training_completed'),
+                'final_pool_sha256':hashlib.sha256(json.dumps(trained['pool'],sort_keys=True).encode()).hexdigest(),
+                'optimizer_history':[{'iteration':h['iteration'],'optimizer_status':h.get('optimizer_status'),
+                    'episodes':h.get('episodes')} for h in trained.get('history',[])],
                 'initial_pool_sha256':trained.get('initial_pool_sha256')}
         if pool and pool.seed_set!=config["skill_seed_set"]:
             raise ValueError("Stored skill seed set differs from the declared experiment")
@@ -361,7 +378,7 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
                 initial_pool_hash=hashlib.sha256(json.dumps(pool_before,sort_keys=True).encode()).hexdigest()
         completed, counter = [], 0
         planned = config["train_episodes"] if stage == "train" else config["episodes"]
-        start_seed = config["train_seed"] if stage == "train" else config["eval_seed"]
+        planned_seeds=split_seeds(config,'train' if stage=='train' else 'final_test')
         boundaries = {(i*planned+config["iterations"]-1)//config["iterations"]
                       for i in range(1,config["iterations"]+1)} if stage == "train" else {planned}
         pending_experiences = [Experience(**e) for e in checkpoint.get("pending_experiences", [])] if checkpoint else []
@@ -384,7 +401,7 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
                 if result.get("status") != "completed": raise ValueError("Cannot recover an incomplete episode result")
                 experiences=recover_episode(result,config,client,text_model,output)
             else:
-                result, experiences = run_episode(config, start_seed+episode, episode, client, pool, text_model, output)
+                result, experiences = run_episode(config, planned_seeds[episode], episode, client, pool, text_model, output)
             completed.append(result); pending_results.append(result); pending_experiences.extend(experiences)
             counter += int(not recovered)
             if stage == "train" and episode+1 in boundaries:
@@ -432,8 +449,8 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
                             probe_rows.extend(json.loads(line) for line in trace.open() if line.strip())
                         probe_rule={**config['evolution'].get('selection_shift_rule',{}),
                             'epsilon':config['selector']['epsilon'],
-                            'allowed_seeds':list(range(config['train_seed'],config['train_seed']+config['train_episodes'])),
-                            'forbidden_seeds':list(range(config['eval_seed'],config['eval_seed']+config['episodes']))}
+                            'allowed_seeds':split_seeds(config,'train'),
+                            'forbidden_seeds':split_seeds(config,'final_test')}
                         def verify_selector(previous,proposed):
                             key='selector_probe:'+progress_digest([previous,proposed,probe_rows,probe_rule,client.identity])
                             cached=journal.restore(key) if journal else None
@@ -456,7 +473,7 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
                     before_validation=pool.snapshot() if pool else None
                     for v in range(config["validation_episodes"]):
                         if client: client.calls=[]
-                        measured,_=run_episode(config,config["validation_seed"]+v,v,client,pool,text_model,validation_dir)
+                        measured,_=run_episode(config,split_seeds(config,'validation')[v],v,client,pool,text_model,validation_dir)
                         validation.append(measured)
                     if pool and pool.snapshot()!=before_validation: raise RuntimeError("Validation updated the skill pool")
                     ev["validation_reward_mean"]=aggregate_episodes(validation)["mean_joint_reward"]
@@ -464,10 +481,14 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
                 history.append({"iteration": len(history)+1, "episodes": episode+1,
                     "reward_mean": average, "baseline": baselines[task], **ev, "pool_snapshot": pool.snapshot() if pool else None})
                 snapshot = {"stage": "train", "pool": pool.snapshot() if pool else None,
+                    'training_run_id':training_run_id,
+                    'training_lineage_id':lineage_id,
+                    'planned_training_episodes':planned,'planned_optimizer_iterations':config['iterations'],
+                    'training_completed':episode+1==planned,
                     "episodes_completed": episode+1,
                     "total_training_episodes": inherited_episodes+episode+1,
                     "inherited_training_seeds": inherited_seeds, "inherited_training_episodes": inherited_episodes,
-                    "training_seeds": sorted(set(inherited_seeds)|set(range(start_seed, start_seed+episode+1))),
+                    "training_seeds": sorted(set(inherited_seeds)|set(planned_seeds[:episode+1])),
                     "model_identity": client.identity if client else None, "baselines": baselines,
                     "experience": evolution.snapshot() if evolution else {}, "history": history,
                     "config_digest": fingerprint, "algorithm": config["evolution"],
@@ -486,10 +507,14 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
                 # Persist the pending batch too, so a one-episode batch invocation
                 # resumes without rerunning or overwriting completed experience.
                 atomic_json(checkpoint_path, {"stage":"train", "pool":pool.snapshot() if pool else None,
+                    'training_run_id':training_run_id,
+                    'training_lineage_id':lineage_id,
+                    'planned_training_episodes':planned,'planned_optimizer_iterations':config['iterations'],
+                    'training_completed':False,
                     "episodes_completed":episode+1,
                     "total_training_episodes":inherited_episodes+episode+1,
                     "inherited_training_seeds":inherited_seeds,"inherited_training_episodes":inherited_episodes,
-                    "training_seeds":sorted(set(inherited_seeds)|set(range(start_seed,start_seed+episode+1))),
+                    "training_seeds":sorted(set(inherited_seeds)|set(planned_seeds[:episode+1])),
                     "model_identity":client.identity if client else None, "baselines":baselines,
                     "experience":evolution.snapshot() if evolution else {}, "history":history,
                     "pending_experiences":[e.__dict__ for e in pending_experiences],
@@ -506,6 +531,7 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
             "history": history, "planned_episodes": planned, "pool_frozen": stage == "eval",
             "model_identity": client.identity if client else None,
             "training_provenance": training_provenance,
+            'comparison_run_id':manifest.get('comparison_run_id'),
             'comparison_initial_pool_sha256':initial_pool_hash,
             "pool_sha256": hashlib.sha256(json.dumps(pool.snapshot() if pool else None, sort_keys=True).encode()).hexdigest(),
             "initial_pool_sha256": hashlib.sha256(json.dumps(pool_before, sort_keys=True).encode()).hexdigest()}

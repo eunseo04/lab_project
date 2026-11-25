@@ -7,26 +7,137 @@ from . import ROOT
 
 ARMS = ("E0", "E1", "E2", "E3")
 REDS = ("finite", "aggressive", "stealthy", "impact", "degrade")
-VERIFICATION_VARIANTS = ('B2-ASV','B2-SSV','B2-ASV-SSV','B2-ASV-SSV-RV',
-                         'B2-ASV-SSV-RV-screen','B4-ASV','B4-SSV','B4-ASV-SSV')
+VERIFICATION_VARIANTS = {name:{'base':'B4' if name.startswith('B4-') else 'B2',
+    'action_support_verification':'ASV' in name,'selection_shift_verification':'SSV' in name,
+    'rollout_verification':'-RV' in name or name.startswith('B4-')}
+    for name in ('B2-ASV','B2-SSV','B2-ASV-SSV','B2-ASV-SSV-RV',
+                 'B2-ASV-SSV-RV-screen','B4-ASV','B4-SSV','B4-ASV-SSV')}
+COMPLETED_OPTIMIZER_STATUSES=frozenset(('completed_changed','completed_unchanged','completed_no_eligible_skill'))
 
 
-def variant_config(name):
+def comparison_metadata(config):
+    """Shared identity for runtime variants and reports; labels do not prove learning."""
+    c={'comparison_id':config} if isinstance(config,str) else config
+    name=c.get('comparison_id',c.get('arm','unknown'));variant=VERIFICATION_VARIANTS.get(name,{})
+    base=c.get('base_comparison_id',variant.get('base',name))
+    internal=c.get('arm')
+    known=internal in ARMS or base in ('B0','B1','B2','B3-no-support','B3','B4')
+    consistent=not (internal in ARMS and base in ('B0','B1','B2','B3-no-support','B3','B4') and
+        internal not in ({'E0'} if base=='B0' else {'E1'} if base=='B1' else {'E2','E3'}))
+    requires=(internal in ('E2','E3') if internal in ARMS else base in ('B2','B3-no-support','B3','B4')) if known else None
+    return {'comparison_id':name,'base_comparison_id':base,'internal_arm':internal,
+            'requires_training':requires,'policy_type_known':known,'policy_label_consistent':consistent,**variant}
+
+
+def split_seeds(config,split):
+    names={'train':('train_seeds','train_seed','train_episodes'),
+           'final_test':('eval_seeds','eval_seed','episodes'),
+           'validation':('validation_seeds','validation_seed','validation_episodes')}
+    explicit,start,count=names[split]
+    return list(config[explicit]) if explicit in config else list(range(config[start],config[start]+config[count]))
+
+
+def seed_exposure_history(directory):
+    """Read actual episode records, partial traces and registrations without editing them."""
+    directory=Path(directory);events=[];registered=[]
+    known={s:'historical_development_test' for s in [*range(101000,101100),102000,58000,201000,201001,211000,211001,215000]}
+    known.update({s:'historical_training' for s in (91000,91001)})
+    known.update({s:'historical_candidate_validation' for s in (213000,213001)})
+    events.extend({'seed':s,'role':role,'state':'exposed','source':'provided research history'} for s,role in known.items())
+    for path in sorted(directory.rglob('manifest.json')):
+        data=json.loads(path.read_text());cfg=data.get('config') or {}
+        role='validation' if cfg.get('evaluation_role')=='rollout' else 'train' if data.get('stage')=='train' else 'final_test'
+        for record in sorted(path.parent.glob('episode-????.json')):
+            e=json.loads(record.read_text())
+            if e.get('kind')!='real_cage4' or e.get('unit_test_fixture_only'):continue
+            events.append({'seed':e['seed'],'role':role,'red':cfg.get('red'),'state':'exposed',
+                'source':str(record.resolve()),'status':e.get('status')})
+        for partial in sorted(path.parent.glob('episode-????.partial.jsonl')):
+            with partial.open() as stream:line=next((line for line in stream if line.strip()),None)
+            if line:
+                row=json.loads(line)
+                if type(row.get('seed')) is int:events.append({'seed':row['seed'],'role':role,'state':'exposed_partial','source':str(partial.resolve())})
+    for path in sorted(directory.rglob('protocol.json')):
+        p=json.loads(path.read_text());plan=p.get('seed_plan')
+        if plan:
+            for role in ('train','validation','final_test','transfer','reserved_final_test'):
+                for seed in plan.get(role,[]):registered.append({'seed':seed,'role':role,'source':str(path.resolve())})
+        else:
+            for role,key in (('train','training_seeds'),('validation','rollout_validation_seeds'),
+                             ('final_test','pilot_test_seeds'),('transfer','generalization_seeds'),
+                             ('reserved_final_test','reserved_full_test_seeds')):
+                for seed in p.get(key,[]):registered.append({'seed':seed,'role':role,'source':str(path.resolve())})
+    exposed={e['seed'] for e in events}
+    return {'schema':'seed-exposure-v1','events':events,'registrations':registered,
+        'exposed_seeds':sorted(exposed),'reserved_unexposed_seeds':sorted({r['seed'] for r in registered if r['role']=='reserved_final_test'}-exposed),
+        'scope':'Observed records and supplied history; unexecuted registrations are not completed samples.'}
+
+
+def validate_seed_plan(plan,history=None):
+    plan=deepcopy(plan)
+    if history is None:history=seed_exposure_history(ROOT/'research_outputs')
+    if plan.get('purpose') not in ('final_evaluation','development','reproduction'):
+        raise ValueError('Seed plan needs explicit purpose: final_evaluation/development/reproduction')
+    for role in ('train','validation','final_test','transfer'):
+        values=plan.get(role)
+        if not isinstance(values,list) or any(type(s) is not int or s<0 for s in values) or len(set(values))!=len(values):
+            raise ValueError('Explicit unique integer seed list required: '+role)
+    roles=('train','validation','final_test','transfer')
+    for i,a in enumerate(roles):
+        for b in roles[i+1:]:
+            if set(plan[a])&set(plan[b]):raise ValueError('Seed plan splits overlap: '+a+'/'+b)
+    exposed=set(history.get('exposed_seeds',[]))
+    reused={role:sorted(set(plan[role])&exposed) for role in roles}
+    if plan['purpose']=='final_evaluation' and (reused['final_test'] or reused['transfer']):
+        raise ValueError('Final holdout/transfer seed already exposed: '+str(reused))
+    reserved=plan.get('reserved_final_test',[])
+    if not isinstance(reserved,list) or any(type(s) is not int for s in reserved) or len(set(reserved))!=len(reserved):
+        raise ValueError('Invalid reserved final-test seed list')
+    if set(reserved)&(set(plan['train'])|set(plan['validation'])|set(plan['transfer'])):
+        raise ValueError('Reserved final-test seeds overlap learning/validation/transfer')
+    plan.update(reused_seed_roles=reused,validation_reuse_is_new_independent_sample=False,
+        reserved_unseen_seeds=sorted(set(reserved)-exposed-set(plan['final_test'])),
+        reserved_exposed_seeds=sorted(set(reserved)&exposed),
+        actual_final_test_is_reserved_unused=False)
+    return plan
+
+
+def apply_seed_plan(config,plan,history=None):
+    if history is None:history=seed_exposure_history(ROOT/'research_outputs')
+    c=deepcopy(config);plan=validate_seed_plan(plan,history)
+    if not plan['train']:raise ValueError('An explicit training/source seed set is required')
+    c.update(seed_plan=plan,seed_use=plan['purpose'],train_seeds=plan['train'],
+        train_seed=plan['train'][0],train_episodes=len(plan['train']),validation_seeds=[],validation_episodes=0)
+    if history is not None:c['seed_exposure_history']=history
+    if plan['final_test']:
+        c.update(eval_seeds=plan['final_test'],eval_seed=plan['final_test'][0],episodes=len(plan['final_test']),evaluation_disabled=False)
+    else:
+        c.pop('eval_seeds',None);c['evaluation_disabled']=True
+    if c['evolution'].get('rollout_verification'):
+        c['rollout_validation']['seeds']=plan['validation']
+    return validate(c)
+
+
+def variant_config(name,seed_plan=None):
     """Named overrides of existing configs; no copied YAML or silent B2/B3/B4 redefinition."""
-    if name not in VERIFICATION_VARIANTS:return load(ROOT/f'research_configs/rollout-{name}.yaml')
-    base='B4' if name.startswith('B4-') else 'B2'
+    if name not in VERIFICATION_VARIANTS:
+        c=load(ROOT/f'research_configs/rollout-{name}.yaml')
+        if seed_plan is not None:return apply_seed_plan(c,seed_plan)
+        c.setdefault('seed_use','legacy_reproduction')
+        return validate(c)
+    metadata=VERIFICATION_VARIANTS[name];base=metadata['base']
     c=load(ROOT/f'research_configs/rollout-{base}.yaml')
-    c.update(train_seed=212000,eval_seed=211000,validation_seed=214000)
-    c['evolution'].update(action_support_verification='ASV' in name,
-                          selection_shift_verification='SSV' in name)
+    c['evolution'].update(action_support_verification=metadata['action_support_verification'],
+                          selection_shift_verification=metadata['selection_shift_verification'])
     if '-RV' in name:
         c['evolution']['rollout_verification']=True
         c['rollout_validation']=load(ROOT/'research_configs/rollout-B4.yaml')['rollout_validation']
     if name.endswith('-screen'):
         c['rollout_validation'].update(reject_screen_pairs=2,reject_screen_only=True,
             procedure_version='necessary-worst-seed-rejection-v1')
-    if c['evolution'].get('rollout_verification'):c['rollout_validation']['seeds']=list(range(213000,213020))
+    c.setdefault('seed_use','legacy_reproduction')
     c.update(comparison_id=name,experiment_version='cage4-support-shift-v1',base_comparison_id=base)
+    if seed_plan is not None:return apply_seed_plan(c,seed_plan)
     return validate(c)
 
 
@@ -47,6 +158,7 @@ def validate(config):
         "connection_leads": False}
     for key, value in defaults.items(): c.setdefault(key, value)
     c.setdefault("validation_episodes", 1)
+    c.setdefault('seed_use','legacy_reproduction')
     c.setdefault("validation_seed", 5000)
     c.setdefault("model", {"endpoint": "http://127.0.0.1:8018", "model": "Qwen/Qwen3-8B",
         "revision": "b968826d9c46dd6066d109eabc6255188de91218", "temperature": 1.0,
@@ -123,10 +235,21 @@ def validate(config):
         if type(e[key]) is not int or e[key] < 1: raise ValueError(f"evolution.{key} must be positive")
     if not 0 < e["gamma"] <= 1 or not 0 < e["ema_alpha"] <= 1 or not 0 < e["clip"] < 1:
         raise ValueError("Invalid discount, EMA rate or PPO clipping interval")
-    train_seeds = set(range(c["train_seed"], c["train_seed"]+c["train_episodes"]))
-    eval_seeds = set(range(c["eval_seed"], c["eval_seed"]+c["episodes"]))
+    if 'seed_plan' in c:
+        if 'seed_exposure_history' not in c:c['seed_exposure_history']=seed_exposure_history(ROOT/'research_outputs')
+        c['seed_plan']=validate_seed_plan(c['seed_plan'],c['seed_exposure_history'])
+        if set(split_seeds(c,'train'))!=set(c['seed_plan']['train']):raise ValueError('Config training seeds differ from registered plan')
+        if not c.get('evaluation_disabled'):
+            role='validation' if c.get('evaluation_role')=='rollout' else 'transfer' if c.get('evaluation_role')=='transfer_test' else 'final_test'
+            if not set(split_seeds(c,'final_test'))<=set(c['seed_plan'][role]):raise ValueError('Evaluation seeds differ from registered role: '+role)
+    for split,count in (('train','train_episodes'),('final_test','episodes'),('validation','validation_episodes')):
+        values=split_seeds(c,split)
+        if len(values)!=c[count] or len(set(values))!=len(values) or any(type(s) is not int or s<0 for s in values):
+            raise ValueError('Explicit seed list/count mismatch: '+split)
+    train_seeds = set(split_seeds(c,'train'))
+    eval_seeds = set(split_seeds(c,'final_test'))
     if train_seeds & eval_seeds: raise ValueError("Training and evaluation seed sets overlap")
-    validation_seeds=set(range(c["validation_seed"],c["validation_seed"]+c["validation_episodes"]))
+    validation_seeds=set(split_seeds(c,'validation'))
     if validation_seeds & (train_seeds | eval_seeds): raise ValueError("Validation seeds overlap with training/evaluation")
     if c["profile"] == "paper-compatible" and c["skip_busy_policy"]:
         raise ValueError("Paper-compatible mode requires skip_busy_policy: false")
@@ -143,8 +266,8 @@ def validate(config):
         seeds=rule.get('seeds',[])
         if not seeds or len(set(seeds))!=len(seeds) or any(type(s) is not int for s in seeds):
             raise ValueError('Explicit unique rollout validation seeds required')
-        if 'minimum_pairs' in rule and (type(rule['minimum_pairs']) is not int or rule['minimum_pairs']<20 or len(seeds)<rule['minimum_pairs']):
-            raise ValueError('Registered rollout approval needs at least 20 paired seeds')
+        from .rollout import approval_seeds
+        approval_seeds(rule)
         if set(seeds)&(train_seeds|eval_seeds|validation_seeds):
             raise ValueError('Rollout validation seeds overlap other splits')
         required=('minimum_mean_gain','minimum_win_rate','minimum_median_gain','maximum_seed_loss',

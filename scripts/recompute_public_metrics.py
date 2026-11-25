@@ -9,6 +9,19 @@ import statistics
 ROOT=Path(__file__).resolve().parents[1]
 
 
+def paired_episodes(before,after):
+    """Pair within a registered comparison run; never overwrite an equal eval seed."""
+    def index(items):
+        result={}
+        for e in items:
+            key=(e.get('comparison_run_id','legacy'),e['seed'])
+            if key in result:raise ValueError('Ambiguous repeated eval seed: distinct comparison_run_id required for training repetitions')
+            result[key]=e
+        return result
+    old,new=index(before),index(after);keys=sorted(old.keys()&new.keys())
+    return keys,[old[k] for k in keys],[new[k] for k in keys]
+
+
 def recompute(episodes):
     grouped=defaultdict(list)
     for episode in episodes:
@@ -18,7 +31,8 @@ def recompute(episodes):
     rows=[];paired=[]
     for key,items in sorted(grouped.items()):
         seeds=[e['seed'] for e in items]
-        if len(seeds)!=len(set(seeds)):raise ValueError('Duplicate episode seed within version/red/split/label')
+        identities=[(e.get('comparison_run_id','legacy'),e.get('training_run_id'),e['seed']) for e in items]
+        if len(identities)!=len(set(identities)):raise ValueError('Duplicate episode seed within one evaluation/training run')
         rewards=[e['joint_return'] for e in items]
         for episode in items:
             series=episode.get('scored_step_rewards')
@@ -28,12 +42,15 @@ def recompute(episodes):
         rows.append(dict(zip(['version','red','split','label'],key),n=len(items),mean=statistics.mean(rewards),
             sample_std=statistics.stdev(rewards) if len(items)>1 else None,
             total_execution_time_s=sum(e['execution_time_s'] for e in items),
-            rewards_by_seed={e['seed']:e['joint_return'] for e in items}))
+            rewards_by_seed={e['seed']:e['joint_return'] for e in items} if len(seeds)==len(set(seeds)) else None,
+            unique_eval_seed_count=len(set(seeds)),
+            rewards_by_run_seed=[{'comparison_run_id':e.get('comparison_run_id','legacy'),
+                'training_run_id':e.get('training_run_id'),'seed':e['seed'],'reward':e['joint_return']} for e in items]))
         if key[-1]=='B0' or key[:3]+('B0',) not in grouped:continue
-        baseline={e['seed']:e['joint_return'] for e in grouped[key[:3]+('B0',)]}
-        current={e['seed']:e['joint_return'] for e in items}
-        common=sorted(baseline.keys()&current.keys());delta=[current[s]-baseline[s] for s in common]
-        paired.append(dict(zip(['version','red','split','label'],key),paired_n=len(common),seeds=common,
+        common,before,after=paired_episodes(grouped[key[:3]+('B0',)],items)
+        delta=[b['joint_return']-a['joint_return'] for a,b in zip(before,after)]
+        paired.append(dict(zip(['version','red','split','label'],key),paired_n=len(common),seeds=[k[1] for k in common],
+            paired_run_seeds=[{'comparison_run_id':k[0],'seed':k[1]} for k in common],
             differences=delta,mean_difference=statistics.mean(delta) if delta else None,
             win_rate=sum(d>0 for d in delta)/len(delta) if delta else None))
     return {'groups':rows,'paired_vs_B0':paired,'raw_trajectory_revalidation':False,

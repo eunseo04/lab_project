@@ -11,6 +11,19 @@ def pool_digest(snapshot):
     return hashlib.sha256(json.dumps(snapshot,sort_keys=True).encode()).hexdigest()
 
 
+def approval_seeds(rule):
+    """Approval always needs an explicitly registered minimum of twenty pairs."""
+    minimum=rule.get('minimum_pairs')
+    seeds=rule.get('seeds',[])
+    if type(minimum) is not int or minimum<20:
+        raise ValueError('Explicit minimum_pairs >= 20 is required for rollout approval')
+    if not seeds or len(set(seeds))!=len(seeds) or any(type(s) is not int for s in seeds):
+        raise ValueError('Explicit unique integer rollout validation seeds required')
+    if len(seeds)<minimum:
+        raise ValueError('Registered rollout approval needs at least 20 paired seeds and minimum_pairs')
+    return seeds
+
+
 def _checked_episode(episode):
     if episode.get('status')!='completed':return False
     if episode.get('kind')!='real_cage4':raise ValueError('Only real CAGE4 validation can admit a skill')
@@ -49,9 +62,7 @@ def proposed_pool(pool,candidate,rule):
 def compare_rollouts(previous,candidate,rule):
     """Keep the previous pool unless a complete paired validation passes."""
     old={r['seed']:r for r in previous};new={r['seed']:r for r in candidate}
-    expected=set(rule['seeds'])
-    if not expected or len(expected)!=len(rule['seeds']):raise ValueError('Nonempty unique validation seeds required')
-    if len(expected)<rule.get('minimum_pairs',len(expected)):raise ValueError('Registered minimum approval pair count was reduced')
+    expected=set(approval_seeds(rule))
     if len(old)!=len(previous) or len(new)!=len(candidate):raise ValueError('Duplicate validation seed')
     if set(old)!=expected or set(new)!=expected:
         return {'accepted':False,'reason':'incomplete_validation','previous_n':len(old),'candidate_n':len(new)}
@@ -80,6 +91,7 @@ def compare_rollouts(previous,candidate,rule):
 
 def verify_transaction(pool,candidate,evaluate,rule,evaluate_pair=None,proposed_snapshot=None):
     """Evaluate independent snapshots; never mutate the live pool on rejection."""
+    approval_seeds(rule)
     before=deepcopy(pool.snapshot());original_hash=pool_digest(before)
     if proposed_snapshot is None:
         proposed,maintenance=proposed_pool(pool,candidate,rule)

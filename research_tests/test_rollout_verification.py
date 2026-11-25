@@ -35,7 +35,7 @@ from test_research import offline,experience
 
 
 def rule():
-    return {'seeds':list(range(41000,41020)),'minimum_mean_gain':0.,'minimum_win_rate':.6,
+    return {'seeds':list(range(41000,41020)),'minimum_pairs':20,'minimum_mean_gain':0.,'minimum_win_rate':.6,
         'minimum_median_gain':0.,'maximum_seed_loss':50.,'maximum_mean_lwf_loss':0.,
         'maximum_mean_asf_loss':0.,'maximum_std_ratio':1.25,'maximum_std_increase':25.,'ports':[8018]}
 
@@ -75,6 +75,22 @@ def test_reanalysis_after_failed_remove_can_justify_reassessment_and_retry():
 def test_consistent_complete_environment_gain_passes():
     result=compare_rollouts(episodes(),episodes(10),rule())
     assert result['accepted'] and result['win_rate']==1 and result['mean_difference']==10
+
+
+@pytest.mark.parametrize('minimum,count',[(None,2),(None,20),(2,2),(19,19),(20,19)])
+def test_all_approval_entry_points_require_explicit_twenty_pairs(minimum,count,offline):
+    bad=rule();bad['seeds']=bad['seeds'][:count]
+    if minimum is None:bad.pop('minimum_pairs')
+    else:bad['minimum_pairs']=minimum
+    with pytest.raises(ValueError):compare_rollouts(episodes()[:count],episodes(10)[:count],bad)
+    cfg={'train_seed':100,'eval_seed':10000,'rollout_validation':bad,
+        'evolution':{'rollout_verification':True,'schedule':'paper_batch',
+                     'gate_mode':'paper_rtg','maintenance_mode':'paper_algorithm1'}}
+    with pytest.raises(ValueError):validate(cfg)
+    pool=SecuritySkillPool(24);before=pool.snapshot()
+    with pytest.raises(ValueError):
+        verify_transaction(pool,Skill('c','i',['p'],'t'),lambda *a:pytest.fail('no rollout before valid registration'),bad)
+    assert pool.snapshot()==before
 
 
 def test_outlier_average_alone_is_not_admitted():
@@ -192,7 +208,72 @@ def test_aggregated_update_cannot_change_an_unsupported_component():
     records=[{'related':True,'gradient':{'execution':'Change policy'}}]
     assert not candidate_supported(parent,candidate,records)['passed']
     candidate.initiation=parent.initiation
-    assert candidate_supported(parent,candidate,records)['passed']
+    result=candidate_supported(parent,candidate,records)
+    assert not result['passed'] and 'unlinked_candidate_changes' in result['linkage_errors']
+
+
+def supported_candidate_fixture():
+    rows=[{'step':5,'seed':7,'agent':'blue_agent_4','requested_action':'Remove h1',
+        'policy_invoked':True,'request_applied':True,'action_status':'TRUE'}]
+    data={'is_related':True,'diagnosis_status':'supported','reward_attribution':'unknown',
+        'semantic_gradient':{'policy':'Review actual call status; its cause remains unknown.'},
+        'evidence':[{'component':'policy','evidence_id':'E0','field':'action_status'}],
+        'claims':[{'component':'policy','evidence_id':'E0','action':'Remove','target':'h1',
+            'finding':'completed_success','phase':'after','as_of_step':6,'restore_epoch':-1,'causal_attribution':'unknown'}],
+        'proposals':[{'component':'policy','evidence_ids':['E0'],'observed_action':'Remove',
+            'operation':'check_call_outcome','scope':'same_observed_host_and_epoch','causal_status':'untested_hypothesis'}]}
+    model=EvidenceModel(lambda _:json.dumps(data),rows,diagnosis_verification=True)
+    canonical=json.loads(model('controlled boundary'))
+    parent=Skill('parent','same initiation',['Check status'],'same termination')
+    candidate=Skill('child',parent.initiation,['Review the observed Remove call outcome before retrying.'],parent.termination)
+    records=[{'related':True,'gradient':{'execution':canonical['semantic_gradient']['policy']},'evidence_audits':model.audits}]
+    links=[{'component':'execution','element':0,'candidate_text':candidate.policy[0],
+        'proposal_ids':[canonical['proposals'][0]['proposal_id']]}]
+    return parent,candidate,records,links
+
+
+def test_linked_normal_candidate_has_bounded_support_without_claiming_semantic_truth():
+    parent,candidate,records,links=supported_candidate_fixture()
+    result=candidate_supported(parent,candidate,records,links)
+    assert result['passed'] and result['change_links'][0]['fact_ids']
+    assert not result['semantics_verified'] and result['requires_rollout']
+    links[0]['candidate_text']='Different unlinked text'
+    assert not candidate_supported(parent,candidate,records,links)['passed']
+
+
+def test_normal_grounded_candidate_can_pass_original_gate_and_full_pool_validation(offline,monkeypatch):
+    parent,candidate,records,links=supported_candidate_fixture()
+    pool=SecuritySkillPool(24);snapshot=pool.snapshot();snapshot['skills']=[parent.__dict__];pool.restore(snapshot)
+    exp=experience();exp.skill=parent.name
+    def validator(p,c,s):
+        return verify_transaction(p,c,lambda _,role:episodes(0 if role=='previous' else 10),rule())
+    ev=Evolution(offline,{'schedule':'paper_batch','gate_mode':'paper_rtg','maintenance_mode':'paper_algorithm1',
+        'best_of_n':1,'evidence_verification':True,'diagnosis_verification':True,'rollout_verification':True},rollout_validator=validator)
+    def evolve(*args):
+        ev.gradients.extend(deepcopy(records));ev._candidate_links=deepcopy(links)
+        return deepcopy(candidate),'REFINE'
+    monkeypatch.setattr(ev,'evolve',evolve)
+    monkeypatch.setattr(ev,'probabilities',lambda skill,exps:[0.]*sum(len(e.transitions) for e in exps))
+    result=ev.update(pool,[exp],{'test':0},1)['evolution'][0]['candidates'][0]
+    assert result['semantic_support']['passed'] and result['ppo_accepted'] and result['accepted']
+    assert result['rollout_validation']['accepted'] and len(result['rollout_validation']['seeds'])==20
+    assert any(s.name==candidate.name for s in pool.skills)
+
+
+def test_linked_remove_success_cannot_prove_all_privileged_persistence_eliminated():
+    parent,candidate,records,links=supported_candidate_fixture()
+    candidate.policy=['Remove TRUE proves all privileged persistence is eliminated.'];links[0]['candidate_text']=candidate.policy[0]
+    result=candidate_supported(parent,candidate,records,links)
+    assert not result['passed'] and result['known_rule_contradictions']
+
+
+def test_indirect_unclassified_policy_and_termination_changes_require_rollout():
+    from research.semantic_evidence import action_support
+    parent=Skill('p','i',['Observe'],'when reviewed')
+    candidate=Skill('c','i',['Immediately isolate the affected network zone and keep that zone disconnected.'],'retain containment indefinitely')
+    result=action_support(parent,candidate,[],[])
+    assert result['requires_rollout'] and result['semantic_status']=='unknown'
+    assert set(result['unclassified_changes'])=={'policy','termination'} and result['forbidden_actions']==[]
 
 
 def test_reusable_candidate_cannot_memorize_training_host_or_ip():

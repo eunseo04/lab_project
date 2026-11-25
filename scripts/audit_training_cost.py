@@ -31,7 +31,8 @@ def render_sg(config,pool_snapshot,experiences):
     from research.attribution import support_statistics
     from research.upstream import Experience
     class Capture:
-        def __init__(self):self.calls=[]
+        def __init__(self):self.calls=[];self.evidence_rows=[]
+        def capture_evidence_rows(self,rows):self.evidence_rows.append(deepcopy(rows))
         def __call__(self,prompt):
             self.calls.append(prompt)
             return '{"is_related":false,"semantic_gradient":{"initiation":"","policy":"","termination":""}}'
@@ -52,7 +53,7 @@ def render_sg(config,pool_snapshot,experiences):
             for index,prompt in enumerate(model.calls[offset:]):
                 steps=evolution.gradients[gradient_offset+index]['steps']
                 output.append({'skill':parent.name,'chunk':index,'prompt':prompt,'eligible':eligible,
-                    'evidence_rows':[t for t in exp.transitions if t['step'] in steps],
+                    'evidence_rows':model.evidence_rows[offset+index] if config['evolution'].get('evidence_verification') else [t for t in exp.transitions if t['step'] in steps],
                     'trace_sha256':digest(exp.__dict__),'prompt_sha256':hashlib.sha256(prompt.encode()).hexdigest()})
     return output,by_name
 
@@ -125,7 +126,95 @@ def audit(directory):
     return report
 
 
-def profile_fixed_update(directory,protocol,client,trained,pending,preparation,time_available):
+def profile_diagnosis(directory,protocol,client,pending,preparation,time_available,maximum_probes=3,cover_features=False,required=False):
+    """Real SG probes on complete original chunks; never a shortened optimizer loop."""
+    from research.upstream import Experience,OriginalEvolution
+    from research.semantic_evidence import EvidenceModel
+    from research.diagnosis import canonical_operations
+    from research.client import stable_seed
+    directory=Path(directory);deadline=time.monotonic()+min(protocol.get('maximum_profile_seconds',900),time_available()-90)
+    rendered,_=render_sg(protocol['configs']['B3'],preparation['ready']['pool'],[Experience(**e) for e in pending['experiences']])
+    eligible=sorted((r for r in rendered if r['eligible']),key=lambda r:(len(r['prompt']),r['prompt_sha256']))
+    features=[]
+    for item in eligible:
+        kinds=set()
+        for row in item['evidence_rows']:
+            ops=canonical_operations(row,item['evidence_rows']);decision=ops['requested_decision'];op=ops['completed_or_pending_operation']
+            if decision['name']=='Sleep' and decision['request_applied']:kinds.add('current_sleep')
+            if decision['target']:kinds.add('host_decision')
+            if op.get('name')=='Restore' and op.get('completed_at') is not None:kinds.add('previous_restore')
+            if op.get('name')=='Remove' and op.get('completed_at') is not None:kinds.add('previous_remove')
+            if not decision['policy_invoked'] or op.get('status')=='IN_PROGRESS':kinds.add('busy')
+            if op['restore_epoch_after']>=0:kinds.add('restore_epoch')
+            for body in (row.get('observation_after') or {}).values():
+                if isinstance(body,dict) and any(isinstance(p,dict) and 'PID' in p and 'username' not in p for p in body.get('Processes',[])):kinds.add('observed_pid')
+        features.append(kinds)
+    chosen=[];covered=set();used_skills=set()
+    if cover_features:
+        for _ in range(min(maximum_probes,len(eligible))):
+            remaining=[i for i in range(len(eligible)) if i not in chosen]
+            index=max(remaining,key=lambda i:(len(features[i]-covered),eligible[i]['skill'] not in used_skills,-len(eligible[i]['prompt']),eligible[i]['prompt_sha256']))
+            chosen.append(index);covered.update(features[index]);used_skills.add(eligible[index]['skill'])
+    elif eligible:chosen=sorted({0,len(eligible)//2,len(eligible)-1})[:maximum_probes]
+    plan={'scope':'Historical training only; full original chunks; deterministic feature coverage or length cost sampling',
+        'registered_before_generation':True,'expected_probes':len(chosen),'feature_coverage':sorted(set().union(*(features[i] for i in chosen)) if chosen else set()),
+        'selected':[{'index':i,'skill':eligible[i]['skill'],'prompt_sha256':eligible[i]['prompt_sha256'],'features':sorted(features[i])} for i in chosen],
+        'model_identity':client.identity,'new_optimizer_iterations':0,'natural_accuracy_population_estimate':None}
+    atomic_json(directory/'report/diagnosis_probe_plan.json',plan)
+    result={'schema':'diagnosis-boundary-probes-v2','training_data_only':True,'optimizer_ran':False,'profiles':[],'status':'not_started',
+        'source_sha256':protocol.get('source_sha256'),
+        'expected_probes':len(chosen),'sampling':plan['scope'],'model_identity':client.identity,
+        'candidate_generation':None,'ppo_approval':None,'whole_pool_rollout_admission':None,
+        'limitation':'Observation/format/link checks on selected SG outputs are not general diagnosis accuracy, causation or defense reward.'}
+    failure=None
+    try:
+        for i in chosen:
+            if time.monotonic()>=deadline:raise TimeoutError('Registered probe allowance exhausted')
+            item=eligible[i];messages=[{'role':'user','content':item['prompt']}];tokens=client._tokens(messages)
+            if tokens['prompt_tokens']+768>tokens['max_context']:raise ValueError('Actual complete SG input exceeds context; no truncation')
+            began=time.perf_counter()
+            with client.context(stage='diagnosis_boundary_probe',skill=item['skill'],prompt_sha256=item['prompt_sha256']):
+                response=client.generate(messages,seed=stable_seed(protocol.get('experiment_id'),i,item['prompt_sha256']),purpose='evolution',max_tokens=768)
+            boundary=EvidenceModel(lambda _:response['text'],item['evidence_rows'],diagnosis_verification=True)
+            validation_error=None
+            try:
+                canonical=json.loads(boundary('Replay only this exact newly generated response for deterministic checks'))
+                audits=boundary.audits;audit=audits[-1]
+            except (TypeError,ValueError,KeyError,AttributeError) as exc:
+                validation_error=f'{type(exc).__name__}: {exc}'
+                canonical={'is_related':False,'semantic_gradient':{}}
+                audit={'passed':False,'raw_response':response['text'],'validation_error':validation_error};audits=[audit]
+            parsed=OriginalEvolution._parse_json_safely(None,response['text'])
+            gradient=parsed.get('semantic_gradient') if isinstance(parsed,dict) else None
+            abstained=isinstance(parsed,dict) and parsed.get('is_related') is False and isinstance(gradient,dict) and not any(gradient.values()) and not parsed.get('proposals') and not parsed.get('claims') and not validation_error
+            result['profiles'].append({'skill':item['skill'],'chunk':item['chunk'],'prompt_sha256':item['prompt_sha256'],
+                'source_trace_sha256':item['trace_sha256'],'features':sorted(features[i]),'input_tokens':tokens['prompt_tokens'],
+                'output_tokens':response['output_tokens'],'seconds':time.perf_counter()-began,'canonical':canonical,
+                'audits':audits,'format_valid':isinstance(parsed,dict),'validation_tool_error':validation_error,
+                'references_valid':bool(audit.get('valid_references')) and not audit.get('errors'),
+                'observation_claims_consistent':audit.get('diagnosis_validation',{}).get('passed'),
+                'proposal_links_valid':audit.get('structured_proposals',{}).get('passed'),
+                'decision':'grounded_proposal' if audit['passed'] else 'abstained' if abstained else 'blocked_unverified_diagnosis',
+                'raw_unverified_prose_used_for_generation':False})
+            atomic_json(directory/'report/sg_boundary_profile.json',result)
+        result['status']='measured'
+    except Exception as exc:
+        failure=exc;result.update(status='incomplete',error=f'{type(exc).__name__}: {exc}')
+    result['stage_counts']={'generated':len(result['profiles']),
+        'format_valid':sum(r['format_valid'] for r in result['profiles']),
+        'validation_tool_errors':sum(r['validation_tool_error'] is not None for r in result['profiles']),
+        'references_valid':sum(r['references_valid'] for r in result['profiles']),
+        'observation_claims_consistent':sum(bool(r['observation_claims_consistent']) for r in result['profiles']),
+        'proposal_links_valid':sum(bool(r['proposal_links_valid']) for r in result['profiles']),
+        'grounded_proposals':sum(r['decision']=='grounded_proposal' for r in result['profiles']),
+        'abstentions':sum(r['decision']=='abstained' for r in result['profiles']),
+        'candidate_generation':None,'ppo_approval':None,'rollout_admission':None}
+    atomic_json(directory/'report/sg_boundary_profile.json',result)
+    if required and result['status']!='measured':raise failure or RuntimeError('Required diagnosis probe incomplete')
+    return result
+
+
+def profile_fixed_update(directory,protocol,client,trained,pending,preparation,time_available,diagnosis_only=False):
     """Measure existing exact scorers and repaired SG boundary on historical TRAINING only.
 
     Historical per-token reference results may be reused only for identical full
@@ -139,6 +228,9 @@ def profile_fixed_update(directory,protocol,client,trained,pending,preparation,t
     from research.client import stable_seed
     from research.semantic_evidence import EvidenceModel
     directory=Path(directory);deadline=time.monotonic()+min(900.,time_available()-90)
+    if diagnosis_only:
+        return profile_diagnosis(directory,protocol,client,pending,preparation,time_available,
+            protocol.get('diagnosis_probe_count',6),cover_features=True,required=True)
     report={'backend_adopted':False,'complete_matrix':False,'status':'not_measured',
         'tolerances':{'token_absolute':1e-4,'sequence_absolute':1e-3,'ppo_objective_absolute':1e-6},
         'production_backend':'incremental_reference','training_data_only':True,'measurements':[]}
@@ -224,27 +316,7 @@ def profile_fixed_update(directory,protocol,client,trained,pending,preparation,t
     except Exception as exc:report.update(status='failed_or_incomplete',error=f'{type(exc).__name__}: {exc}')
     report['adoption_reason']='Default remains reference. All actual Network candidates are checked, but this pilot is not a complete near-boundary/EOS/context-length certificate.'
     persist()
-    # Cost and natural-output audit of the repaired B3 schema, never candidate admission.
-    sg={'training_data_only':True,'optimizer_ran':False,'profiles':[],'status':'not_started'}
-    try:
-        cfg=protocol['configs']['B3'];experiences=[Experience(**e) for e in pending['experiences']]
-        rendered,_=render_sg(cfg,preparation['ready']['pool'],experiences)
-        ordered=sorted((r for r in rendered if r['eligible']),key=lambda r:len(r['prompt']))
-        for index in sorted({0,len(ordered)//2,len(ordered)-1}) if ordered else []:
-            check();item=ordered[index];tokenized=client._tokens([{'role':'user','content':item['prompt']}])
-            began=time.perf_counter()
-            with client.context(stage='repaired_sg_profile',skill=item['skill'],trace_hash=item['trace_sha256']):
-                response=client.generate([{'role':'user','content':item['prompt']}],seed=stable_seed('support-shift-v1','repaired-sg-cost',index),purpose='evolution',max_tokens=768)
-            boundary=EvidenceModel(lambda _:response['text'],item['evidence_rows'],diagnosis_verification=True)
-            canonical=json.loads(boundary('Same verification boundary; recorded raw profile output'))
-            sg['profiles'].append({'skill':item['skill'],'chunk':item['chunk'],'prompt_sha256':item['prompt_sha256'],
-                'input_tokens':tokenized['prompt_tokens'],'output_tokens':response['output_tokens'],
-                'seconds':time.perf_counter()-began,'canonical':canonical,'audits':boundary.audits,
-                'raw_unverified_prose_used_for_generation':False})
-            atomic_json(directory/'report/sg_boundary_profile.json',sg)
-        sg['status']='measured'
-    except Exception as exc:sg.update(status='incomplete',error=f'{type(exc).__name__}: {exc}')
-    atomic_json(directory/'report/sg_boundary_profile.json',sg)
+    profile_diagnosis(directory,protocol,client,pending,preparation,lambda:min(time_available(),deadline-time.monotonic()+90))
     return report
 
 
@@ -427,7 +499,7 @@ def generation_cost_upper(samples,maximum_prompt,maximum_output=768):
     return max(estimates)
 
 
-def preflight(protocol,measurement,usage,gpu_count,label,include_collection=False):
+def preflight(protocol,measurement,usage,gpu_count,label,include_collection=False,evaluation_labels=None):
     if measurement.get('status')!='measured' or measurement.get('episode_upper_seconds') is None:
         return {'status':'deferred','reason':'Actual end-to-end cost samples are missing','measurement':measurement}
     stages=defaultdict(list)
@@ -448,16 +520,25 @@ def preflight(protocol,measurement,usage,gpu_count,label,include_collection=Fals
     aggregate_capacity=generation_cost_upper(kernels,24576-768,768)*aggregate_count
     score_upper=max(s['seconds']/s['samples'] for s in stages['old_score']+stages['new_score'])*1.5
     ep=measurement['episode_upper_seconds'];n=protocol['statistics']['pilot_n']
-    parts={'collection':2*ep if include_collection else 0,
-        'sg':sg,
-        'aggregation_best_of_n':aggregate,
+    cfg=protocol.get('configs',{}).get(label,{});loops=cfg.get('iterations',1)
+    rollout=cfg.get('evolution',{}).get('rollout_verification',label=='B4')
+    attempts=cfg.get('evolution',{}).get('maximum_rollout_candidates_per_iteration',1)*loops
+    planned_rollouts=40*attempts if rollout else 0
+    reused=measurement.get('completed_identical_rollout_episodes',0) if measurement.get('rollout_reuse_identity_verified') else 0
+    if type(reused) is not int or not 0<=reused<=planned_rollouts:raise ValueError('Invalid verified rollout reuse count')
+    labels=evaluation_labels if evaluation_labels is not None else protocol.get('core_evaluation_labels',['B0','B1','B2'])
+    collected=measurement.get('collected_training_episodes',measurement.get('episode_seconds',{}).get('n',2))
+    collection=cfg.get('train_episodes',2) if include_collection else max(0,cfg.get('train_episodes',2)-collected)
+    parts={'collection':collection*ep,
+        'sg':sg*loops,
+        'aggregation_best_of_n':aggregate*loops,
         'old_new_score':(measurement.get('planned_old_score_cache_misses',measurement['planned_valid_decisions'])
-                         +measurement['planned_valid_decisions']*measurement['best_of_n'])*score_upper,
-        'paired_candidate_validation':40*ep/gpu_count if label=='B4' else 0,
-        'frozen_paired_test':(3+len([a for a in protocol['requested_training_arms'] if a!='B2']))*n*ep/gpu_count,
+                         +measurement['planned_valid_decisions']*measurement['best_of_n'])*score_upper*loops,
+        'paired_candidate_validation':(planned_rollouts-reused)*ep/gpu_count,
+        'frozen_paired_test':len(labels)*n*ep/gpu_count,
         'checkpoint_shutdown_margin':120}
     wall=sum(parts.values());remaining_gpu=usage['gpu_hour_cap']-usage['gpu_hours'];remaining_wall=usage['wall_second_cap']-usage['wall_seconds']
-    capacity=wall-sg-aggregate+sg_capacity+aggregate_capacity
+    capacity=wall-sg*loops-aggregate*loops+(sg_capacity+aggregate_capacity)*loops
     return {'status':'passed' if wall<=remaining_wall and wall*gpu_count/3600<=remaining_gpu else 'deferred',
         'arm':label,'projected_upper_wall_seconds':wall,'projected_occupied_gpu_hours':wall*gpu_count/3600,
         'remaining_gpu_hours':remaining_gpu,'remaining_wall_seconds':remaining_wall,'parts_seconds':parts,
@@ -468,7 +549,10 @@ def preflight(protocol,measurement,usage,gpu_count,label,include_collection=Fals
         'full_768_token_capacity_gpu_hours':capacity*gpu_count/3600,
         'full_capacity_fits':capacity<=remaining_wall and capacity*gpu_count/3600<=remaining_gpu,
         'forecast_is_not_completion_guarantee':True,
-        'b4_pairs':20 if label=='B4' else 0,'thresholds_unchanged':True}
+        'b4_pairs':20 if rollout else 0,'rollout_candidate_attempts_reserved':attempts if rollout else 0,
+        'planned_validation_episodes':planned_rollouts,'reused_validation_episodes':reused,
+        'training_plan':{'episodes':cfg.get('train_episodes',2),'iterations':loops},
+        'evaluation_labels_reserved':labels,'thresholds_unchanged':True}
 
 
 def main():

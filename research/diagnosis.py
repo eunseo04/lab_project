@@ -39,6 +39,22 @@ def restore_boundary(rows, agent, host, at):
     return max(boundaries, default=-1)
 
 
+def canonical_operations(row, rows):
+    """One definition for displayed and checked decision/operation targets and epochs."""
+    from .behavior import chosen_action
+    name,target=chosen_action(row) if row.get('requested_action') else (None,None)
+    decision={'name':name,'target':target,'policy_invoked':bool(row.get('policy_invoked')),
+        'request_applied':bool(row.get('request_applied')),'parse_error':row.get('parse_error'),
+        'recorded_request':bool(row.get('requested_action')),'step':row['step']}
+    result={}
+    for key,op in (('requested_decision',decision),('completed_or_pending_operation',operation(row))):
+        target=op.get('target')
+        result[key]={**op,'as_of_before':row['step'],'as_of_after':row['step']+1,
+            'restore_epoch_before':restore_boundary(rows,row['agent'],target,row['step']),
+            'restore_epoch_after':restore_boundary(rows,row['agent'],target,row['step']+1)}
+    return result
+
+
 def validate_diagnosis(data, rows, provenance):
     """Require typed, falsifiable observation claims for each changed component.
 
@@ -61,15 +77,12 @@ def validate_diagnosis(data, rows, provenance):
             errors.append('claim_without_matching_citation'); continue
         if finding not in FINDINGS or claim.get('causal_attribution') != 'unknown':
             errors.append('unproven_causal_or_unknown_claim'); continue
+        operations=canonical_operations(row,rows)
+        op=operations['requested_decision' if finding=='recorded_decision' else 'completed_or_pending_operation']
         if finding == 'recorded_decision':
             # A decision fact is distinct from completion of an earlier action.
             if not row.get('policy_invoked') or not row.get('request_applied') or row.get('parse_error') or not row.get('requested_action'):
                 errors.append('not_an_applied_policy_decision'); continue
-            from .behavior import chosen_action
-            name, target = chosen_action(row)
-            op = {'name': name, 'target': target}
-        else:
-            op = operation(row)
         if claim.get('action') != op.get('name'):
             errors.append('action_mismatch'); continue
         host = claim.get('target')
@@ -110,13 +123,15 @@ def validate_diagnosis(data, rows, provenance):
                 services = body.get('Services', {})
                 if not isinstance(services, dict) or claim.get('service') not in services or services[claim['service']] != claim.get('value'):
                     errors.append('service_state_not_observed'); continue
-        boundary = restore_boundary(rows, row['agent'], host, as_of)
+        boundary = op['restore_epoch_'+phase]
         if 'restore_epoch' not in claim or claim['restore_epoch'] != boundary:
             errors.append('restore_epoch_mismatch'); continue
         # A newly observed PID is not evidence that an older Remove failed.
         if finding == 'completed_failure' and claim.get('pid') is not None:
             errors.append('call_status_is_not_pid_cleanup_evidence'); continue
-        valid.append({**claim, 'component': component, 'status': 'observation_consistent'})
+        valid.append({**claim, 'component': component, 'status': 'observation_consistent',
+            'source_seed':row.get('seed'),'source_agent':row['agent'],'source_step':row['step'],
+            'source_trace_sha256':provenance.get('trace_sha256')})
     supported = {c['component'] for c in valid}
     for component in provenance.get('changed_components', []):
         if component not in supported:
@@ -130,7 +145,7 @@ def validate_diagnosis(data, rows, provenance):
 
 
 PROMPT = '''
-### CAGE4 diagnosis consistency schema (Proposed v7, separate from Skill-Pro)
+### CAGE4 diagnosis consistency schema (Proposed v8, separate from Skill-Pro)
 Keep the original initiation/policy/termination semantic gradients. In addition,
 return diagnosis_status="supported|unknown|insufficient_evidence", reward_attribution="unknown",
 and claims=[{"component":"policy", "evidence_id":"E0", "action":"Remove",
@@ -139,9 +154,11 @@ and claims=[{"component":"policy", "evidence_id":"E0", "action":"Remove",
 Allowed findings: recorded_decision, completed_success, completed_failure, pending, observed_pid (include pid),
 observed_admin_indicator (include indicator), observed_service_state (include service and value).
 Use one matching evidence citation and observation-consistent claim for EVERY changed component.
-Action and target must describe the cited own operation, not a suggested future operation.
+Use requested_decision for recorded_decision, and completed_or_pending_operation
+for all other findings. Copy that object's name, target, as_of and target-specific
+restore_epoch fields. They may describe different targets in the same row.
 For recorded_decision only, use the actual requested action/target of an invoked,
-applied, parsed policy decision, even if the displayed own_operation describes an
+applied, parsed policy decision, even if completed_or_pending_operation describes an
 earlier completion. Sleep/Monitor have target JSON null, never the string "null"
 or an invented host. Use phase="after". This finding verifies only a recorded
 decision; UNKNOWN never establishes success, failure or an IN_PROGRESS operation.
@@ -174,7 +191,8 @@ def canonical_proposals(data, validation):
     """
     from .progress import digest
     facts=[]
-    fields=('component','evidence_id','action','target','finding','phase','as_of_step','restore_epoch','pid','indicator','service','value')
+    fields=('component','evidence_id','action','target','finding','phase','as_of_step','restore_epoch','pid','indicator','service','value',
+        'source_seed','source_agent','source_step','source_trace_sha256')
     for claim in validation.get('valid_claims',[]):
         fact={k:claim[k] for k in fields if k in claim}
         fact['fact_id']='F'+digest(fact)[:16]
@@ -196,7 +214,8 @@ def canonical_proposals(data, validation):
             errors.append('unbounded_or_causal_proposal');continue
         if any(proposal.get('observed_action')!=f['action'] for f in support):
             errors.append('proposal_action_mismatch');continue
-        proposals.append({'proposal_id':f'P{index}','component':component,'operation':kind,
+        proposals.append({'proposal_id':'P'+digest([component,kind,scope,[f['fact_id'] for f in support]])[:16],
+            'component':component,'operation':kind,
             'scope':scope,'causal_status':'untested_hypothesis',
             'fact_ids':[f['fact_id'] for f in support],
             'observed_actions':sorted({f['action'] for f in support})})

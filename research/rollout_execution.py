@@ -14,6 +14,7 @@ import threading
 import time
 from . import ROOT
 from .rollout import pool_digest,verify_transaction
+from .config import split_seeds
 from .progress import Journal,atomic_json,digest,BudgetExceeded,IncompleteOptimization,implementation_identity
 
 
@@ -22,7 +23,7 @@ class EnvironmentVerifier:
         self.config=deepcopy(config);self.directory=Path(output)/'rollout-verification'
         self.directory.mkdir(exist_ok=True);self.identity=identity
         self.rule=deepcopy(config['rollout_validation'])
-        used=set(range(config['train_seed'],config['train_seed']+config['train_episodes']))|set(range(config['eval_seed'],config['eval_seed']+config['episodes']))
+        used=set(split_seeds(config,'train'))|set(split_seeds(config,'final_test'))
         if used&set(self.rule['seeds']):raise ValueError('Rollout validation seeds overlap training/final evaluation')
         self.deadline=self.rule.get('deadline_unix',float('inf'))
         self.journal=Journal(config.get('journal_path',Path(output)/'journal.sqlite3'))
@@ -80,7 +81,7 @@ class EnvironmentVerifier:
         key=pool_digest(snapshot);pool_file=case/f'{role}-pool.json'
         payload={'stage':'train','pool':snapshot,'episodes_completed':self.completed_training_episodes,
             'total_training_episodes':self.inherited_episodes+self.completed_training_episodes,
-            'training_seeds':sorted(set(self.inherited_seeds)|set(range(self.config['train_seed'],self.config['train_seed']+self.completed_training_episodes))),
+            'training_seeds':sorted(set(self.inherited_seeds)|set(split_seeds(self.config,'train')[:self.completed_training_episodes])),
             'model_identity':self.identity,'validation_only':True}
         provenance=self.config.get('verification_pool_provenance',{}).get(key)
         if self.config.get('verification_pool_provenance') and provenance is None:
@@ -108,7 +109,8 @@ class EnvironmentVerifier:
                         summary_path=dest/'summary.json'
                         summary=json.loads(summary_path.read_text()) if summary_path.exists() else {}
                         if summary.get('status')!='completed':
-                            cfg=deepcopy(self.config);cfg.update(pool=str(pool_file),eval_seed=seed,episodes=1,
+                            cfg=deepcopy(self.config);cfg.update(pool=str(pool_file),eval_seed=seed,eval_seeds=[seed],episodes=1,
+                                evaluation_disabled=False,validation_seeds=[],
                                 validation_episodes=0,evaluation_role='rollout',journal_path=str(self.journal.path))
                             cfg.pop('rollout_validation',None);cfg['evolution']['rollout_verification']=False
                             cfg['model'].update(endpoint=f'http://127.0.0.1:{port}',scoring_endpoints=[],generation_endpoints=[])

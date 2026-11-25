@@ -6,6 +6,8 @@ from concurrent.futures import ThreadPoolExecutor
 import json
 import heapq
 import time
+from pathlib import Path
+import hashlib
 import numpy as np
 
 from .upstream import (OriginalEvolution, Experience, ExperiencePool, GoldenExperiencePool,
@@ -42,6 +44,10 @@ class Evolution(OriginalEvolution):
     def __init__(self, model, config, rollout_validator=None, selection_verifier=None):
         super().__init__(model, threshold=config.get("threshold", 6), epsilon=config.get("clip", 0.2))
         self.config = config
+        self.verification_identity=None
+        if config.get('evidence_verification') or config.get('action_support_verification') or config.get('selection_shift_verification'):
+            self.verification_identity={name:hashlib.sha256(Path(__file__).with_name(name).read_bytes()).hexdigest()
+                for name in ('semantic_evidence.py','diagnosis.py')}
         self.selection_verifier=selection_verifier
         self.gradients = []
         self._gradient_cache = {}
@@ -97,8 +103,10 @@ class Evolution(OriginalEvolution):
             'logical_reservations':reservations,'merge_order':list(range(len(prepared)))})
         def execute(job):
             (index,transitions,visible,local),reservation=job
-            key='sg-result:'+digest([self._loop_key,old_skill.__dict__,experience.__dict__,index,
-                                    self.config.get('evidence_verification'),self.config.get('diagnosis_verification')])
+            cache_inputs=[self._loop_key,old_skill.__dict__,experience.__dict__,index,
+                self.config.get('evidence_verification'),self.config.get('diagnosis_verification')]
+            if self.verification_identity is not None:cache_inputs.append(self.verification_identity)
+            key='sg-result:'+digest(cache_inputs)
             cached=self.journal.restore(key) if self.journal else None
             if cached is not None:
                 return cached
@@ -136,10 +144,19 @@ class Evolution(OriginalEvolution):
             return {}  # No ungrounded NEW fallback after all evidence was rejected.
         if self.config.get("evidence_verification",False):
             original=self.evolver_model
+            self._candidate_links=[]
             def constrained(prompt):
-                return original(prompt+"\nOnly modify components with nonempty evidence-supported gradients. "
+                raw=original(prompt+"\nOnly modify components with nonempty evidence-supported gradients. "
                     "Copy every other original initiation/policy/termination component EXACTLY, without paraphrasing. "
-                    "Do not include training host instance names, IP addresses or trace citations in the reusable Skill.")
+                    "Do not include training host instance names, IP addresses or trace citations in the reusable Skill. "
+                    "Also return top-level change_links for EVERY changed initiation, policy step, and termination: "
+                    "{component: initiation|execution|termination, element: null for initiation/termination or policy step index, "
+                    "candidate_text: exact text of that new element, proposal_ids: [IDs from the structured verified gradients]}. "
+                    "Keep those IDs only in change_links metadata, never reusable Skill text. "
+                    "Links are untested hypotheses, not proof of causal benefit.")
+                parsed=OriginalEvolution._parse_json_safely(self,raw) or {}
+                self._candidate_links=deepcopy(parsed.get('change_links',[]))
+                return raw
             local=OriginalEvolution(constrained,threshold=self.threshold,epsilon=self.epsilon)
             with self._scope(stage='aggregation_candidate',logical_stages=['aggregation','candidate_generation']):
                 return OriginalEvolution._run_semantic_update(local,old_skill,gradients_list,evolution_type)
@@ -202,7 +219,9 @@ class Evolution(OriginalEvolution):
         model=self.evolver_model
         context=getattr(getattr(model,'client',None),'base_context',{})
         self._loop_key='optimizer:'+digest([context,iteration])
-        input_hash=digest([pool.snapshot(),[e.__dict__ for e in experiences],baselines,self.config])
+        inputs=[pool.snapshot(),[e.__dict__ for e in experiences],baselines,self.config]
+        if self.verification_identity is not None:inputs.append(self.verification_identity)
+        input_hash=digest(inputs)
         state=self.journal.restore(self._loop_key)
         if state and state['input_hash']!=input_hash:
             raise ValueError('Optimizer resume inputs, Pool, baseline or algorithm differ')
@@ -250,6 +269,7 @@ class Evolution(OriginalEvolution):
 
     def _update_impl(self, pool, experiences, baselines, iteration):
         started = time.perf_counter()
+        selection_base=deepcopy(pool.snapshot()) if self.config.get('selection_shift_verification') else None
         logs = []
         paper_batch = self.config.get("schedule") == "paper_batch"
         current_batch = defaultdict(list)
@@ -285,6 +305,7 @@ class Evolution(OriginalEvolution):
                 -sum(t.get("policy_invoked",False) and t.get("request_applied",False)
                 and not t.get("parse_error") for e in current_batch[s.name] for t in e.transitions)))
         order=[s.name for s in ready]
+        buffers_before_candidates=deepcopy(self.experience_buffer) if selection_base is not None else None
         if self.journal:
             registered=self.journal.restore(self._loop_key+':parent_order')
             if registered is not None and registered!=order:
@@ -363,10 +384,10 @@ class Evolution(OriginalEvolution):
                     self._progress('candidate:'+parent.name+':'+str(index),{'status':'parsed_before_scoring',**item})
                     if self.config.get("evidence_verification",False):
                         from .semantic_evidence import candidate_supported
-                        support=candidate_supported(parent,candidate,self.gradients[start_gradient:])
+                        support=candidate_supported(parent,candidate,self.gradients[start_gradient:],getattr(self,'_candidate_links',[]))
                         item['semantic_support']=support
                         if not support['passed']:
-                            item['error']='candidate_changes_not_supported_by_observable_evidence'
+                            item['deferred']='candidate_linkage_or_known_rule_not_supported'
                             record['candidates'].append(item)
                             self._progress('candidate:'+parent.name+':'+str(index),item)
                             continue
@@ -387,6 +408,12 @@ class Evolution(OriginalEvolution):
                                     mode=self.config.get('gate_mode','official_code'),epsilon=self.epsilon)
                                 item['reference_boundary_recheck']=True
                         item.update(score=value, diagnostics=diagnostics)
+                        diagnostic_old=exact_old if item.get('reference_boundary_recheck') else old
+                        unchanged_value=gate_score(gate_evidence,diagnostic_old,diagnostic_old,baselines,
+                            mode=self.config.get('gate_mode','official_code'),epsilon=self.epsilon)[0]
+                        item['surrogate_diagnostics']={'J_candidate':value,'J_old':unchanged_value,
+                            'delta_J':value-unchanged_value,'admission_rule_unchanged':True,
+                            'scope':'Diagnostics only; original best positive candidate rule is unchanged.'}
                     else:
                         value = 0.0
                         item["gate"] = "disabled_no_logprob_calls"
@@ -402,6 +429,9 @@ class Evolution(OriginalEvolution):
                         selected = [best] if best[0] > self.config.get("acceptance_margin", 0.0) else []
                     for value, candidate, item in selected:
                         candidate.maturity = 0
+                        if (item.get('semantic_support') or {}).get('requires_rollout') and not rollout_mode:
+                            item['ppo_accepted']=True;item['deferred']='candidate_semantics_require_real_rollout'
+                            continue
                         if any(self.config.get(k,False) for k in ('action_support_verification','selection_shift_verification')):
                             item['ppo_accepted']=True
                             item['post_gate_verification']=self.verify_post_gate(pool,parent,candidate,evidence,gate_evidence,iteration)
@@ -447,9 +477,28 @@ class Evolution(OriginalEvolution):
                 maintenance = pool.maintain()  # actual official-code LCB/semantic pruning
         else:
             maintenance = pool.maintain_fifo()
+        final_selection=None
+        if selection_base is not None and not rollout_mode and any(r['accepted'] for r in logs):
+            from .rollout import pool_digest
+            final_snapshot=pool.snapshot()
+            final_selection={'scope':'whole_update_after_capacity_maintenance',
+                'previous_pool_sha256':pool_digest(selection_base),
+                'probed_pool_sha256':pool_digest(final_snapshot),
+                'probe':self.selection_verifier(deepcopy(selection_base),deepcopy(final_snapshot))}
+            if final_selection['probe'].get('requires_rollout',False):
+                pool.restore(selection_base);self.experience_buffer=buffers_before_candidates
+                for record in logs:
+                    record['accepted']=False
+                    for item in record['candidates']:
+                        if item.get('accepted'):
+                            item.update(accepted=False,deferred='final_pool_selection_requires_real_rollout')
+                final_selection['decision']='deferred_previous_pool_retained'
+            else:final_selection['decision']='exact_final_pool_selection_screen_passed'
+            final_selection['committed_pool_sha256']=pool_digest(pool.snapshot())
+            self._progress('final_selection_verification',final_selection)
         self._progress("maintenance",{'maintenance':maintenance,'pool':pool.snapshot()})
         from .attribution import evolution_statistics
-        return {"evolution": logs, "maintenance": maintenance,
+        return {"evolution": logs, "maintenance": maintenance,'final_selection_verification':final_selection,
                 "skill_experience_statistics":evolution_statistics(experiences,logs),
                 "seconds": time.perf_counter()-started, "pool_size": len(pool.skills)}
 

@@ -1,6 +1,6 @@
 # 코드 및 데이터 구조
 
-현재 구현 기준은 2026-11-25의 정리된 체크아웃이다. 전체 파일별 기능·주요 함수/클래스·JSON 필드는 [파일 목록 CSV](code_and_data_inventory.csv)에 있다. 과거 결과·원시 실행 로그·별도 revision 복사본은 포함하지 않는다.
+현재 연구 코드와 데이터 구조를 설명한다. 전체 파일별 기능·주요 함수/클래스·JSON 필드는 [파일 목록 CSV](code_and_data_inventory.csv)에 있다. CSV는 Git 관리 파일 목록이며, 로컬 `research_outputs/`의 보존된 원시 실행 기록은 별도로 설명한다.
 
 ## 실행 흐름
 
@@ -16,7 +16,7 @@ scripts/run_research.sh B0|B1|B2|B3|B4|B3-no-support train|evaluate
 
 | 위치 | 역할 |
 |---|---|
-| `research/` | 현재 연구 모듈 24개. 단일 실행 구현 |
+| `research/` | 현재 연구 모듈. 단일 실행 구현 |
 | `acd/` | 공통 ACD 프롬프트·행동 JSON·통신·CybORG/KEEP 연동 |
 | `research_configs/` | B0–B4와 최소 경험 지원 no-support ablation |
 | `artifacts/initial_pool.json` | B1–B4 공통의 정적 초기 Skill. 학습 결과가 아님 |
@@ -116,15 +116,15 @@ Checkpoint는 Pool 외에 완료 수·훈련 seed·모델 정보·baseline·FIFO
 
 ## 검증과 평가 분리
 
-| 용도 | 기본 full 설정 |
+| 용도 | 과거 YAML의 full 재현 설정 |
 |---|---|
 | 훈련 | seed 91000–91005, 6 episode / 3 iteration |
 | 후보 Rollout validation | 97000–97019 |
 | 보조 validation 예약 | 99000, 기본 사용 수 0 |
-| 독립 test | 201000–201099 |
+| 당시 test | 201000–201099; 이미 노출된 시드는 현재 독립 holdout이 아님 |
 | 다른 Red pilot | 202000 |
 
-후보 하나는 이전 Pool 20회와 후보 Pool 20회의 대응 결과를 비교한다. 독립 seed 쌍은 20개다. 모든 지정 seed 완료, 평균 개선·승률·중앙값·최악 손실·Green 피해·분산 기준을 유지하고 승인 시 검증한 정확한 Pool을 사용한다. 거부 시 이전 Pool을 유지한다. validation을 test에 섞지 않는다. 작은 campaign pilot은 별도 version과 더 작은 수집 계획으로 기록된다.
+위 숫자는 과거 설정의 재현용이다. 새 캠페인의 훈련·validation·final-test·transfer는 명시적 seed plan과 노출 이력 검사를 거친다. 후보 하나는 이전 Pool 20회와 후보 Pool 20회의 대응 결과를 비교한다. 독립 seed 쌍은 20개다. 모든 지정 seed 완료, 평균 개선·승률·중앙값·최악 손실·Green 피해·분산 기준을 유지하고 승인 시 검증한 정확한 Pool을 사용한다. 거부 시 이전 Pool을 유지한다. validation을 test에 섞지 않는다. 작은 campaign pilot은 별도 version과 더 작은 수집 계획으로 기록된다.
 
 ## 새 결과 비교 도구
 
@@ -140,7 +140,7 @@ Checkpoint는 Pool 외에 완료 수·훈련 seed·모델 정보·baseline·FIFO
 
 train/test/untrained_control은 분리한다. 학습 완료 provenance가 없는 B2–B4 평가는 untrained_control로 표시한다. mock/미완료 episode와 후보 validation을 최종 test에 넣지 않는다. 동일 version/Red/split의 모델·공통 관찰/채점·KEEP 가중치 조건이 다르면 합치지 않는다. `--reasoning`은 존재하는 raw trace에서 Qwen만의 자유 행동과 busy 대기·진단 플래그를 읽는다.
 
-공개 compact 파일은 `python3 scripts/recompute_public_metrics.py --episodes <episodes.json>`으로 다시 계산할 수 있다. 전체 prompt·token scoring·환경 replay·학습 재개에는 raw 기록과 고정 환경/모델이 별도로 필요하다. 현재 저장소에는 과거 측정 데이터가 없다.
+compact 파일은 `python3 scripts/recompute_public_metrics.py --episodes <episodes.json>`으로 다시 계산할 수 있다. 전체 prompt·token scoring·환경 replay·학습 재개에는 raw 기록과 고정 환경/모델이 별도로 필요하다. 공개 Git checkout에는 과거 측정 데이터가 없으며, 현재 서버의 원시 데이터는 Git에서 제외한 `research_outputs/`에 보존한다.
 
 ## 검사와 한계
 
@@ -204,12 +204,22 @@ B3/B4의 원문 diagnosis/free gradient는 후보 입력에서 격리한다. 검
 
 기본 scorer는 incremental reference다. 실험용 full-sequence backend는 CPU indexing 검사만으로 채택하지 않는다. 실제 BF16 Qwen의 token 합·PPO objective·최종 판정·EOS/mixed-length/긴 prompt까지 검증한 인증과 경계 reference 재확인이 필요하다.
 
-이전 4개 GPU를 함께 점유한 8 GPU-hour 설정의 wall 상한은 120분(학습 85분/rollout 83.5분)이었다. 현재 관리자는 기본 1 GPU, 신규 GPU-hour와 wall-clock cap을 독립 관리하며 resume 시 초기화하지 않는다. 실제 GPU 수를 줄인 것 자체는 처리량 향상 근거가 아니다. B2 한 update의 완료 비용을 먼저 확인하고 B4 40개 환경 실행과 최종 test 비용이 확보되지 않으면 후속 군을 시작하지 않는다.
+이전 4개 GPU의 8 GPU-hour 설정은 120 wall분이었다. 현재 관리자는 기본 1 GPU이며 기동·idle·정리까지 합산한다. `--usage-ledger`는 누적 기록의 session을 중복 제거하고 연결된 후속 사용도 반영한다. 새 output이나 resume은 새 8시간 승인이 아니다. B2 완료 후 B0/B1/B2의 core 동결 평가를 먼저 수행한다. 선택적 후속 군만 예산에 맞지 않으면 deferred_budget이며 core 결과는 남긴다. 모든 군이 필수인 계획은 별도 flag로 구분한다.
 
-새 캠페인은 호출 전에 훈련 212000·212001, 후보 검증 213000–213019, test 211000부터와 다른 Red 215000을 등록한다. 이미 확인한 201000·201001은 개발 자료다. 기존 YAML은 과거 재현 설정이며 새 최종 성능 입증에 재사용하지 않는다. B3-no-support는 독립 variant ID이며 B3−B2는 진단과 최소 지원 조건을 함께 추가한 효과다. 분리 비교는 no-support−B2, B3−no-support, B4−B3다. 실행하지 않은 ablation은 설정만 있다고 측정 결과로 보고하지 않는다.
+새 캠페인은 `--seed-plan` JSON에 train/validation/final_test/transfer와 목적(final_evaluation/development/reproduction)을 명시한다. manifest·완료 episode·partial trace·제공된 이전 이력으로 노출을 확인한다. 201000/201001, 211000/211001, 215000과 validation 213000/213001을 새 holdout으로 사용할 수 없다. 101000–101099·102000 등의 이전 개발 자료도 포함한다. validation 재사용과 반복 평가를 새 독립 표본으로 세지 않는다. 미사용 reserved 목록에서는 과거 노출 및 현재 pilot 배정 시드를 뺀다. 기존 YAML은 legacy_reproduction이다. 새로운 고정 숫자로 자동 치환하지 않는다.
+
+훈련 episode 수는 명시적 train 목록 길이이고 iteration은 CLI에 등록한다. pilot 2/1과 full 6/3을 구분한다. B4 비용은 iteration별 최대 검증 후보 수 × 20 paired seeds/40 episodes와 최종 평가를 포함한다. minimum_pairs는 설정 및 최종 compare 함수에서 필수이고 20 미만은 거부한다. prefix는 거부/보류만 가능하다. 실제 identity로 검증된 완료 rollout 재사용은 잔여 비용만 줄이고 새 episode는 0이다.
 
 GPU 절약용 pilot은 한 GPU의 한 모델에서 요청을 직렬 처리한다. 실험용 full-sequence scorer의 메모리 큰 batch probe는 기본 비활성화하고, 명시한 경우에만 실행한다. preflight는 실측 prefill과 decode를 나눠 예측하므로 이미 측정한 decode 시간을 전체 prefill 배율로 다시 곱하지 않는다. 예측은 보수적 추정이며 누적 GPU/wall hard cap과 구분한다. 표본을 2 seed로 정한 경우 별도 pilot version으로 표시하고 full 결과와 합치지 않는다.
 
 ASV/SSV는 `research.config.variant_config()`에서 기존 설정의 명시적 override로 생성한다. `B2-ASV`/`B2-SSV`/결합군과 B4 추가군은 기존 B0–B4와 다른 비교 ID다. 행동 근거 부족과 selector 분포 변화는 실제 환경 검증을 요구할 사유이며 행동 금지나 성능 실패 판정이 아니다. 선택 빈도는 자유 결정·busy 대기·활성화·실행 tick·완료 호출별로 분모를 구분한다. SSV는 live RNG/counter를 유지하고 최종 test 상태를 받지 않는다.
 
-`run_campaign.py --fixed-update-from`은 이전에 완료한 B2 전체 update를 고정해 초기 Pool과 비교한다. 과거 SQLite는 read-only로 읽고 입력 해시를 전후 대조한다. 기존 8 GPU-hour의 사용량은 `--prior-gpu-hours`로 명시하며 잔여 cap만 새 ledger에 등록한다. 새 B3/B4 학습과 혼동하지 않는다. 거부 전용 2쌍 screen이 불확실하면 이전 Pool을 유지하고 보류한다. 20쌍 승인 기준을 낮추지 않는다. 동일 Pool의 B1 성능 재사용은 별도 매핑으로 표시하고 새 episode를 만들거나 증가시키지 않는다. 원래 궤적에 Red/Green 명령이 없으면 복원했다고 쓰지 않으며, 새 reward sidecar에서만 동시 명령을 추가 기록한다.
+`run_campaign.py --fixed-update-from`은 이전 완료 B2 전체 update를 고정한다. `--diagnosis-probes-only`는 그 과거 훈련의 원래 SG chunk로 Qwen 진단만 측정하며 새 training/최종 CAGE4 성능이 아니다. JSON 형식·관찰 사실·proposal 연결·후보 생성·PPO·실제 채택을 분리하며 미실행 단계는 N/A다. 과거 SQLite는 read-only로 읽고 입력 해시를 전후 대조한다. `--prior-gpu-hours`보다 실제 연결 ledger가 더 많이 사용됐으면 더 작은 잔여 한도를 쓴다. screen 보류, 보상 거부, 승인 및 완료 unchanged loop를 서로 다르게 센다.
+
+보고기는 내부 E0/E1/E2/E3, base_comparison_id, 정확한 optimizer 완료 상태와 hash-matched checkpoint·history·동결 Pool을 검사한다. 완료한 원본 B2를 학습된 B4-ASV-SSV로 이름만 바꿀 수 없다. 여러 training run은 comparison_run_id/train lineage와 seed로 구분한다. B0/B1의 training repetition은 해당 없음이고 missing provenance는 미상이다. source/model 조건이 다른 결과는 합치지 않는다. 작은 summary의 산술 재계산은 raw trajectory·optimizer 재현과 다르다.
+
+schema v8의 canonical_operations는 requested_decision과 completed_or_pending_operation을 분리하고 각각 대상별 as_of/Restore epoch를 제공한다. candidate-proposal-links-v2는 변경 요소의 정확한 텍스트·proposal/fact ID 연결만 검사하며 자연어 의미와 보상 효과를 증명하지 않는다. 미분류 ASV 절차 변경과 미검증 의미는 실제 whole-Pool rollout 또는 보류다. SSV-only는 capacity 정리 후 전체 최종 Pool을 다시 검사하며 SSV를 체류·termination·보상 검증이라고 부르지 않는다.
+
+v2 bundle은 output 밖의 historical checkpoint/journal/두 훈련 trace/초기 Pool을 포함하고 동일 내용은 content hash로 참조한다. SQLite는 일관된 read-only backup이며 원본 bytes hash와 snapshot hash를 구분한다. `report_experiment.py --restore-bundle ... --destination ...`은 빈 디렉터리에 상대 경로와 restored_protocol.json을 만든다. historical_batch(protocol, root=복원경로)는 원래 절대 경로 없이 입력을 읽는다. weights는 포함하지 않는다. source/lock은 설치 조건, compact metrics는 요약 재계산, raw bundle은 실제 기록·응답 복원의 범위다. `--summary-only`는 외부 업로드 없이 작은 summary를 준비한다.
+
+이번 수정의 실제 검증 기록은 로컬 `research_outputs/audit-fields-ece94dbe/report/`에 있다. `offline_validation.xml`은 CPU 314개 통과, `probe_analysis.json`은 두 차례 6건씩의 실제 Qwen 출력과 단계별 검사, `isolated_restore.json`은 실제 과거 입력 5개의 격리 복원이다. 최종 v3의 JSON 6건·관찰 claim 검사 1건·proposal 연결 1건은 새 학습이나 방어 보상 성능이 아니다. `resource_accounting.json`의 누적 사용량은 6.882450/8 GPU-hour이고 `resource_release_verification.json`은 실제 소유 PID와 포트 해제 기록이다. 이 원시 결과는 Git에서 제외하며 자동 공개하지 않는다.

@@ -1,6 +1,7 @@
 """Compare new completed runs without historical results or model calls."""
 import argparse
 from collections import Counter, defaultdict
+from copy import deepcopy
 import json
 from pathlib import Path
 import random
@@ -14,12 +15,99 @@ import sqlite3
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from scripts.recompute_public_metrics import recompute
+from scripts.recompute_public_metrics import recompute,paired_episodes
 from research.progress import Journal,atomic_json
+from research.config import comparison_metadata,VERIFICATION_VARIANTS,COMPLETED_OPTIMIZER_STATUSES
 
 
 def load(path):
     return json.loads(path.read_text())
+
+
+def training_evidence(config,summary,run,cache):
+    """Classify a frozen policy using a completed, hash-matched training artifact."""
+    metadata=comparison_metadata(config)
+    if not metadata['policy_type_known'] or not metadata['policy_label_consistent']:
+        return {'state':'unknown_or_inconsistent_policy_type','verified':False,'requires_training':None,
+                'training_run_id':None,'training_identity':None}
+    if not metadata['requires_training']:
+        return {'state':'not_applicable','verified':True,'requires_training':False,
+                'training_run_id':None,'training_identity':None}
+    p=summary.get('training_provenance') or {}
+    result={'state':'unknown_provenance','verified':False,'requires_training':True,
+            'training_run_id':None,'training_identity':None}
+    if not p.get('episodes_completed'):
+        result['state']='initial_pool' if p.get('episodes_completed')==0 else 'unknown_provenance'
+        return result
+    if p.get('optimizer_status') not in COMPLETED_OPTIMIZER_STATUSES:
+        result['state']='incomplete_or_unknown_optimizer';return result
+    path=Path(p.get('path',''))
+    if not path.is_absolute():path=run/path
+    if not path.is_file() or not p.get('sha256'):
+        result['state']='missing_training_artifact';return result
+    key=(str(path.resolve()),p['sha256'])
+    if key not in cache:
+        raw=path.read_bytes();cache[key]=(hashlib.sha256(raw).hexdigest(),json.loads(raw))
+    actual,trained=cache[key]
+    if actual!=p['sha256']:
+        result['state']='training_artifact_hash_mismatch';return result
+    algorithm=trained.get('algorithm');declared=p.get('algorithm')
+    if not isinstance(algorithm,dict) or declared!=algorithm:
+        result['state']='unknown_or_inconsistent_training_method';return result
+    base=metadata['base_comparison_id'];e=config.get('evolution') or {}
+    proposed=base in ('B3','B3-no-support','B4')
+    defaults={'evidence_verification':proposed,'diagnosis_verification':proposed,
+        'minimum_independent_episodes':2 if base in ('B3','B4') else 0,
+        'action_support_verification':metadata.get('action_support_verification',False),
+        'selection_shift_verification':metadata.get('selection_shift_verification',False)}
+    expected={k:e.get(k,v) for k,v in defaults.items()}
+    expected['rollout_verification']=base=='B4' or metadata.get('rollout_verification',False)
+    for k in ('gate_mode','schedule','maintenance_mode'):
+        if k in e:expected[k]=e[k]
+    if any(algorithm.get(k,False if isinstance(value,bool) else 0)!=value for k,value in expected.items()):
+        result['state']='training_method_mismatch';return result
+    history=trained.get('history',[]);status=trained.get('optimizer_status')
+    if (trained.get('stage')!='train' or trained.get('pending_experiences') or
+            status not in COMPLETED_OPTIMIZER_STATUSES or status!=p['optimizer_status'] or not history or
+            any(h.get('optimizer_status') not in COMPLETED_OPTIMIZER_STATUSES for h in history)):
+        result['state']='incomplete_training_commit';return result
+    if (trained.get('training_completed') is False or
+            trained.get('episodes_completed',0)<trained.get('planned_training_episodes',0) or
+            len(history)<trained.get('planned_optimizer_iterations',0)):
+        result['state']='incomplete_training_plan';return result
+    if (config.get('train_episodes',0)>trained.get('episodes_completed',0) or
+            config.get('iterations',0)>len(history)):
+        result['state']='training_plan_does_not_match_evaluation';return result
+    if not trained.get('planned_training_episodes') and not config.get('train_episodes'):
+        result['state']='unknown_training_plan';return result
+    seeds=trained.get('training_seeds');initial=trained.get('initial_pool_sha256')
+    final=hashlib.sha256(json.dumps(trained.get('pool'),sort_keys=True).encode()).hexdigest()
+    frozen=run/'frozen_pool.json'
+    if frozen.is_file():
+        frozen_hash=hashlib.sha256(json.dumps(load(frozen).get('pool'),sort_keys=True).encode()).hexdigest()
+    else:frozen_hash=None
+    if (not seeds or not initial or p.get('initial_pool_sha256')!=initial or
+            p.get('training_seeds')!=seeds or p.get('episodes_completed')!=trained.get('episodes_completed') or
+            summary.get('pool_sha256')!=final or (frozen_hash is not None and frozen_hash!=final) or
+            (p.get('final_pool_sha256') is not None and p['final_pool_sha256']!=final)):
+        result['state']='unverified_pool_or_training_identity';return result
+    identity=trained.get('training_lineage_id') or trained.get('training_run_id') or 'historical:'+actual
+    return {**result,'state':'verified_completed_training','verified':True,
+        'training_run_id':trained.get('training_run_id') or 'historical:'+actual,'training_identity':identity,
+        'training_seeds':seeds,'initial_pool_sha256':initial,'final_pool_sha256':final,
+        'optimizer_status':status,'committed_iterations':len(history),
+        'training_episodes_completed':trained['episodes_completed'],
+        'origin':'recorded_training_run' if trained.get('training_run_id') else 'verified_historical_update'}
+
+
+def training_summary(items):
+    if any(e.get('requires_training',True) is None for e in items):return {'count':None,'status':'unknown'}
+    learned=[e for e in items if e.get('requires_training',comparison_metadata(e['label'])['requires_training'])]
+    if not learned:return {'count':None,'status':'not_applicable'}
+    if any(not e.get('training_identity') for e in learned):return {'count':None,'status':'unknown'}
+    return {'count':len({e['training_identity'] for e in learned}),'status':'verified_artifacts',
+            'training_run_ids':sorted({e['training_run_id'] for e in learned}),
+            'note':'Environment seeds and repeated evaluation of one artifact are not independent training repetitions.'}
 
 
 def collect(directory, include_trace=False):
@@ -29,6 +117,7 @@ def collect(directory, include_trace=False):
     runs = sorted({p.parent for name in ('summary.json', 'manifest.json') for p in directory.rglob(name)
                    if 'rollout-verification' not in p.relative_to(directory).parts})
     episodes, statuses, signatures, policy_signatures, initial_pools = [], [], {}, {}, {}
+    provenance_cache={};protocol_signatures={}
     for run in runs:
         summary = load(run/'summary.json') if (run/'summary.json').exists() else {}
         manifest = load(run/'manifest.json') if (run/'manifest.json').exists() else {}
@@ -37,12 +126,13 @@ def collect(directory, include_trace=False):
             continue
         stage = summary.get('stage', manifest.get('stage', 'unknown'))
         label = config.get('comparison_id', config.get('arm', 'unknown'))
-        split = 'train' if stage == 'train' else 'test'
-        provenance = summary.get('training_provenance') or {}
-        if stage == 'eval' and label in ('B2', 'B3-no-support', 'B3', 'B4') and not provenance.get('episodes_completed'):
-            split = 'untrained_control'
-        if stage=='eval' and label in ('B2','B3-no-support','B3','B4') and provenance.get('optimizer_status') and not provenance['optimizer_status'].startswith('completed_'):
-            split='untrained_control'
+        stage={'evaluate':'eval'}.get(stage,stage)
+        split = 'train' if stage == 'train' else 'test' if stage=='eval' else 'untrained_control'
+        if stage=='eval' and config.get('seed_use') in ('development','reproduction','legacy_reproduction'):
+            split='development' if config['seed_use']=='development' else 'reproduction'
+        provenance=training_evidence(config,summary,run,provenance_cache) if stage=='eval' else {}
+        if stage=='eval' and not provenance['verified']:split='untrained_control'
+        comparison_run=summary.get('comparison_run_id') or config.get('comparison_run_id') or config.get('experiment_id') or str(run.parent.relative_to(directory))
         if config.get('evaluation_role')=='rollout':continue
         version = config.get('experiment_version', 'unversioned')+':'+config.get('composition', 'unknown')
         found = {(e['seed'], e.get('episode_id', 0)): e for e in summary.get('episodes', [])}
@@ -64,24 +154,32 @@ def collect(directory, include_trace=False):
                 'identity': {k: identity.get(k) for k in ('model', 'revision', 'dtype', 'chat_template_sha256')},
                 'keep_weights': {k: v.get('sha256') for k, v in (episode.get('weights') or {}).items()},
                 'implementation':manifest.get('implementation_sha256'),
-                'protocol':config.get('protocol_digest'),
             }, sort_keys=True)
             group = (version, config['red'], split)
             if group in signatures and signatures[group] != signature:
                 raise ValueError('Comparison conditions differ within the same version/red/split')
             signatures[group] = signature
+            protocol_key=group+(comparison_run,)
+            if protocol_key in protocol_signatures and protocol_signatures[protocol_key]!=config.get('protocol_digest'):
+                raise ValueError('Protocol conditions differ within a comparison run')
+            protocol_signatures[protocol_key]=config.get('protocol_digest')
             shared_initial=summary.get('comparison_initial_pool_sha256')
             if label!='B0' and shared_initial:
                 if group in initial_pools and initial_pools[group]!=shared_initial:
                     raise ValueError('Comparison initial Pools differ')
                 initial_pools[group]=shared_initial
-            policy_key=group+(label,)
+            policy_key=group+(comparison_run,label,provenance.get('training_run_id'))
             policy_value=summary.get('pool_sha256')
             if policy_key in policy_signatures and policy_signatures[policy_key]!=policy_value:
                 raise ValueError('Different frozen Pools cannot be merged within one arm')
             policy_signatures[policy_key]=policy_value
             item = {k: episode[k] for k in ('seed', 'status', 'kind', 'joint_return', 'execution_time_s')}
             item.update(version=version, label=label, red=config['red'], split=split,
+                        comparison_run_id=comparison_run,training_run_id=provenance.get('training_run_id'),
+                        training_identity=provenance.get('training_identity'),
+                        requires_training=provenance.get('requires_training',comparison_metadata(config)['requires_training']),
+                        training_provenance_state=provenance.get('state'),training_origin=provenance.get('origin'),
+                        holdout_role=(config.get('seed_plan') or {}).get('purpose','historical_or_unverified_holdout'),
                         reward_components=episode.get('reward_components'),
                         scored_step_rewards=episode.get('scored_step_rewards'), model_identity=identity,
                         source=str(run.relative_to(directory)), episode_id=episode.get('episode_id', 0))
@@ -109,36 +207,50 @@ def collect(directory, include_trace=False):
                          'optimizer_states':[h.get('optimizer_status','unknown') for h in summary.get('history',[])],
                          'pool_changes':sum(h.get('pool_changed',False) for h in summary.get('history',[])),
                          'failure':load(run/'failure.json') if (run/'failure.json').exists() else None})
+        statuses[-1].update(comparison_run_id=comparison_run,training_evidence=provenance)
     return episodes, statuses
 
 
 
-COMPARISONS=(('B1','B0'),('B2','B1'),('B4','B2'),('B4','B0'),
+COMPARISONS=(('B1','B0'),('B2','B1'),('B2','B0'),('B4','B2'),('B4','B0'),
              ('B3-no-support','B2'),('B3','B3-no-support'),('B3','B2'),('B4','B3'),
-             ('B2-ASV','B2'),('B2-SSV','B2'),('B2-ASV-SSV','B2'),('B2-ASV-SSV-RV-screen','B2'))
+             *[(name,metadata['base']) for name,metadata in VERIFICATION_VARIANTS.items()])
 
 
 def paired_comparisons(episodes):
-    groups=defaultdict(dict)
-    for e in episodes:groups[(e['version'],e['red'],e['split'])].setdefault(e['label'],{})[e['seed']]=e
+    groups=defaultdict(lambda:defaultdict(list))
+    for e in episodes:groups[(e['version'],e['red'],e['split'])][e['label']].append(e)
     output=[]
     for (version,red,split),arms in sorted(groups.items()):
-        for new,old in COMPARISONS:
-            before=arms.get(old,{});after=arms.get(new,{})
-            seeds=sorted(before.keys()&after.keys());delta=[after[s]['joint_return']-before[s]['joint_return'] for s in seeds]
+        comparisons=list(dict.fromkeys([*COMPARISONS,*[(name,'B0') for name in arms if name!='B0']]))
+        for new,old in comparisons:
+            keys,before,after=paired_episodes(arms.get(old,[]),arms.get(new,[]))
+            seeds=[k[1] for k in keys];delta=[b['joint_return']-a['joint_return'] for a,b in zip(before,after)]
+            reps={label:training_summary(items) for label,items in ((old,before),(new,after))}
+            learned=[v for v in reps.values() if v['status']!='not_applicable']
+            repetitions=min(v['count'] for v in learned) if learned and all(v['count'] is not None for v in learned) else None
             row={'comparison':new+'-'+old,'version':version,'red':red,'split':split,'paired_n':len(seeds),
                 'seeds':seeds,'differences':delta,'mean_difference':statistics.mean(delta) if delta else None,
                 'median_difference':statistics.median(delta) if delta else None,
                 'win_tie_loss':[sum(d>0 for d in delta),sum(d==0 for d in delta),sum(d<0 for d in delta)] if delta else None,
                 'paired_bootstrap_95ci':None,'reward_component_mean_differences':None,
-                'training_repetitions':1 if delta else None,
+                'paired_run_seeds':[{'comparison_run_id':k[0],'seed':k[1]} for k in keys],
+                'training_repetitions':repetitions,'training_repetitions_by_arm':reps,
+                'training_repetitions_status':'not_applicable' if not learned else 'unknown' if repetitions is None else 'verified_artifacts',
                 'interpretation':'Paired environment seeds do not identify individual-action causation or independent training-run uncertainty.'}
             if len(delta)>1:
-                rng=random.Random(20261125);means=sorted(statistics.mean(rng.choices(delta,k=len(delta))) for _ in range(10000))
+                clusters=defaultdict(list)
+                for key,d in zip(keys,delta):clusters[key[0]].append(d)
+                rng=random.Random(20261125)
+                if len(clusters)>1:
+                    blocks=list(clusters.values());means=sorted(statistics.mean(d for block in rng.choices(blocks,k=len(blocks)) for d in block) for _ in range(10000))
+                    row['bootstrap_unit']='comparison_run_cluster'
+                else:
+                    means=sorted(statistics.mean(rng.choices(delta,k=len(delta))) for _ in range(10000));row['bootstrap_unit']='environment_seed_conditional_on_one_training_artifact'
                 row['paired_bootstrap_95ci']=[means[249],means[9749]]
-            if delta and all(before[s].get('reward_components') is not None and after[s].get('reward_components') is not None for s in seeds):
-                keys=set().union(*(before[s]['reward_components'].keys()|after[s]['reward_components'].keys() for s in seeds))
-                row['reward_component_mean_differences']={k:statistics.mean(after[s]['reward_components'].get(k,0)-before[s]['reward_components'].get(k,0) for s in seeds) for k in keys}
+            if delta and all(e.get('reward_components') is not None for e in before+after):
+                component_keys=set().union(*(e['reward_components'] for e in before+after))
+                row['reward_component_mean_differences']={k:statistics.mean(b['reward_components'].get(k,0)-a['reward_components'].get(k,0) for a,b in zip(before,after)) for k in component_keys}
             output.append(row)
     if not groups:
         output=[{'comparison':new+'-'+old,'paired_n':0,'mean_difference':None,'median_difference':None,
@@ -203,22 +315,44 @@ def optimizer_report(directory,output,statuses):
 
 
 def reproduction_bundle(directory,output):
+    """Archive exact inputs, including hash-addressed historical dependencies."""
     selected=[p for p in directory.rglob('*') if p.is_file() and output not in p.parents
               and p.suffix in ('.json','.jsonl','.log','.yaml','.sqlite3')]
     # WAL-backed SQLite requires a consistent backup, not a blind copy of its main file.
     selected += [p for p in output.rglob('*') if p.is_file() and p.suffix in ('.json','.md','.xml')
                  and p.name!='reproducibility_manifest.json']
-    archive=output/'reproduction_bundle.tar.gz';manifest=[]
-    with tempfile.TemporaryDirectory(prefix='lab-bundle-') as temp, tarfile.open(archive,'w:gz') as bundle:
+    archive=output/'reproduction_bundle.tar.gz';temporary=output/'reproduction_bundle.tmp.gz';manifest=[];by_hash={};by_name={};dependencies={}
+    protocol=load(directory/'protocol.json') if (directory/'protocol.json').exists() else {}
+    source_info=protocol.get('fixed_update_source') or {}
+    required=source_info.get('files_sha256',{})
+    def dependency_path(value):
+        p=Path(value);return p if p.is_absolute() else directory/p
+    referenced=[source_info[k] for k in ('checkpoint','journal','initial_pool') if source_info.get(k)]+source_info.get('training_traces',[])
+    if any(str(p) not in required for p in referenced):raise ValueError('Historical dependency lacks a registered file hash')
+    for path,expected in required.items():
+        if not dependency_path(path).is_file() or hashlib.sha256(dependency_path(path).read_bytes()).hexdigest()!=expected:
+            raise ValueError('Historical dependency missing or changed: '+path)
+    with tempfile.TemporaryDirectory(prefix='lab-bundle-') as temp, tarfile.open(temporary,'w:gz') as bundle:
+        def add(name,raw,kind,**metadata):
+            sha=hashlib.sha256(raw).hexdigest();info=tarfile.TarInfo(name)
+            if name in by_name:
+                if by_name[name]!=sha:raise ValueError('Bundle path collision: '+name)
+                return sha
+            by_name[name]=sha
+            if sha in by_hash:info.type=tarfile.LNKTYPE;info.linkname=by_hash[sha];bundle.addfile(info)
+            else:
+                info.size=len(raw);bundle.addfile(info,io.BytesIO(raw));by_hash[sha]=name
+            manifest.append({'path':name,'sha256':sha,'bytes':len(raw),'kind':kind,**metadata})
+            return sha
+        def contents(path,name):
+            if path.suffix!='.sqlite3':return path.read_bytes()
+            snapshot=Path(temp)/(hashlib.sha256(name.encode()).hexdigest()+'.sqlite3')
+            with sqlite3.connect('file:'+str(path.resolve())+'?mode=ro',uri=True) as db,sqlite3.connect(snapshot) as backup:
+                db.backup(backup)
+            return snapshot.read_bytes()
         for path in sorted(selected):
-            name=str(path.relative_to(directory));source=path
-            if path.suffix=='.sqlite3':
-                source=Path(temp)/(hashlib.sha256(name.encode()).hexdigest()+'.sqlite3')
-                with sqlite3.connect(path) as db,sqlite3.connect(source) as backup:db.backup(backup)
-            raw=source.read_bytes();manifest.append({'path':name,'sha256':hashlib.sha256(raw).hexdigest(),'bytes':len(raw),
-                'kind':'full_trace' if path.suffix=='.jsonl' else 'durable_journal' if path.suffix=='.sqlite3' else 'checkpoint_or_metadata'})
-            info=tarfile.TarInfo(name);info.size=len(raw)
-            bundle.addfile(info,io.BytesIO(raw))
+            name=str(path.relative_to(directory))
+            add(name,contents(path,name),'full_trace' if path.suffix=='.jsonl' else 'durable_journal' if path.suffix=='.sqlite3' else 'checkpoint_or_metadata')
         source_paths=sorted(list((ROOT/'research').glob('*.py'))+list((ROOT/'acd').glob('*.py'))+
             list((ROOT/'scripts').glob('*.py'))+list((ROOT/'scripts').glob('*.sh'))+
             list((ROOT/'research_configs').glob('*.yaml'))+list(ROOT.glob('*lock*'))+
@@ -226,31 +360,67 @@ def reproduction_bundle(directory,output):
         for source in source_paths:
             if not source.is_file():continue
             name='checkout/'+str(source.relative_to(ROOT));raw=source.read_bytes()
-            manifest.append({'path':name,'sha256':hashlib.sha256(raw).hexdigest(),'bytes':len(raw),'kind':'reproduction_source_or_lock'})
-            info=tarfile.TarInfo(name);info.size=len(raw)
-            bundle.addfile(info,io.BytesIO(raw))
+            add(name,raw,'reproduction_source_or_lock')
+        for old,expected in required.items():
+            path=dependency_path(old);name='historical_inputs/'+expected+'/'+path.name
+            raw=contents(path,name);sha=add(name,raw,'historical_frozen_input',source_path=old,source_file_sha256=expected)
+            dependencies[old]={'relative_path':name,'bundle_sha256':sha,'source_file_sha256':expected,
+                'sqlite_consistent_backup':path.suffix=='.sqlite3'}
+        embedded={'schema':'reproduction-bundle-v2','members':deepcopy(manifest),'historical_dependencies':dependencies,
+            'own_manifest_hash_excluded':True,'weights_included':False}
+        add('bundle_manifest.json',json.dumps(embedded,ensure_ascii=False,indent=2).encode(),'embedded_manifest')
+    import os
+    os.replace(temporary,archive)
     atomic_json(output/'reproducibility_manifest.json',{'bundle':str(archive),'sha256':hashlib.sha256(archive.read_bytes()).hexdigest(),
-        'members':manifest,'compact_metrics':'episodes.json does not contain exact actor prompts, full raw observations, RNG or optimizer responses.',
+        'members':manifest,'historical_dependencies':dependencies,'schema':'reproduction-bundle-v2',
+        'compact_metrics':'episodes.json does not contain exact actor prompts, full raw observations, RNG or optimizer responses.',
         'source_model_locks':'Use protocol.json hashes and the pinned root checkout; weights are excluded. No external upload or Git action performed.'})
 
-def report_experiment(directory, output=None, include_trace=False):
+
+def restore_reproduction_bundle(archive,destination):
+    """Restore into an empty directory; original absolute paths are provenance only."""
+    destination=Path(destination).resolve();destination.mkdir(parents=True,exist_ok=True)
+    if any(destination.iterdir()):raise ValueError('Restore destination must be empty')
+    with tarfile.open(archive,'r:gz') as bundle:
+        members=bundle.getmembers();names={m.name for m in members}
+        def safe(name):return bool(name) and not Path(name).is_absolute() and '..' not in Path(name).parts
+        if len(names)!=len(members) or any(not safe(m.name) or not (m.isfile() or m.isdir() or m.islnk()) or
+            (m.islnk() and (not safe(m.linkname) or m.linkname not in names)) for m in members):
+            raise ValueError('Unsafe or duplicate bundle member')
+        with bundle.extractfile('bundle_manifest.json') as stream:manifest=json.load(stream)
+        bundle.extractall(destination)
+    for item in manifest['members']:
+        path=destination/item['path']
+        if hashlib.sha256(path.read_bytes()).hexdigest()!=item['sha256']:raise ValueError('Restored file hash mismatch: '+item['path'])
+    path=destination/'protocol.json';protocol=load(path) if path.exists() else {}
+    original=protocol.get('fixed_update_source')
+    if original:
+        mapping=manifest['historical_dependencies']
+        def remap(value):
+            if isinstance(value,str):return mapping[value]['relative_path'] if value in mapping else value
+            if isinstance(value,list):return [remap(v) for v in value]
+            if isinstance(value,dict):return {k:remap(v) for k,v in value.items() if k!='files_sha256'}
+            return value
+        source=remap(original);source['files_sha256']={v['relative_path']:v['bundle_sha256'] for v in mapping.values()}
+        protocol.update(original_fixed_update_source=original,fixed_update_source=source,restored_relative_paths=True)
+    atomic_json(destination/'restored_protocol.json',protocol)
+    return protocol
+
+def report_experiment(directory, output=None, include_trace=False, include_bundle=True):
     directory = Path(directory).resolve()
     output = Path(output).resolve() if output else directory/'report'
     episodes, statuses = collect(directory, include_trace)
     metrics = recompute(episodes)
-    for pair in metrics['paired_vs_B0']:
-        delta = pair['differences']
-        pair['median_difference'] = statistics.median(delta) if delta else None
-        pair['paired_bootstrap_95ci'] = None
-        if len(delta) > 1:
-            rng = random.Random(20261125)
-            means = [statistics.mean(rng.choices(delta, k=len(delta))) for _ in range(10000)]
-            means.sort()
-            pair['paired_bootstrap_95ci'] = [means[249], means[9749]]
     metrics['paired_comparisons']=paired_comparisons(episodes)
+    for pair in metrics['paired_vs_B0']:
+        checked=next(p for p in metrics['paired_comparisons'] if p['comparison']==pair['label']+'-B0' and
+            all(p[k]==pair[k] for k in ('version','red','split')))
+        for key in ('median_difference','paired_bootstrap_95ci','bootstrap_unit'):
+            pair[key]=checked.get(key)
     for group in metrics['groups']:
         group['mean_execution_time_s']=group['total_execution_time_s']/group['n']
         items=[e for e in episodes if all(e[k]==group[k] for k in ('version','red','split','label'))]
+        group['training_repetitions']=training_summary(items)
         if all(e.get('reward_components') is not None for e in items):
             components=set().union(*(e['reward_components'] for e in items))
             group['mean_reward_components']={k:statistics.mean(e['reward_components'].get(k,0) for e in items) for k in components}
@@ -290,6 +460,26 @@ def report_experiment(directory, output=None, include_trace=False):
         lines.append('| '+' | '.join(fmt(pair.get(k)).replace('|','/') for k in
             ('comparison','version','red','split','paired_n','mean_difference','median_difference','win_tie_loss','paired_bootstrap_95ci'))+' |')
     protocol=load(directory/'protocol.json') if (directory/'protocol.json').exists() else {}
+    reference=protocol.get('historical_performance_reference')
+    if reference:
+        raw=Path(reference['path']).read_bytes()
+        if hashlib.sha256(raw).hexdigest()!=reference['sha256']:raise ValueError('Historical performance reference changed')
+        previous=json.loads(raw)
+        atomic_json(output/'historical_metrics_reference.json',{'reference':reference,'metrics':previous})
+        lines+=['','## Historical context (not new test samples)','',reference['role'],
+            'Frozen performance source: '+str(reference.get('source_commit')),
+            '| Red | Arm | N | Mean reward | Sample SD | Mean episode seconds |',
+            '|---|---|---|---|---|---|']
+        for g in previous.get('groups',[]):
+            lines.append('| '+' | '.join(fmt(g.get(k)) for k in ('red','label','n','mean','sample_std','mean_execution_time_s'))+' |')
+    if protocol.get('protocol_kind')=='historical-diagnosis-probes-v1':
+        probe=load(output/'sg_boundary_profile.json') if (output/'sg_boundary_profile.json').exists() else {}
+        lines+=['','## Real Qwen diagnosis probes on historical training','',
+            'Complete original SG chunks, frozen BF16 weights. No new CAGE4 episode, optimizer loop, candidate generation, PPO approval or rollout admission is claimed.',
+            'Feature-selected outputs are not a population estimate of natural diagnosis accuracy or defense performance. Correct abstention is separate from a grounded proposal.','',
+            '| Stage | Observed count |','|---|---|']
+        for stage,value in probe.get('stage_counts',{}).items():lines.append('| '+stage+' | '+fmt(value)+' |')
+        lines+=['','[Selection plan](diagnosis_probe_plan.json), [raw responses and checks](sg_boundary_profile.json).']
     if protocol.get('protocol_kind')=='fixed-committed-update-verification-v1':
         lines+=['','## Fixed committed-update verification','',
             'B2 uses the exact historical completed update, evaluated on freshly registered test seeds. No new training loop is claimed. B3/B4 full training and 20-pair approval are N/A.',
@@ -303,14 +493,23 @@ def report_experiment(directory, output=None, include_trace=False):
     optimizer_report(directory,output,statuses)
     from scripts.audit_training_cost import audit
     audit(directory)
-    reproduction_bundle(directory,output)
+    if include_bundle:reproduction_bundle(directory,output)
     return {'episodes': len(episodes), 'runs': len(statuses), 'rollout_decisions': len(decisions), 'output': str(output)}
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('directory', type=Path)
+    parser.add_argument('directory', type=Path,nargs='?')
+    parser.add_argument('--restore-bundle',type=Path,help='Restore a v2 bundle into an empty --destination')
+    parser.add_argument('--destination',type=Path)
+    parser.add_argument('--summary-only',action='store_true',help='Export compact metrics/status without copying raw inputs or weights')
     parser.add_argument('--output', type=Path)
     parser.add_argument('--reasoning', action='store_true', help='Also read available raw traces for Qwen-only behavior counts')
     args = parser.parse_args()
-    print(json.dumps(report_experiment(args.directory, args.output, args.reasoning)))
+    if args.restore_bundle:
+        if not args.destination:parser.error('--restore-bundle requires --destination')
+        restore_reproduction_bundle(args.restore_bundle,args.destination)
+        print(json.dumps({'restored':str(args.destination)}))
+    else:
+        if args.directory is None:parser.error('directory is required')
+        print(json.dumps(report_experiment(args.directory, args.output, args.reasoning,not args.summary_only)))

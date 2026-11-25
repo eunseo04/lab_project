@@ -1,4 +1,5 @@
 from copy import deepcopy
+import pytest
 
 from research.attribution import auxiliary_attribution, verify_counterfactual_snapshot
 from research.evolution import Evolution
@@ -62,6 +63,76 @@ def test_campaign_cost_preflight_counts_40_validation_rollouts_and_independent_c
     # A wall-hour cap cannot authorize more GPU-hours.
     exhausted={**usage,'gpu_hours':7.99,'wall_second_cap':1000000}
     assert preflight(protocol,measured,exhausted,2,'B4')['status']=='deferred'
+
+
+def test_seed_plan_blocks_exposed_holdout_and_marks_development_reuse():
+    import pytest
+    from research.config import validate_seed_plan
+    plan={'purpose':'final_evaluation','train':[900001,900003],'validation':list(range(901000,901020)),
+        'final_test':[211000,902003],'transfer':[903000],'reserved_final_test':[211000,902003,902004]}
+    history={'events':[],'exposed_seeds':[211000,213000,215000]}
+    with pytest.raises(ValueError,match='already exposed'):validate_seed_plan(plan,history)
+    plan['purpose']='development';result=validate_seed_plan(plan,history)
+    assert result['reused_seed_roles']['final_test']==[211000]
+    assert result['reserved_unseen_seeds']==[902004] and result['reserved_exposed_seeds']==[211000]
+    assert not result['validation_reuse_is_new_independent_sample']
+    plan['final_test']=[900001]
+    with pytest.raises(ValueError,match='overlap'):validate_seed_plan(plan,history)
+
+
+def test_seed_plan_applies_noncontiguous_lists_and_variants_do_not_pick_new_holdouts():
+    from research.config import variant_config,apply_seed_plan,split_seeds
+    c=variant_config('B2-ASV');base=variant_config('B2')
+    assert c['eval_seed']==base['eval_seed'] and c['seed_use']=='legacy_reproduction'
+    plan={'purpose':'final_evaluation','train':[900001,900003],'validation':[],
+        'final_test':[902001,902004],'transfer':[903000]}
+    c['iterations']=1;c=apply_seed_plan(c,plan,{'events':[],'exposed_seeds':[]})
+    assert split_seeds(c,'train')==[900001,900003] and split_seeds(c,'final_test')==[902001,902004]
+
+
+def test_cumulative_budget_ledgers_deduplicate_sessions_and_discover_later_usage(tmp_path,monkeypatch):
+    import json
+    from types import SimpleNamespace
+    from scripts.run_campaign import recorded_gpu_usage,campaign_budget
+    outputs=tmp_path/'research_outputs';parent=outputs/'parent';child=outputs/'child';parent.mkdir(parents=True);child.mkdir()
+    first={'id':'one','start':100.,'stop':3700.,'gpu_count':1}
+    second={'id':'two','start':4000.,'stop':7600.,'gpu_count':1}
+    for folder,sessions in ((parent,[first]),(child,[first,second])):
+        (folder/'completion.json').write_text(json.dumps({'new_campaign_usage':{'gpu_hours':len(sessions),'sessions':sessions}}))
+    (child/'protocol.json').write_text(json.dumps({'prior_physical_usage':{'sources':[str(parent)]}}))
+    assert recorded_gpu_usage([parent,child])['gpu_hours']==2
+    monkeypatch.setattr('scripts.run_campaign.ROOT',tmp_path)
+    args=SimpleNamespace(usage_ledger=[parent],prior_gpu_hours=1.,gpu_hours=6.1,plan_only=False)
+    with pytest.raises(ValueError,match='exceeds'):campaign_budget(args)
+    args.gpu_hours=6.;prior,ledger=campaign_budget(args)
+    assert prior==2 and ledger['unique_sessions']==2
+    args.usage_ledger=[child];args.prior_gpu_hours=0.
+    prior,ledger=campaign_budget(args)
+    assert prior==2 and ledger['unique_sessions']==2
+
+
+def test_optional_budget_deferral_does_not_erase_completed_core(tmp_path,monkeypatch):
+    import json,threading
+    from scripts.run_campaign import run_training_study
+    calls=[];states={'episode_cost_upper_seconds':1.}
+    class Journal:
+        def restore(self,key):return states.get(key)
+        def checkpoint(self,key,value):states[key]=value
+        def budget_usage(self):return {}
+    protocol={'configs':{'B2':{'train_episodes':2,'iterations':1}},'requested_training_arms':['B2','B4'],
+        'pilot_test_seeds':[800001],'core_evaluation_labels':['B0','B1','B2'],'statistics':{'pilot_n':1}}
+    def worker(label,stage,port,seed=None,red='finite',pool=None):
+        calls.append((label,stage));dest=tmp_path/'runs'/label;dest.mkdir(parents=True,exist_ok=True)
+        if stage=='train':
+            (dest/'checkpoint.json').write_text(json.dumps({'history':[{}],'episodes_completed':2,
+                'optimizer_status':'completed_unchanged','training_completed':True}))
+        return dest,{'status':'completed','summary_status':'completed'}
+    monkeypatch.setattr('scripts.audit_training_cost.preflight',lambda *a,**k:{'status':'deferred','reason':'fixture cost'})
+    monkeypatch.setattr('scripts.audit_training_cost.audit',lambda *a:None)
+    run_training_study(protocol,tmp_path,Journal(),[{'port':8418}],worker,lambda:100,lambda _:None,threading.Event())
+    assert calls==[('B2','train'),('B0','evaluate'),('B1','evaluate'),('B2','evaluate')]
+    assert json.loads((tmp_path/'core_comparison.json').read_text())['status']=='completed'
+    assert json.loads((tmp_path/'extension_status.json').read_text())['B4']['status']=='deferred_budget'
 
 
 def test_campaign_cleanup_checks_process_identity_before_signaling(tmp_path):
@@ -182,6 +253,29 @@ def test_live_selector_instrumentation_preserves_original_prompt_choice_and_rng(
         assert random.getstate()==after and observed==direct
         audit=controller.last_event['selection_audit']
         assert audit['source']==('llm' if direct else 'epsilon_exploration')
+
+
+@pytest.mark.parametrize('final_shift',[False,True])
+def test_ssv_final_probe_covers_whole_pool_after_multiple_parents_and_capacity(offline,monkeypatch,final_shift):
+    from research.rollout import pool_digest
+    pool=SecuritySkillPool(24);pool.max_size=len(pool.skills);before=deepcopy(pool.snapshot())
+    parents=pool.skills[:2];exps=[];calls=[]
+    for parent in parents:
+        exp=experience();exp.skill=parent.name;exps.append(exp)
+    def verify(old,new):
+        calls.append((deepcopy(old),deepcopy(new)))
+        return {'requires_rollout':final_shift and len(calls)==3}
+    ev=Evolution(offline,{'schedule':'paper_batch','gate_mode':'paper_rtg','maintenance_mode':'paper_algorithm1',
+        'best_of_n':1,'selection_shift_verification':True},selection_verifier=verify)
+    monkeypatch.setattr(ev,'evolve',lambda p,e:(Skill(p.name+'_next',p.initiation,['Review status'],p.termination),'REFINE'))
+    monkeypatch.setattr(ev,'probabilities',lambda p,es:[0.]*sum(len(e.transitions) for e in es))
+    result=ev.update(pool,exps,{'test':0},1);final=result['final_selection_verification']
+    assert len(calls)==3 and calls[-1][0]==before
+    assert final['probed_pool_sha256']==pool_digest(calls[-1][1])
+    assert len(calls[-1][1]['skills'])<=pool.max_size
+    if final_shift:
+        assert pool.snapshot()==before and not any(r['accepted'] for r in result['evolution'])
+    else:assert final['committed_pool_sha256']==final['probed_pool_sha256']==pool_digest(pool.snapshot())
 
 
 def test_scorer_profile_fills_missing_per_token_generation_cache_with_reference(tmp_path,monkeypatch):
