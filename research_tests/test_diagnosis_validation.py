@@ -171,6 +171,65 @@ def test_correct_claim_with_unrelated_proposal_is_deferred():
     assert 'proposal_unrelated_to_validated_finding' in model.audits[-1]['structured_proposals']['errors']
 
 
+def sleep_decision_evidence():
+    data,rows=evidence('Sleep','UNKNOWN')
+    rows[0]['requested_action']='Sleep'
+    data['evidence'][0]['field']='requested_action'
+    data['claims'][0].update(target=None,finding='recorded_decision')
+    add_proposal(data,'review_recorded_decision')
+    data['proposals'][0]['scope']='same_observed_decision'
+    return data,rows
+
+
+def test_unknown_targetless_sleep_supports_only_a_recorded_decision():
+    data,rows=sleep_decision_evidence()
+    data['diagnosis']='Unverified prose: Sleep failed and caused the joint reward loss.'
+    data['semantic_gradient']['policy']='UNVERIFIED_SLEEP_FAILURE: restore every host.'
+    model=EvidenceModel(lambda _:json.dumps(data),rows,diagnosis_verification=True)
+    result=json.loads(model('unchanged source of observed facts'))
+    assert result['is_related'] and model.audits[-1]['passed']
+    assert result['verified_facts'][0]['finding']=='recorded_decision'
+    assert result['verified_facts'][0]['target'] is None
+    assert result['proposals'][0]['scope']=='same_observed_decision'
+    assert 'UNVERIFIED_SLEEP_FAILURE' not in json.dumps(result)
+    assert 'UNVERIFIED_SLEEP_FAILURE' in model.audits[-1]['raw_response']
+
+
+@pytest.mark.parametrize('invalid',[
+    'busy','not_applied','parse_error','missing_request','missing_target','invented_target',
+    'string_null','empty_target','wrong_time','before_decision','invented_failure','invented_pending','unrelated_proposal','wrong_scope'])
+def test_targetless_decision_does_not_admit_unobserved_outcomes_or_requests(invalid):
+    data,rows=sleep_decision_evidence();claim=data['claims'][0]
+    if invalid=='busy':rows[0]['policy_invoked']=False
+    elif invalid=='not_applied':rows[0]['request_applied']=False
+    elif invalid=='parse_error':rows[0]['parse_error']='invalid response'
+    elif invalid=='missing_request':rows[0]['requested_action']=None
+    elif invalid=='missing_target':del claim['target']
+    elif invalid=='invented_target':claim['target']='h1'
+    elif invalid=='string_null':claim['target']='null'
+    elif invalid=='empty_target':claim['target']=''
+    elif invalid=='wrong_time':claim['as_of_step']=7
+    elif invalid=='before_decision':claim.update(phase='before',as_of_step=5)
+    elif invalid=='invented_failure':claim['finding']='completed_failure'
+    elif invalid=='invented_pending':claim['finding']='pending'
+    elif invalid=='unrelated_proposal':data['proposals'][0]['operation']='check_call_outcome'
+    elif invalid=='wrong_scope':data['proposals'][0]['scope']='same_observed_host_and_epoch'
+    model=EvidenceModel(lambda _:json.dumps(data),rows,diagnosis_verification=True)
+    result=json.loads(model('audit only'))
+    assert not result['is_related'] and not model.audits[-1]['passed']
+    assert not any(result['semantic_gradient'].values())
+
+
+def test_current_sleep_decision_is_not_the_previous_completed_remove():
+    data,rows=sleep_decision_evidence()
+    rows[0]['behavior_outcome']={'completed_action':{'name':'Remove','target':'h1',
+        'status':'FALSE','started_at':3,'completed_at':6}}
+    model=EvidenceModel(lambda _:json.dumps(data),rows,diagnosis_verification=True)
+    result=json.loads(model('the prior completion and current decision are separate'))
+    assert result['is_related'] and result['verified_facts'][0]['action']=='Sleep'
+    assert result['verified_facts'][0]['target'] is None
+
+
 def controlled_native_diagnosis_cases():
     """Real partial CAGE4 records under scripted actions, not an LLM performance run."""
     from research.adapter import make_environment,plain,BLUE_AGENTS

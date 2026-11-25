@@ -96,6 +96,8 @@ loop 상태는 `completed_changed`, `completed_unchanged`, `completed_no_eligibl
 
 B3/B4는 typed claim → canonical 관찰 사실 → 연결된 구조화 가설만 후보 입력으로 넘긴다. 원문 diagnosis/free gradient는 감사 기록으로 격리한다. 성분 범위/관찰 관계 검사는 일반 자연어 의미·인과관계·제안 절차의 효과를 보증하지 않는다. 공동 reward를 개별 Skill의 직접 기여로 해석하지 않으며, PPO Gate 양수만으로 방어 성능 개선을 주장하지 않는다.
 
+진단 schema v7의 `recorded_decision`은 실제 호출·적용된 정책 결정을 확인한다. Sleep의 대상은 JSON `null`이며 `UNKNOWN` 결과를 성공·실패·진행 중으로 해석하지 않는다. 이전 행동의 완료와 현재 결정을 구분하고, 연결된 제안은 같은 관찰 결정의 재검토로 제한한다. 이 계약 검증의 통과가 새 Qwen 진단 정확도나 방어 보상 개선을 뜻하지는 않는다.
+
 새 캠페인은 훈련 **212000·212001**, 후보 검증 **213000–213019**, test **211000부터**, 다른 Red **215000**을 호출 전에 등록한다. 이미 결과를 확인한 201000·201001은 개발 분석 자료다. 기존 YAML의 과거 시드는 기존 결과 재현용이며 새 독립 성능 입증에 재사용하지 않는다. 보고기는 B1−B0, B2−B1, B3−B2, B4−B3 등 완료 seed 쌍, 표본 SD, 평균/중앙값, win/tie/loss, 사전 고정 bootstrap CI를 낸다. 미실행은 N/A로 남긴다. 동일 source/model/protocol에서 한 군의 서로 다른 동결 Pool 결과를 합치지 않는다.
 
 보고기의 `bottleneck_report.json`, `optimizer_progress.json`, `resume_verification.json`, `diagnosis_evaluation.json`, `performance.md`/`metrics.json`, `skill_changes.json`, `reproducibility_manifest.json`과 압축 bundle을 확인한다. compact episode 지표만으로는 optimizer나 원시 prompt를 복원할 수 없다. 캠페인은 성공·예산 종료·예외·TERM 모두에서 기록된 자기 PID/자식 worker만 종료하고 GPU PID·메모리·포트를 확인한다. 이 작업은 Git commit/push나 외부 업로드를 자동 실행하지 않는다.

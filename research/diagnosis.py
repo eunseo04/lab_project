@@ -1,7 +1,7 @@
 """CAGE4 observation checks for proposed SGs; these do not prove causation."""
 COMPONENTS = {'initiation', 'execution', 'termination'}
 FINDINGS = {'completed_success', 'completed_failure', 'pending', 'observed_pid',
-            'observed_admin_indicator', 'observed_service_state'}
+            'observed_admin_indicator', 'observed_service_state', 'recorded_decision'}
 
 
 def operation(row):
@@ -61,11 +61,20 @@ def validate_diagnosis(data, rows, provenance):
             errors.append('claim_without_matching_citation'); continue
         if finding not in FINDINGS or claim.get('causal_attribution') != 'unknown':
             errors.append('unproven_causal_or_unknown_claim'); continue
-        op = operation(row)
+        if finding == 'recorded_decision':
+            # A decision fact is distinct from completion of an earlier action.
+            if not row.get('policy_invoked') or not row.get('request_applied') or row.get('parse_error') or not row.get('requested_action'):
+                errors.append('not_an_applied_policy_decision'); continue
+            from .behavior import chosen_action
+            name, target = chosen_action(row)
+            op = {'name': name, 'target': target}
+        else:
+            op = operation(row)
         if claim.get('action') != op.get('name'):
             errors.append('action_mismatch'); continue
         host = claim.get('target')
-        if not host or host != op.get('target'):
+        if ('target' not in claim or host != op.get('target') or
+                (not host and not (host is None and op.get('name') in {'Sleep', 'Monitor'}))):
             errors.append('target_mismatch'); continue
         phase = claim.get('phase', 'after')
         if phase not in ('before', 'after'):
@@ -75,7 +84,10 @@ def validate_diagnosis(data, rows, provenance):
         if type(as_of) is not int or as_of != recorded_at:
             errors.append('observation_time_mismatch'); continue
         end, start = op.get('completed_at'), op.get('started_at')
-        if finding.startswith('completed_'):
+        if finding == 'recorded_decision':
+            if phase != 'after':
+                errors.append('decision_not_recorded_before_action'); continue
+        elif finding.startswith('completed_'):
             expected = 'TRUE' if finding == 'completed_success' else 'FALSE'
             if op.get('status') != expected or end is None or phase != 'after' or end > as_of or start is None or end < start:
                 errors.append('not_a_completed_action'); continue
@@ -118,16 +130,21 @@ def validate_diagnosis(data, rows, provenance):
 
 
 PROMPT = '''
-### CAGE4 diagnosis consistency schema (Proposed v6, separate from Skill-Pro)
+### CAGE4 diagnosis consistency schema (Proposed v7, separate from Skill-Pro)
 Keep the original initiation/policy/termination semantic gradients. In addition,
 return diagnosis_status="supported|unknown|insufficient_evidence", reward_attribution="unknown",
 and claims=[{"component":"policy", "evidence_id":"E0", "action":"Remove",
 "target":"actual host from that record", "finding":"completed_failure", "phase":"after",
 "as_of_step":1, "restore_epoch":-1, "causal_attribution":"unknown"}].
-Allowed findings: completed_success, completed_failure, pending, observed_pid (include pid),
+Allowed findings: recorded_decision, completed_success, completed_failure, pending, observed_pid (include pid),
 observed_admin_indicator (include indicator), observed_service_state (include service and value).
 Use one matching evidence citation and observation-consistent claim for EVERY changed component.
 Action and target must describe the cited own operation, not a suggested future operation.
+For recorded_decision only, use the actual requested action/target of an invoked,
+applied, parsed policy decision, even if the displayed own_operation describes an
+earlier completion. Sleep/Monitor have target JSON null, never the string "null"
+or an invented host. Use phase="after". This finding verifies only a recorded
+decision; UNKNOWN never establishes success, failure or an IN_PROGRESS operation.
 as_of_step equals record step for before, step+1 for after. restore_epoch is the latest
 successful same-host Restore completion visible at that time, or -1 if none is recorded.
 IN_PROGRESS never supports completed_failure/success. FALSE is a call status, not proof
@@ -140,6 +157,7 @@ Do not claim that these checks prove causation. Never insert evidence IDs into S
 
 
 PROPOSAL_FINDINGS = {
+    'review_recorded_decision': {'recorded_decision'},
     'check_call_outcome': {'completed_success', 'completed_failure'},
     'wait_for_completion': {'pending'},
     'review_observed_pid': {'observed_pid'},
@@ -173,12 +191,13 @@ def canonical_proposals(data, validation):
             errors.append('proposal_without_matching_validated_fact');continue
         if kind not in PROPOSAL_FINDINGS or any(f['finding'] not in PROPOSAL_FINDINGS[kind] for f in support):
             errors.append('proposal_unrelated_to_validated_finding');continue
-        if proposal.get('scope')!='same_observed_host_and_epoch' or proposal.get('causal_status')!='untested_hypothesis':
+        scope = 'same_observed_decision' if kind == 'review_recorded_decision' else 'same_observed_host_and_epoch'
+        if proposal.get('scope')!=scope or proposal.get('causal_status')!='untested_hypothesis':
             errors.append('unbounded_or_causal_proposal');continue
         if any(proposal.get('observed_action')!=f['action'] for f in support):
             errors.append('proposal_action_mismatch');continue
         proposals.append({'proposal_id':f'P{index}','component':component,'operation':kind,
-            'scope':'same_observed_host_and_epoch','causal_status':'untested_hypothesis',
+            'scope':scope,'causal_status':'untested_hypothesis',
             'fact_ids':[f['fact_id'] for f in support],
             'observed_actions':sorted({f['action'] for f in support})})
     gradients={key:'' for key in COMPONENTS}
@@ -201,6 +220,7 @@ Also return proposals, with one entry for each component you propose to change:
 "operation":"check_call_outcome","scope":"same_observed_host_and_epoch",
 "causal_status":"untested_hypothesis"}.
 Allowed operation/finding pairs:
+review_recorded_decision -> recorded_decision (use scope="same_observed_decision");
 check_call_outcome -> completed_success or completed_failure;
 wait_for_completion -> pending; review_observed_pid -> observed_pid;
 review_privilege_indicator -> observed_admin_indicator;
