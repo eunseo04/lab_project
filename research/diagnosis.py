@@ -1,7 +1,11 @@
 """CAGE4 observation checks for proposed SGs; these do not prove causation."""
+import re
+
 COMPONENTS = {'initiation', 'execution', 'termination'}
 FINDINGS = {'completed_success', 'completed_failure', 'pending', 'observed_pid',
             'observed_admin_indicator', 'observed_service_state', 'recorded_decision'}
+TRAFFIC_ACTIONS = {'BlockTrafficZone', 'AllowTrafficZone'}
+TRAFFIC_SCOPE_CONTRADICTION = 'ACD_traffic_control_has_one_fixed_source_and_one_destination'
 
 
 def operation(row):
@@ -46,6 +50,8 @@ def canonical_operations(row, rows):
     decision={'name':name,'target':target,'policy_invoked':bool(row.get('policy_invoked')),
         'request_applied':bool(row.get('request_applied')),'parse_error':row.get('parse_error'),
         'recorded_request':bool(row.get('requested_action')),'step':row['step']}
+    if name in TRAFFIC_ACTIONS and row.get('requested_traffic_zone_pair'):
+        decision['traffic_zone_pair'] = row['requested_traffic_zone_pair']
     result={}
     for key,op in (('requested_decision',decision),('completed_or_pending_operation',operation(row))):
         target=op.get('target')
@@ -148,6 +154,7 @@ def validate_diagnosis(data, rows, provenance):
             errors.append('call_status_is_not_pid_cleanup_evidence'); continue
         valid.append({**claim, 'component': component, 'status': 'observation_consistent',
             **({'observation_target':host,'target':host,'action':claim.get('action')} if observation_finding else {}),
+            **traffic_fact_context(row, {} if observation_finding else op),
             'source_seed':row.get('seed'),'source_agent':row['agent'],'source_step':row['step'],
             'source_trace_sha256':provenance.get('trace_sha256')})
     supported = {c['component'] for c in valid}
@@ -206,17 +213,79 @@ PROPOSAL_FINDINGS = {
 }
 
 
-def traffic_scope_contradictions(text):
-    """Check explicit claims beyond the fixed ACD traffic pair."""
-    import re
-    for sentence in re.split(r'[.!?\n]',text):
-        if re.search(r'\b(?:do not|cannot|never|avoid)\b',sentence,re.I):
+def traffic_fact_context(row, op):
+    context = {}
+    if isinstance(row.get('traffic_zone_interface'), dict):
+        context['traffic_zone_interface'] = row['traffic_zone_interface']
+    if op.get('name') in TRAFFIC_ACTIONS and isinstance(op.get('traffic_zone_pair'), dict):
+        context['traffic_zone_pair'] = op['traffic_zone_pair']
+    return context
+
+
+def traffic_scope_contradictions(text, facts=()):
+    """Recognize explicit scope contradictions. Unclassified prose stays unknown."""
+    sources = set()
+    completion_pairs = {}
+    for fact in facts:
+        interface = fact.get('traffic_zone_interface', {})
+        pair = fact.get('traffic_zone_pair', {})
+        agent = fact.get('agent', fact.get('source_agent', ''))
+        if not isinstance(interface, dict) or not isinstance(pair, dict) or not (interface or pair):
             continue
-        traffic=re.search(r'\b(?:BlockTrafficZone|AllowTrafficZone|block|allow|isolate)\b',sentence,re.I)
-        broad=re.search(r'\b(?:all sources|any source subnet|any from_subnet|entire (?:subnet|zone)|whole (?:subnet|zone)|all (?:incoming|outgoing) traffic)\b',sentence,re.I)
-        assigns_source=re.search(r'\bfrom_subnet\s*[:=]\s*[\w]+_subnet\b',sentence,re.I)
-        if traffic and (broad or assigns_source):
-            return ['ACD_traffic_control_has_one_fixed_source_and_one_destination']
+        if not isinstance(agent, str) or not re.fullmatch(r'blue_agent_[0-4]', agent):
+            continue
+        from CybORG.Agents.LLMAgents.llm_adapter.utils.constants import CAGE4_SUBNETS
+        fixed_source = CAGE4_SUBNETS[int(agent[-1])]
+        if interface and interface.get('fixed_from_subnet') != fixed_source:
+            continue
+        if pair and (pair.get('from_subnet') != fixed_source or not isinstance(pair.get('to_subnet'), str)
+                or pair['to_subnet'] != fact.get('target')):
+            continue
+        sources.add(fixed_source)
+        action = fact.get('action')
+        if pair and action in TRAFFIC_ACTIONS and fact.get('finding') in ('completed_success', 'completed_failure'):
+            completion_pairs.setdefault(action.lower(), set()).add((fixed_source, pair['to_subnet']))
+
+    # Separate independently asserted claims before checking direct negations.
+    action = r'(?:BlockTrafficZone|AllowTrafficZone|block\w*|allow\w*|isolat\w*)'
+    setter = r'(?:set|change|choose|select|specify|override|assign|supply|pick)'
+    clause_break = r'[.!?;\n,]|\b(?:but|however|instead|whereas)\b|\b(?:and|then)\s+(?='+action+r'\b)'
+    direct_negative = (r"\b(?:not|never|cannot|avoid|don['’]t|can['’]t|doesn['’]t|won['’]t)\s+"
+        r"(?:(?:try to|attempt to|use|using|be used to|repeatedly)\s+)*(?:" + action + '|' + setter +
+        r'|affect|cover|control)\b')
+    broad_scope = (r'\b(?:all sources|any source subnet|any from_subnet|entire (?:subnet|zone)|'
+        r'whole (?:subnet|zone)|all (?:incoming|outgoing) traffic|multiple (?:destinations?|source subnets?))\b')
+    endpoint = r"""\s*(?:=|:|\bis\b)?\s*[`"']?([a-z0-9_]+_subnet)\b"""
+    explicit_source = r'\b(?:from_subnet|(?:fixed\s+)?source(?:\s+subnet)?)'+endpoint
+    explicit_target = r'\b(?:to_subnet|(?:selected\s+)?destination(?:\s+subnet)?)'+endpoint
+    assigns_source = r'\b'+setter+r'\s+(?:the\s+)?(from_subnet|source (?:subnet|zone))\b'
+    traffic_control = r'\b(?:BlockTrafficZone|AllowTrafficZone|block traffic|allow traffic|isolate)\b'
+    completed_claim = r'\b(?:BlockTrafficZone|AllowTrafficZone)\s+(?:completed|succeeded|failed|executed)\b'
+    for clause in re.split(clause_break, text, flags=re.I):
+        assignment = re.search(assigns_source, clause, re.I)
+        if (assignment and (assignment[1].lower() == 'from_subnet' or re.search(traffic_control, clause, re.I))
+                and not re.search(direct_negative, clause[:assignment.end()], re.I)):
+            return [TRAFFIC_SCOPE_CONTRADICTION]
+        if not re.search(r'\b'+action+r'\b', clause, re.I):
+            continue
+        broad = re.search(broad_scope, clause, re.I)
+        if broad and not (re.search(direct_negative, clause[:broad.start()], re.I) or
+                          re.search(r'\b(?:not|never)\s+(?:the\s+)?$', clause[:broad.start()], re.I)):
+            return [TRAFFIC_SCOPE_CONTRADICTION]
+        claimed_source = {m[1].lower() for m in re.finditer(explicit_source, clause, re.I)
+                          if not re.search(direct_negative, clause[:m.start()], re.I)}
+        claimed_target = {m[1].lower() for m in re.finditer(explicit_target, clause, re.I)
+                          if not re.search(direct_negative, clause[:m.start()], re.I)}
+        if len(claimed_source) > 1 or len(claimed_target) > 1:
+            return [TRAFFIC_SCOPE_CONTRADICTION]
+        if claimed_source and sources and not claimed_source & sources:
+            return [TRAFFIC_SCOPE_CONTRADICTION]
+        actual = re.search(completed_claim, clause, re.I)
+        if actual and claimed_target:
+            pairs = completion_pairs.get(actual[0].split()[0].lower(), set())
+            if pairs and not any((not claimed_source or source in claimed_source) and target in claimed_target
+                                 for source, target in pairs):
+                return [TRAFFIC_SCOPE_CONTRADICTION]
     return []
 
 
@@ -229,7 +298,7 @@ def canonical_proposals(data, validation):
     from .progress import digest
     facts=[]
     fields=('component','evidence_id','action','target','observation_target','finding','phase','as_of_step','restore_epoch','pid','indicator','service','value',
-        'source_seed','source_agent','source_step','source_trace_sha256')
+        'source_seed','source_agent','source_step','source_trace_sha256','traffic_zone_interface','traffic_zone_pair')
     for claim in validation.get('valid_claims',[]):
         fact={k:claim[k] for k in fields if k in claim}
         fact['fact_id']='F'+digest(fact)[:16]
@@ -295,21 +364,21 @@ def canonical_fact_catalog(rows):
     facts=[]
     for i,row in enumerate(rows):
         ops=canonical_operations(row,rows)
-        def add(finding,phase,target,action=None,**details):
+        def add(finding,phase,target,action=None,action_record=None,**details):
             at=row['step']+int(phase=='after')
             fact={'evidence_id':f'E{i}','agent':row['agent'],'step':row['step'],
                 'finding':finding,'phase':phase,'as_of_step':at,'target':target,'action':action,
                 'restore_epoch':restore_boundary(rows,row['agent'],target,at),
-                'source_record_sha256':digest(row),**details}
+                'source_record_sha256':digest(row),**traffic_fact_context(row, action_record or {}),**details}
             fact['fact_id']='F'+digest(fact)[:16];facts.append(fact)
         decision=ops['requested_decision'];op=ops['completed_or_pending_operation']
         if decision['policy_invoked'] and decision['request_applied'] and not decision['parse_error'] and decision['recorded_request']:
-            add('recorded_decision','after',decision['target'],decision['name'])
+            add('recorded_decision','after',decision['target'],decision['name'],action_record=decision)
         if op['recorded_operation'] and op.get('status') in ('TRUE','FALSE') and op.get('completed_at') is not None and op.get('started_at') is not None and op['started_at']<=op['completed_at']<=row['step']+1:
-            pair={'traffic_zone_pair':op['traffic_zone_pair']} if op.get('traffic_zone_pair') else {}
-            add('completed_success' if op['status']=='TRUE' else 'completed_failure','after',op.get('target'),op.get('name'),**pair)
+            add('completed_success' if op['status']=='TRUE' else 'completed_failure','after',op.get('target'),op.get('name'),
+                action_record=op)
         if op['recorded_operation'] and op.get('status')=='IN_PROGRESS' and op.get('completed_at') is None:
-            add('pending','after',op.get('target'),op.get('name'))
+            add('pending','after',op.get('target'),op.get('name'),action_record=op)
         for phase in ('before','after'):
             for host,body in (row.get('observation_'+phase) or {}).items():
                 if not isinstance(body,dict):continue
@@ -328,7 +397,7 @@ def canonical_fact_catalog(rows):
 
 def validate_interventions(data,rows):
     """Resolve selected IDs exactly, validate bounded hypotheses, never repair a claim."""
-    import json,re
+    import json
     from .progress import digest
     catalog={f['fact_id']:f for f in canonical_fact_catalog(rows)}
     hypotheses=data.get('interventions',[]);errors=[];facts={};proposals=[]
@@ -337,7 +406,7 @@ def validate_interventions(data,rows):
     if not isinstance(hypotheses,list):hypotheses=[];errors.append('invalid_interventions')
     if hypotheses and data.get('is_related') is not True:errors.append('inconsistent_related_status')
     if len(hypotheses)>32:errors.append('too_many_interventions');hypotheses=[]
-    hosts={f['target'] for f in catalog.values() if isinstance(f.get('target'),str)}
+    hosts={f['target'] for f in catalog.values() if isinstance(f.get('target'),str) and f.get('action') not in TRAFFIC_ACTIONS}
     for hypothesis in hypotheses:
         if not isinstance(hypothesis,dict) or set(hypothesis)-allowed:
             errors.append('invalid_intervention_fields');continue
@@ -351,8 +420,8 @@ def validate_interventions(data,rows):
         binding=hypothesis.get('target_binding')
         if binding not in ('observed_host','none') or (binding=='observed_host' and any(f.get('target') is None for f in selected)):
             errors.append('unsupported_runtime_binding');continue
-        text=' '.join(hypothesis[k] for k in required)
-        contradictions=traffic_scope_contradictions(text)
+        text='\n'.join(hypothesis[k] for k in required)
+        contradictions=traffic_scope_contradictions(text, selected)
         if contradictions:
             errors.extend(contradictions);continue
         if re.search(r'\b(?:\d{1,3}\.){3}\d{1,3}\b|\b[FP][a-f0-9]{16}\b|\bE\d+\b',text) or any(re.search(r'(?<!\w)'+re.escape(host)+r'(?!\w)',text) for host in hosts):
@@ -369,7 +438,7 @@ def validate_interventions(data,rows):
             'untested_modification_hypothesis':p,'constraint':'Facts alone are verified. Problem, proposed procedure and efficacy remain untested. Bind targets from current observations; never copy instance IDs.'},ensure_ascii=False,sort_keys=True)+'\n'
     return {'passed':bool(proposals) and not errors,'schema':'fact-interventions-v1','facts':list(facts.values()),'proposals':proposals,
         'gradients':gradients,'errors':errors,'facts_verified':bool(facts) and not errors,'candidate_links_valid':None,
-        'known_contradiction':False,'efficacy_verified':False,'raw_prose_forwarded':False,
+        'known_contradiction':TRAFFIC_SCOPE_CONTRADICTION in errors,'efficacy_verified':False,'raw_prose_forwarded':False,
         'limitation':'Selected catalog facts are exact; natural-language problem/procedure/efficacy are hypotheses, not verified semantics.'}
 
 

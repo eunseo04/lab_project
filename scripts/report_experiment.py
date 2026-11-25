@@ -19,7 +19,7 @@ sys.path.insert(0, str(ROOT))
 from scripts.recompute_public_metrics import recompute,paired_episodes,episode_group,GROUP_FIELDS
 from research.progress import Journal,atomic_json
 from research.config import (comparison_metadata,VERIFICATION_VARIANTS,CONTROLLER_VARIANTS,
-    COMPLETED_OPTIMIZER_STATUSES,check_pool_interface)
+    COMPLETED_OPTIMIZER_STATUSES,check_pool_interface,policy_interface,read_policy_manifest,read_training_manifest)
 from acd.config import LEGACY_ENCODER
 
 
@@ -27,7 +27,7 @@ def load(path):
     return json.loads(path.read_text())
 
 
-def training_evidence(config,summary,run,cache):
+def training_evidence(config,summary,run,cache,*,fixed_source=None):
     """Classify a frozen policy using a completed, hash-matched training artifact."""
     metadata=comparison_metadata(config)
     if not metadata['policy_type_known'] or not metadata['policy_label_consistent']:
@@ -55,8 +55,20 @@ def training_evidence(config,summary,run,cache):
     if actual!=p['sha256']:
         result['state']='training_artifact_hash_mismatch';return result
     try:
-        check_pool_interface(trained,config)
-    except ValueError:
+        original=read_training_manifest(path,trained,manifest_ref=p.get('training_manifest'))
+        if original is None and trained.get('policy_interface') is None and fixed_source:
+            # A fixed-update study archived an exact copy of a previously trained Pool.
+            directory,source=fixed_source
+            registered_checkpoint=source.get('checkpoint')
+            registered_hashes=source.get('files_sha256') or {}
+            if registered_checkpoint and registered_hashes.get(registered_checkpoint)==actual:
+                original_path=directory/registered_checkpoint
+                if original_path.is_file() and hashlib.sha256(original_path.read_bytes()).hexdigest()==actual:
+                    name=source.get('training_manifest')
+                    manifest_ref=({'path':str(directory/name),'sha256':registered_hashes.get(name)} if name else None)
+                    original=read_training_manifest(original_path,trained,manifest_ref=manifest_ref)
+        check_pool_interface(trained,config,manifest=original)
+    except (ValueError,OSError):
         result['state']='training_policy_interface_mismatch';return result
     algorithm=trained.get('algorithm');declared=p.get('algorithm')
     if not isinstance(algorithm,dict) or declared!=algorithm:
@@ -73,8 +85,6 @@ def training_evidence(config,summary,run,cache):
         if k in e:expected[k]=e[k]
     for k in ('method_version','admission_mode','evidence_schema'):
         if k in e:expected[k]=e[k]
-    if trained.get('controller_contract','upstream')!=config.get('selector',{}).get('contract','upstream'):
-        result['state']='training_controller_mismatch';return result
     if any(algorithm.get(k,False if isinstance(value,bool) else 0)!=value for k,value in expected.items()):
         result['state']='training_method_mismatch';return result
     history=trained.get('history',[]);status=trained.get('optimizer_status')
@@ -97,8 +107,11 @@ def training_evidence(config,summary,run,cache):
     if frozen.is_file():
         frozen_record=load(frozen)
         try:
-            check_pool_interface(frozen_record,config)
-        except ValueError:
+            manifest_path=run/'manifest.json'
+            original=(read_policy_manifest(manifest_path)
+                      if 'policy_interface' not in frozen_record and manifest_path.is_file() else None)
+            check_pool_interface(frozen_record,config,manifest=original)
+        except (ValueError,OSError):
             result['state']='frozen_policy_interface_mismatch';return result
         frozen_hash=hashlib.sha256(json.dumps(frozen_record.get('pool'),sort_keys=True).encode()).hexdigest()
     else:frozen_hash=None
@@ -126,58 +139,99 @@ def training_summary(items):
             'note':'Environment seeds and repeated evaluation of one artifact are not independent training repetitions.'}
 
 
-def collect(directory, include_trace=False):
+def collect(directory, include_trace=False, *, include_trace_paths=False):
     directory = Path(directory).resolve()
     if directory == ROOT or not directory.is_dir():
         raise ValueError('Pass a specific experiment output directory')
     runs = sorted({p.parent for name in ('summary.json', 'manifest.json') for p in directory.rglob(name)
-                   if 'rollout-verification' not in p.relative_to(directory).parts})
+                   if not {'report','rollout-verification'}.intersection(p.relative_to(directory).parts)})
     episodes, statuses, signatures, policy_signatures, initial_pools = [], [], {}, {}, {}
-    provenance_cache={};protocol_signatures={}
+    provenance_cache={};protocol_signatures={};controller_signatures={}
+    protocol_path=directory/'protocol.json'
+    fixed_source=(directory,load(protocol_path).get('fixed_update_source',{})) if protocol_path.is_file() else None
     for run in runs:
         summary = load(run/'summary.json') if (run/'summary.json').exists() else {}
         manifest = load(run/'manifest.json') if (run/'manifest.json').exists() else {}
-        config = summary.get('config') or manifest.get('config') or {}
-        if not config:
+        recorded_config=manifest.get('config') or {}
+        config = summary.get('config') or recorded_config
+        if not config and not summary.get('result_kind'):
             continue
         stage = summary.get('stage', manifest.get('stage', 'unknown'))
         label = config.get('comparison_id', config.get('arm', 'unknown'))
         stage={'evaluate':'eval'}.get(stage,stage)
         split = 'train' if stage == 'train' else 'test' if stage=='eval' else 'untrained_control'
-        if stage=='eval' and config.get('seed_use') in ('development','reproduction','legacy_reproduction'):
-            split='development' if config['seed_use']=='development' else 'reproduction'
-        provenance=training_evidence(config,summary,run,provenance_cache) if stage=='eval' else {}
+        registered_role=recorded_config.get('evaluation_role')
+        role = config.get('evaluation_role')
+        if {'rollout','validation'}.intersection((role,registered_role)):
+            continue
+        registered_stage={'evaluate':'eval'}.get(manifest.get('stage'),manifest.get('stage'))
+        if registered_stage is not None and stage!=registered_stage:
+            raise ValueError('Run stage differs from its manifest')
+        if role is not None and registered_role is not None and role!=registered_role:
+            raise ValueError('Evaluation role differs from its manifest')
+        role=role or registered_role
+        registered_seed_use=recorded_config.get('seed_use') or (recorded_config.get('seed_plan') or {}).get('purpose')
+        seed_use=config.get('seed_use') or (config.get('seed_plan') or {}).get('purpose')
+        if seed_use and registered_seed_use and seed_use!=registered_seed_use:
+            raise ValueError('Seed use differs from its manifest')
+        seed_use=seed_use or registered_seed_use
+        if stage=='eval' and role=='transfer_test':
+            split='transfer'
+        elif stage=='eval' and seed_use in ('development','reproduction','legacy_reproduction'):
+            split='development' if seed_use=='development' else 'reproduction'
+        evaluation_scope=split
+        provenance=training_evidence(config,summary,run,provenance_cache,fixed_source=fixed_source) if stage=='eval' else {}
         if stage=='eval' and not provenance['verified']:split='untrained_control'
-        comparison_run=summary.get('comparison_run_id') or config.get('comparison_run_id') or config.get('experiment_id') or str(run.parent.relative_to(directory))
-        if config.get('evaluation_role')=='rollout':continue
+        implicit_run='.' if run==directory else str(run.parent.relative_to(directory))
+        comparison_run=summary.get('comparison_run_id') or config.get('comparison_run_id') or config.get('experiment_id') or implicit_run
         version = config.get('experiment_version', 'unversioned')+':'+config.get('composition', 'unknown')
-        found = {(e['seed'], e.get('episode_id', 0)): e for e in summary.get('episodes', [])}
-        for path in sorted(run.glob('episode-????.json')):
-            episode = load(path); key = (episode['seed'], episode.get('episode_id', 0))
-            if key in found and found[key].get('joint_return') != episode.get('joint_return'):
-                raise ValueError(f'Episode summary disagrees with its completed record: {path}')
-            found[key] = episode
+        result_kind = summary.get('result_kind')
+        found = {}
+        if config and result_kind in (None, 'real_cage4') and not summary.get('unit_test_fixture_only'):
+            found = {(e['seed'], e.get('episode_id', 0)): e for e in summary.get('episodes', []) if 'seed' in e}
+            for path in sorted(run.glob('episode-????.json')):
+                episode = load(path); key = (episode['seed'], episode.get('episode_id', 0))
+                if key in found:
+                    if found[key].get('joint_return') != episode.get('joint_return'):
+                        raise ValueError(f'Episode summary disagrees with its completed record: {path}')
+                    if found[key].get('unit_test_fixture_only'):
+                        episode = {**episode, 'unit_test_fixture_only': True}
+                found[key] = episode
         completed = 0
-        encoder=config.get('communication_encoder',LEGACY_ENCODER)
+        interface=policy_interface(config);encoder=interface['communication_encoder']
+        if ((recorded_config and policy_interface(recorded_config)!=interface)
+                or (manifest.get('policy_interface') is not None and manifest['policy_interface']!=interface)):
+            raise ValueError('Run policy interface differs from its manifest')
         for episode in found.values():
-            if episode.get('status') != 'completed' or episode.get('kind') != 'real_cage4':
+            if (episode.get('status') != 'completed' or episode.get('kind') != 'real_cage4'
+                    or episode.get('unit_test_fixture_only')):
                 continue
             if config.get('steps') == 500 and (episode.get('joint_transitions'), episode.get('scored_transitions')) != (499, 498):
                 raise ValueError('Invalid official 500-step episode evidence')
             if episode.get('communication_encoder',LEGACY_ENCODER)!=encoder:
                 raise ValueError('Episode communication encoder differs from its config')
+            if episode.get('policy_interface') is not None and episode['policy_interface'] != interface:
+                raise ValueError('Episode policy interface differs from its config')
             identity = episode.get('model_identity') or summary.get('model_identity') or {}
             signature = json.dumps({
-                'conditions': {k: config.get(k) for k in ('steps', 'composition', 'profile', 'scoring', 'communication', 'behavior_context', 'skip_busy_policy', 'action_contract')},
+                'conditions': {k: config.get(k) for k in ('steps', 'composition', 'profile', 'scoring',
+                    'communication', 'behavior_context', 'skip_busy_policy', 'case_presentation', 'connection_leads')},
                 'model': {k: config.get('model', {}).get(k) for k in ('model', 'revision', 'temperature', 'max_tokens')},
                 'identity': {k: identity.get(k) for k in ('model', 'revision', 'dtype', 'chat_template_sha256')},
                 'keep_weights': {k: v.get('sha256') for k, v in (episode.get('weights') or {}).items()},
                 'implementation':manifest.get('implementation_sha256'),
             }, sort_keys=True)
-            group = (version, config['red'], split, encoder)
+            comparison_conditions={'version':version,'red':config['red'],'split':split,
+                'communication_encoder':encoder,'action_contract':interface['action_contract'],
+                'evaluation_scope':evaluation_scope}
+            group=episode_group(comparison_conditions)
             if group in signatures and signatures[group] != signature:
                 raise ValueError('Comparison conditions differ within the same version/red/split')
             signatures[group] = signature
+            controller_key = group + (label,)
+            controller = {'contract':'upstream','urgent_preemption':False,**(config.get('selector') or {})}
+            if controller_signatures.setdefault(controller_key, controller) != controller:
+                raise ValueError('Controller conditions differ within the same comparison arm')
             protocol_key=group+(comparison_run,)
             if protocol_key in protocol_signatures and protocol_signatures[protocol_key]!=config.get('protocol_digest'):
                 raise ValueError('Protocol conditions differ within a comparison run')
@@ -193,22 +247,23 @@ def collect(directory, include_trace=False):
                 raise ValueError('Different frozen Pools cannot be merged within one arm')
             policy_signatures[policy_key]=policy_value
             item = {k: episode[k] for k in ('seed', 'status', 'kind', 'joint_return', 'execution_time_s')}
-            item.update(version=version, label=label, red=config['red'], split=split,
-                        communication_encoder=encoder,
+            item.update(comparison_conditions,label=label,policy_interface=interface,
                         comparison_run_id=comparison_run,training_run_id=provenance.get('training_run_id'),
                         training_identity=provenance.get('training_identity'),
                         requires_training=provenance.get('requires_training',comparison_metadata(config)['requires_training']),
                         training_provenance_state=provenance.get('state'),training_origin=provenance.get('origin'),
-                        holdout_role=(config.get('seed_plan') or {}).get('purpose','historical_or_unverified_holdout'),
+                        holdout_role=seed_use or 'historical_or_unverified_holdout',
                         reward_components=episode.get('reward_components'),
                         scored_step_rewards=episode.get('scored_step_rewards'), model_identity=identity,
                         source=str(run.relative_to(directory)), episode_id=episode.get('episode_id', 0))
-            if include_trace and episode.get('trace'):
+            if (include_trace or include_trace_paths) and episode.get('trace'):
                 path = Path(episode['trace'])
                 if not path.is_absolute():
                     path = run/path
+                if include_trace_paths:
+                    item['trace'] = str(path)
                 counts, flags, busy = Counter(), Counter(), 0
-                if path.is_file():
+                if include_trace and path.is_file():
                     visible_rows=[]
                     for line in path.open():
                         row = json.loads(line)
@@ -228,6 +283,7 @@ def collect(directory, include_trace=False):
             episodes.append(item); completed += 1
         statuses.append({'directory': str(run.relative_to(directory)), 'label': label, 'red': config.get('red'),
                          'stage': stage, 'status': summary.get('status', 'not_committed'),
+                         'split': split, 'evaluation_role': role, 'result_kind': result_kind,
                          'completed_environment_episodes': completed, 'committed_iterations': len(summary.get('history', [])),
                          'optimizer_states':[h.get('optimizer_status','unknown') for h in summary.get('history',[])],
                          'pool_changes':sum(h.get('pool_changed',False) for h in summary.get('history',[])),
@@ -239,6 +295,7 @@ def collect(directory, include_trace=False):
 
 COMPARISONS=(('B1','B0'),('B2','B1'),('B2','B0'),('B4','B2'),('B4','B0'),
              ('B3-no-support','B2'),('B3','B3-no-support'),('B3','B2'),('B4','B3'),
+             ('E1','E0'),('E2','E1'),('E2','E0'),('E3','E2'),('E3','E0'),
              *[(name,metadata['base']) for name,metadata in VERIFICATION_VARIANTS.items()],
              *[(name,'B1' if base=='B1' else 'B1'+name[2:]) for name,base in CONTROLLER_VARIANTS.items()])
 
@@ -247,7 +304,7 @@ def paired_comparisons(episodes):
     groups=defaultdict(lambda:defaultdict(list))
     for e in episodes:groups[episode_group(e)][e['label']].append(e)
     output=[]
-    for (version,red,split,encoder),arms in sorted(groups.items()):
+    for group,arms in sorted(groups.items()):
         comparisons=list(dict.fromkeys([*COMPARISONS,*[(name,'B0') for name in arms if name!='B0']]))
         for new,old in comparisons:
             keys,before,after=paired_episodes(arms.get(old,[]),arms.get(new,[]))
@@ -255,7 +312,7 @@ def paired_comparisons(episodes):
             reps={label:training_summary(items) for label,items in ((old,before),(new,after))}
             learned=[v for v in reps.values() if v['status']!='not_applicable']
             repetitions=min(v['count'] for v in learned) if learned and all(v['count'] is not None for v in learned) else None
-            row={'comparison':new+'-'+old,'version':version,'red':red,'split':split,'communication_encoder':encoder,'paired_n':len(seeds),
+            row={'comparison':new+'-'+old,**dict(zip(GROUP_FIELDS,group)),'paired_n':len(seeds),
                 'seeds':seeds,'differences':delta,'mean_difference':statistics.mean(delta) if delta else None,
                 'median_difference':statistics.median(delta) if delta else None,
                 'win_tie_loss':[sum(d>0 for d in delta),sum(d==0 for d in delta),sum(d<0 for d in delta)] if delta else None,
@@ -292,12 +349,13 @@ def rollout_progress(validation, admission_mode=None):
                 'rollout_completed_pairs':None,'rollout_required_pairs':None}
 
     def valid_seed_list(values):
-        if not isinstance(values,list) or any(type(seed) is not int for seed in values):
+        if not isinstance(values,list) or any(type(seed) is not int or seed<0 for seed in values):
             return []
         return values if len(set(values))==len(values) else []
 
     registered=valid_seed_list(validation.get('registered_seeds',validation.get('seeds')))
-    measured=valid_seed_list(validation.get('completed_paired_seeds',validation.get('paired_seeds')))
+    measured_field=next((field for field in ('completed_paired_seeds','paired_seeds') if field in validation),None)
+    measured=valid_seed_list(validation.get(measured_field))
     required=validation.get('required_approval_pairs',len(registered) or None)
     if type(required) is not int or required<20:
         required=None
@@ -306,18 +364,21 @@ def rollout_progress(validation, admission_mode=None):
     full_result=reason in ('passed','failed_registered_criteria')
     if isinstance(differences,dict):
         recorded_deltas={str(k):value for k,value in differences.items()}
+        if len(recorded_deltas)!=len(differences):
+            recorded_deltas={}
     elif full_result and isinstance(differences,list) and len(differences)==len(registered):
         # Legacy compare_rollouts emits one delta per registered seed only after checking both episodes.
-        measured=measured or registered
+        if measured_field is None:
+            measured=registered
         recorded_deltas=dict(zip(map(str,registered),differences))
     else:
         recorded_deltas={}
     complete_pairs={s for s in measured if (not registered or s in registered)
                     and type(recorded_deltas.get(str(s))) in (int,float)
                     and math.isfinite(recorded_deltas[str(s)])}
-    completed=(full_result and validation.get('validation_complete') is not False and
+    completed=(full_result and validation.get('validation_complete',True) is True and
                required is not None and required==len(registered)==len(complete_pairs) and
-               set(registered)==complete_pairs)
+               set(registered)==set(measured)==complete_pairs and set(recorded_deltas)==set(map(str,registered)))
     prefix=reason in ('failed_registered_worst_seed_early','reject_screen_inconclusive')
     stopped=reason=='failed_registered_worst_seed_early' or validation.get('early_approval_allowed') is False
     state='complete' if completed else 'reject_only' if prefix else 'partial' if complete_pairs else 'planned' if registered else 'unrecorded'
@@ -489,10 +550,10 @@ def restore_reproduction_bundle(archive,destination):
     atomic_json(destination/'restored_protocol.json',protocol)
     return protocol
 
-def report_experiment(directory, output=None, include_trace=False, include_bundle=True):
+def report_experiment(directory, output=None, include_trace=False, include_bundle=True, *, include_legacy_tables=False):
     directory = Path(directory).resolve()
     output = Path(output).resolve() if output else directory/'report'
-    episodes, statuses = collect(directory, include_trace)
+    episodes, statuses = collect(directory, include_trace, include_trace_paths=include_legacy_tables)
     metrics = recompute(episodes)
     metrics['paired_comparisons']=paired_comparisons(episodes)
     for pair in metrics['paired_vs_B0']:
@@ -516,15 +577,16 @@ def report_experiment(directory, output=None, include_trace=False, include_bundl
     for decision in decisions:
         decision.update(rollout_progress(decision))
     output.mkdir(parents=True, exist_ok=True)
-    (output/'episodes.json').write_text(json.dumps({'schema': 'compact-episode-metrics-v1', 'episodes': episodes}, ensure_ascii=False, indent=2)+'\n')
+    compact_episodes = [{k:v for k,v in episode.items() if k!='trace'} for episode in episodes] if include_legacy_tables else episodes
+    (output/'episodes.json').write_text(json.dumps({'schema': 'compact-episode-metrics-v1', 'episodes': compact_episodes}, ensure_ascii=False, indent=2)+'\n')
     (output/'metrics.json').write_text(json.dumps(metrics, ensure_ascii=False, indent=2)+'\n')
     (output/'run_status.json').write_text(json.dumps(statuses, ensure_ascii=False, indent=2)+'\n')
     (output/'rollout_decisions.json').write_text(json.dumps(decisions, ensure_ascii=False, indent=2)+'\n')
     fmt = lambda value: 'N/A' if value is None else f'{value:.2f}' if isinstance(value, float) else str(value)
     lines = ['# Experiment comparison', '',
-             'Only completed real CAGE4 episodes are counted. Train, test and untrained controls are separate. Candidate-validation episodes are excluded from final-test metrics.', '',
-             '| Version | Red | Split | Communication encoder | Arm | N | Mean reward | Sample SD | Total seconds | Paired gain vs B0 | Win rate | Median gain | 95% bootstrap CI |',
-             '|---|---|---|---|---|---|---|---|---|---|---|---|---|']
+             'Completed real CAGE4 episodes are grouped by train, test, transfer, development, reproduction and untrained controls. Candidate-validation episodes are excluded from final-test metrics.', '',
+             '| Version | Red | Split | Communication encoder | Action contract | Evaluation scope | Arm | N | Mean reward | Sample SD | Total seconds | Paired gain vs B0 | Win rate | Median gain | 95% bootstrap CI |',
+             '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|']
     cases = sorted({episode_group(g) for g in metrics['groups']})
     for case in cases:
         groups = {g['label']: g for g in metrics['groups'] if episode_group(g)==case}
@@ -536,11 +598,11 @@ def report_experiment(directory, output=None, include_trace=False, include_bundl
             lines.append('| '+' | '.join(fmt(v).replace('|', '/') for v in row)+' |')
     if not cases:
         for label in ('B0','B1','B2','B3-no-support','B3','B4'):
-            lines.append('| registered | finite | test | N/A | '+label+' | 0 | N/A | N/A | N/A | N/A | N/A | N/A | N/A |')
+            lines.append('| registered | finite | test | N/A | N/A | test | '+label+' | 0 | N/A | N/A | N/A | N/A | N/A | N/A | N/A |')
         lines += ['', 'No completed real episodes. Mock or partial runs are not performance samples.']
     lines += ['', 'Small samples and bootstrap intervals do not establish a general performance gain. Environment completion and committed optimizer iterations are reported separately in run_status.json.', '']
-    lines += ['', '| Comparison | Version | Red | Split | Communication encoder | Paired N | Mean gain | Median | Win/tie/loss | 95% CI |',
-        '|---|---|---|---|---|---|---|---|---|---|']
+    lines += ['', '| Comparison | Version | Red | Split | Communication encoder | Action contract | Evaluation scope | Paired N | Mean gain | Median | Win/tie/loss | 95% CI |',
+        '|---|---|---|---|---|---|---|---|---|---|---|---|']
     for pair in metrics['paired_comparisons']:
         lines.append('| '+' | '.join(fmt(pair.get(k)).replace('|','/') for k in
             ('comparison',*GROUP_FIELDS,'paired_n','mean_difference','median_difference','win_tie_loss','paired_bootstrap_95ci'))+' |')
@@ -594,6 +656,9 @@ def report_experiment(directory, output=None, include_trace=False, include_bundl
             bundle_action='preserved_registered_source_snapshot'
         else:
             reproduction_bundle(directory,output);bundle_action='created_from_registered_source'
+    if include_legacy_tables:
+        from research.reporting import report
+        report(directory,collected=(episodes,statuses),output=output)
     return {'episodes': len(episodes), 'runs': len(statuses), 'rollout_decisions': len(decisions), 'output': str(output),'bundle_action':bundle_action}
 
 

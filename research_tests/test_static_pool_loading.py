@@ -1,6 +1,7 @@
 """A static control must load the same registered initial skills as trained arms."""
 import json
-from research.config import validate
+import pytest
+from research.config import validate, check_pool_interface
 from research.experiment import run
 from research.skills import SecuritySkillPool
 from research.upstream import Skill
@@ -22,3 +23,6 @@ def test_static_control_loads_explicit_common_pool_not_default_six_seeds(tmp_pat
     assert result['status']=='completed' and result['pool_frozen']
     assert result['training_provenance']['path']==str(source.resolve())
     assert result['result_kind']=='mock_test'
+    artifact=json.loads(source.read_text())
+    with pytest.raises(ValueError,match='Missing Skill Pool policy interface'):
+        check_pool_interface(artifact,{**config,'action_contract':'explicit_zone_pair_v1'},static_initial=True)

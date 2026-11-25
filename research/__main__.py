@@ -67,6 +67,8 @@ def main():
             return
         from .experiment import run
         if args.command == "compare":
+            from scripts.report_experiment import report_experiment
+
             if args.variants:
                 base=Path(args.output).resolve() if args.output else ROOT/'research_outputs/variant-comparison'
                 for red in args.reds:
@@ -75,6 +77,7 @@ def main():
                         for key in ('composition','episodes','train_episodes','iterations','steps','pool','communication_encoder'):
                             if getattr(args,key,None) is not None:case[key]=getattr(args,key)
                         resource_args(case,args)
+                        case.setdefault("comparison_run_id",str(base))
                         case.update(red=red,output=str(base));case=validate(case)
                         directory=base/variant/red
                         if args.train and case['arm'] in ('E2','E3'):
@@ -82,20 +85,19 @@ def main():
                             if training['status']!='completed':continue
                             case['pool']=str(directory/'train/checkpoint.json')
                         run(case,'eval',directory/'eval',resume=args.resume,limit=args.limit)
-                from scripts.report_experiment import report_experiment
                 report_experiment(base)
                 return
+            comparison_run = c.get("comparison_run_id") or c.get("experiment_id") or str(Path(c["output"]).resolve())
             for red in args.reds:
                 for arm in args.arms:
-                    case = {**c, "arm": arm, "red": red, "comparison_id": arm}
+                    case = {**c, "arm": arm, "red": red, "comparison_id": arm, "comparison_run_id": comparison_run}
                     if args.train and arm in ("E2", "E3"):
                         training = run(case, "train", resume=args.resume, limit=args.limit)
                         if training["status"] != "completed":
                             print(f"{arm}/{red}: training batch saved; frozen evaluation will follow after training completes", flush=True)
                             continue
                     run(case, "eval", resume=args.resume, limit=args.limit)
-            from .reporting import report
-            report(c["output"])
+            report_experiment(c["output"],include_bundle=False,include_legacy_tables=True)
         else:
             run(c, "train" if args.command == "train" else "eval", args.output, args.resume, args.limit)
     elif args.command == "doctor":

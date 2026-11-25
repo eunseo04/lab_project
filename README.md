@@ -152,7 +152,7 @@ B3의 영구 보류와 cross-host observation 거부를 수정했다. 기존 SG 
 
 기본 B1/B2/B3/B4의 initiation·allowed_actions는 자연어 지침이며 강제 action mask·eligibility·urgent preemption을 보장하지 않는다. runtime CAGEVerifier는 E3 전용이다. 별도 B1-selector-contract와 B3-selector-contract는 selector 역할 지침 하나만 추가한 정적/최적화 대조군이다. primitive actor·termination prompt·epsilon·행동 공간·maturity/gain 필터는 그대로다. 원본 llm_model의 maturity>=3, avg_gain>-0.015 필터와 min_gain 전달 누락은 감사 로그에 남기며 변경하지 않는다.
 
-새 exploratory frozen pair는 기존 run_campaign.py의 --frozen-policy-pilot로 실행한다. 같은 초기 Pool의 B1과 B1-selector-contract를 사전 등록한 시드 하나에서 각각 500 nominal-step으로 평가한다. 두 episode와 기동·정리를 먼저 예약한다. 자동 Skill 개선·B4 승인·미사용 최종 holdout 성능의 증거는 아니다. 실제 결과는 기존 최종 보고서 research_outputs/audit-fields-ece94dbe/report/performance.md와 새 실험 selector-pilot-23071375의 원시 결과에 구분한다.
+기존 `run_campaign.py --frozen-policy-pilot --pilot-controller B0`는 공통 조건의 B0/B1 기준점을 사전 등록한 개발 seed 하나에서 측정한다. 기본 `B1-selector-contract` 선택은 동일 초기 Pool의 두 정적 selector를 비교한다. 각 쌍에 500 nominal-step episode 두 개와 기동·정리 비용을 먼저 예약한다. `--plan-only`는 예약 비용과 현재 예산 충족 여부를 기록한다. 이전 실제 selector 비교는 `research_outputs/selector-pilot-23071375`에 있다.
 
 새 공통 비교 `cage4-acd-parity-v1`의 B0–B4는 고정한 원본 ACD 함수로 송신 메시지와 자기 관찰 벡터를 생성한다. 이전 결과에서 encoder를 명시하지 않은 설정은 `legacy_local_v1`로 읽는다. 원래 조건을 재현하려면 해당 결과의 등록된 config를 사용한다. 연구 CLI와 ACD CLI는 `--communication-encoder`로 모드를 선택할 수 있다. 원본의 severity 변화는 공개 KEEP의 기존 8→3 projection 입력에도 영향을 주므로 새 B0부터 평가한다. KEEP 가중치는 공개 CAGE4 제출본을 사용한다.
 
@@ -163,3 +163,7 @@ B3의 영구 보류와 cross-host observation 거부를 수정했다. 기존 SG 
 후속 실제 정적 paired pilot(seed 788380683, development)은 B1 -121 / B1-selector-contract -122, 차이 -1이었다. N=1의 SD/CI는 N/A이며 개선이나 자동 Skill 최적화 효과를 입증하지 못했다. LWF/ASF/RIA 합계는 같고 공동 action cost만 -1이었다. 모델 호출은 698→733회였고 전체 평가 시간은 각각 906.69/899.15초다. 이 차이를 처리속도 개선이나 특정 Qwen 행동의 인과 효과로 해석하지 않는다. 다음 최종 holdout에는 이 seed를 쓰지 않는다.
 
 위 정적 실측 직후의 CPU 회귀는 329개였다. 최신 원본 정렬 작업에서는 실제 CybORG와 테스트 모델로 B4 동결 1 episode를 CPU에서 마쳤다. 같은 보고서 맨 위에 최신 검사와 과거 실측을 구분해 기록했다. 기존 승인 누적 사용량은 7.388473/8 GPU-hour이며 잔여는 0.611527 GPU-hour다. 새 공통 조건의 Qwen 점수와 학습 후 B3/B4 점수는 N/A다.
+
+공개 개발 seed `788380683`의 노출 이력은 원시 출력이 없는 checkout에서도 확인된다. 새 final/transfer 등록에서는 거부하고, development/reproduction에서는 노출된 재사용으로 기록한다.
+
+학습된 Pool에 인터페이스가 기록되지 않은 경우 원래 학습 manifest와 체크포인트의 조건을 확인한다. 따로 보관한 과거 Pool에는 원본 manifest 경로와 SHA256을 등록할 수 있다. 후보 검증과 final/transfer, 학습 완료 근거가 없는 대조 실행은 공통 보고 경로에서 구분한다. rollout 완료 수는 실제로 짝이 맞고 보상 차이가 유한한 seed만 센다.

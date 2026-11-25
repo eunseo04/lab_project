@@ -1,4 +1,5 @@
 """Synthetic arithmetic fixtures in temporary directories, never performance data."""
+import csv
 import importlib.util
 import json
 import hashlib
@@ -14,6 +15,8 @@ def write_run(root,label,stage,rewards,*,model='fixture',trained=0,optimizer_sta
     directory=root/f'{label}-{stage}';directory.mkdir()
     config={'comparison_id':label,'arm':'E0' if label=='B0' else 'E1' if label=='B1' else 'E2','red':'finite',
             'steps':500,'composition':'hybrid','experiment_version':'unit_fixture',
+            'profile':'controlled-comparison','scoring':'official','communication':'paper_projected_keep',
+            'skip_busy_policy':True,'selector':{'epsilon':0.1,'max_skill_age':16},
             'model':{'model':model,'revision':'unit_fixture'}}
     metadata=reporter.comparison_metadata(config);base=metadata['base_comparison_id']
     proposed=base in ('B3','B3-no-support','B4')
@@ -28,10 +31,10 @@ def write_run(root,label,stage,rewards,*,model='fixture',trained=0,optimizer_sta
     for i,reward in enumerate(rewards):
         episode={'status':'completed','kind':'real_cage4','seed':100+i,'episode_id':i,
                  'joint_return':reward,'execution_time_s':1.,'joint_transitions':499,
-                 'scored_transitions':498,'unit_test_fixture_only':True}
+                 'scored_transitions':498}
         (directory/f'episode-{i:04d}.json').write_text(json.dumps(episode))
         episodes.append(episode)
-    summary={'config':config,'stage':stage,'status':'partial' if stage=='train' else 'completed',
+    summary={'config':config,'stage':stage,'status':'partial' if stage=='train' else 'completed','result_kind':'real_cage4',
              'episodes':episodes[:1] if stage=='train' else episodes,'history':[],
              'training_provenance':{'episodes_completed':trained}}
     if trained:
@@ -41,14 +44,16 @@ def write_run(root,label,stage,rewards,*,model='fixture',trained=0,optimizer_sta
             'training_run_id':'fixture-'+label+'-'+root.name,'training_seeds':list(range(train_seed,train_seed+trained)),
             'optimizer_status':optimizer_status,'initial_pool_sha256':initial,
             'history':[{'iteration':1,'episodes':trained,'optimizer_status':optimizer_status}],
-            'algorithm':config['evolution']}
+            'algorithm':config['evolution'],'policy_interface':reporter.policy_interface(config),
+            'communication_encoder':'legacy_local_v1'}
         source=directory/'training-checkpoint.json';source.write_text(json.dumps(checkpoint))
         summary.update(pool_sha256=hashlib.sha256(json.dumps(pool,sort_keys=True).encode()).hexdigest(),pool_frozen=True,
             comparison_initial_pool_sha256=initial,training_provenance={'path':str(source.resolve()),
                 'sha256':hashlib.sha256(source.read_bytes()).hexdigest(),'episodes_completed':trained,
                 'training_seeds':checkpoint['training_seeds'],'optimizer_status':optimizer_status,'initial_pool_sha256':initial,
                 'algorithm':checkpoint['algorithm']})
-        (directory/'frozen_pool.json').write_text(json.dumps({'pool':pool}))
+        (directory/'frozen_pool.json').write_text(json.dumps({'pool':pool,
+            'policy_interface':checkpoint['policy_interface'],'communication_encoder':'legacy_local_v1'}))
     (directory/'summary.json').write_text(json.dumps(summary))
     return directory
 
@@ -80,6 +85,56 @@ def test_paired_test_ignores_candidate_validation_and_mock_samples(tmp_path):
     assert len(metrics['groups'])==2
     pair=metrics['paired_vs_B0'][0]
     assert pair['paired_n']==2 and pair['mean_difference']==5 and pair['win_rate']==1
+
+
+def test_legacy_tables_share_canonical_admission_with_boundary_roles(tmp_path):
+    for name, label, reward, trained, role in (
+            ('primary', 'B2', -10, 2, 'frozen_test'), ('candidate', 'B2', 997, 0, 'rollout'),
+            ('manifest_candidate', 'B2', 996, 0, 'frozen_test'), ('untrained', 'B2', 995, 0, 'frozen_test'),
+            ('transfer', 'B2', -50, 2, 'transfer_test'), ('fixture', 'B1', 994, 0, 'frozen_test')):
+        root=tmp_path/name;root.mkdir()
+        run=write_run(root,label,'eval',[reward],trained=trained)
+        path=run/'summary.json';summary=json.loads(path.read_text())
+        summary['config']['evaluation_role']=role
+        if name=='manifest_candidate':
+            (run/'manifest.json').write_text(json.dumps({'stage':'eval',
+                'config':{**summary['config'],'evaluation_role':'rollout'}}))
+        if name=='fixture':
+            # A marker in the summary must not be erased by a separate episode file.
+            summary['episodes'][0]['unit_test_fixture_only']=True
+        path.write_text(json.dumps(summary))
+    result=reporter.report_experiment(tmp_path,include_bundle=False,include_legacy_tables=True)
+    out=Path(result['output'])
+    episodes=json.loads((out/'episodes.json').read_text())['episodes']
+    assert {(e['split'],e['joint_return']) for e in episodes}=={
+        ('test',-10),('transfer',-50),('untrained_control',995)}
+    with (out/'table4_ablation.csv').open() as stream:
+        rows=list(csv.DictReader(stream))
+    assert {(r['Split'],r['Mean Reward']) for r in rows if r['Configuration']=='Full Skill-Pro'}=={
+        ('test','-10.000'),('transfer','-50.000')}
+    assert len(list(out.glob('group-*/completed_cases.csv')))==2
+    assert '995.000' in (out/'untrained_controls.csv').read_text()
+
+
+def test_registered_training_stage_cannot_be_relabeled_as_final_eval(tmp_path):
+    run=write_run(tmp_path,'B0','eval',[-1])
+    (run/'manifest.json').write_text(json.dumps({'stage':'train'}))
+    with pytest.raises(ValueError,match='stage differs from its manifest'):
+        reporter.collect(tmp_path)
+
+
+def test_legacy_internal_arm_collision_preserves_distinct_canonical_labels(tmp_path):
+    write_run(tmp_path,'B2','eval',[-10],trained=2)
+    write_run(tmp_path,'B3','eval',[-20],trained=2)
+    result=reporter.report_experiment(tmp_path,include_bundle=False,include_legacy_tables=True)
+    out=Path(result['output'])
+    assert not list(out.glob('group-*/completed_cases.csv'))
+    manifest=json.loads((out/'report_manifest.json').read_text())
+    assert len(manifest['omitted_ambiguous_legacy_groups'])==1
+    with (out/'table4_ablation.csv').open() as stream:
+        rows=list(csv.DictReader(stream))
+    assert {(r['Configuration'],r['Arm'],r['Mean Reward']) for r in rows if r['N']=='1'}=={
+        ('Full Skill-Pro','B2','-10.000'),('B3','B3','-20.000')}
 
 
 def test_different_model_conditions_do_not_share_a_comparison(tmp_path):
@@ -149,11 +204,13 @@ def test_completed_original_update_cannot_be_relabeled_as_trained_proposed(tmp_p
 
 @pytest.mark.parametrize('with_training_manifest',[False,True])
 def test_historical_inputs_restore_without_original_absolute_paths(tmp_path,with_training_manifest):
-    from research.config import policy_interface
+    from research.config import digest, policy_interface
     from research.progress import Journal
     from scripts.run_campaign import historical_batch
     original=tmp_path/'original';original.mkdir();current=tmp_path/'current';current.mkdir();report=current/'report';report.mkdir()
-    checkpoint=original/'B2.json';checkpoint.write_text(json.dumps({'stage':'train','history':[{'iteration':1}],'pool':{'fixture':1}}))
+    config={'communication':'paper_projected_keep','action_contract':'explicit'}
+    checkpoint=original/'B2.json';checkpoint.write_text(json.dumps({'stage':'train','history':[{'iteration':1}],
+        'pool':{'fixture':1},'config_digest':digest(config)}))
     initial=original/'initial_pool.json';initial.write_text(json.dumps({'pool':{'fixture':0}}))
     traces=[]
     for i in range(2):
@@ -166,8 +223,7 @@ def test_historical_inputs_restore_without_original_absolute_paths(tmp_path,with
         'files_sha256':{str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}}}
     if with_training_manifest:
         training_manifest=original/'manifest.json'
-        config={'communication':'paper_projected_keep','action_contract':'explicit'}
-        training_manifest.write_text(json.dumps({'stage':'train','config':config}))
+        training_manifest.write_text(json.dumps({'stage':'train','config':config,'config_digest':digest(config)}))
         source=protocol['fixed_update_source']
         source.update(training_manifest=str(training_manifest),policy_interface=policy_interface(config))
         source['files_sha256'][str(training_manifest)]=hashlib.sha256(training_manifest.read_bytes()).hexdigest()
@@ -179,7 +235,7 @@ def test_historical_inputs_restore_without_original_absolute_paths(tmp_path,with
     original.rename(tmp_path/'original_unavailable')
     restored=tmp_path/'isolated';mapped=reporter.restore_reproduction_bundle(report/'reproduction_bundle.tar.gz',restored)
     assert not any(Path(p).is_absolute() for p in mapped['fixed_update_source']['files_sha256'])
-    trained,pending,prep=historical_batch(mapped,root=restored)
+    trained,pending,prep=historical_batch(mapped,root=restored,require_manifest=with_training_manifest)
     assert trained['history']==[{'iteration':1}] and pending=={'experiences':['recorded']}
     assert prep=={'ready':{'pool':'original'}}
     assert [json.loads((restored/p).read_text())['seed'] for p in mapped['fixed_update_source']['training_traces']]==[7,8]
@@ -188,6 +244,9 @@ def test_historical_inputs_restore_without_original_absolute_paths(tmp_path,with
         mapped['configs']['B2']['communication_encoder']='acd_original_v1'
         with pytest.raises(ValueError,match='preserve the historical policy interface'):
             historical_batch(mapped,root=restored)
+    else:
+        with pytest.raises(ValueError,match='available for inspection only'):
+            historical_batch(mapped,root=restored,require_manifest=True)
 
 
 def test_source_or_frozen_pool_mismatch_is_not_merged(tmp_path):
@@ -253,6 +312,10 @@ def test_optimizer_report_distinguishes_registered_seeds_from_completed_pairs(tm
         ('complete',{'reason':'passed','registered_seeds':seeds,'completed_paired_seeds':seeds,
                      'seeds':seeds,'differences':[1.0]*20,'validation_complete':True}),
         ('claimed',{'reason':'passed','seeds':seeds,'validation_complete':True}),
+        ('explicit_empty',{'reason':'passed','registered_seeds':seeds,'completed_paired_seeds':[],
+                           'differences':[1.0]*20,'validation_complete':True}),
+        ('duplicate',{'reason':'passed','registered_seeds':seeds,'completed_paired_seeds':[0]*20,
+                      'differences':[1.0]*20,'validation_complete':True}),
     ]
     journal.checkpoint('optimizer:loop',{'status':'completed_unchanged','attempts':1,'result':{'evolution':[
         {'candidates':[{'skill':{'name':name},'admission_mode':'rollout','rollout_validation':validation}
@@ -262,4 +325,8 @@ def test_optimizer_report_distinguishes_registered_seeds_from_completed_pairs(tm
     report=json.loads((out/'optimizer_progress.json').read_text())['candidate_stages']
     actual={item['name']:(item['rollout_status'],item['rollout_completed_pairs'],item['rollout_completed']) for item in report}
     assert actual=={'planned':('planned',0,False),'partial':('partial',2,False),'early':('reject_only',1,False),
-                    'legacy':('complete',20,True),'complete':('complete',20,True),'claimed':('planned',0,False)}
+                    'legacy':('complete',20,True),'complete':('complete',20,True),'claimed':('planned',0,False),
+                    'explicit_empty':('planned',0,False),'duplicate':('planned',0,False)}
+    nonfinite=reporter.rollout_progress({'reason':'passed','registered_seeds':seeds,'completed_paired_seeds':seeds,
+        'differences':[1.0]*19+[float('inf')],'validation_complete':True})
+    assert (nonfinite['rollout_status'],nonfinite['rollout_completed_pairs'],nonfinite['rollout_completed'])==('partial',19,False)

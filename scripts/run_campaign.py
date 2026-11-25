@@ -20,7 +20,7 @@ sys.path.insert(0,str(ROOT))
 from research.progress import Journal,atomic_json,BudgetExceeded,IncompleteOptimization,digest,implementation_identity
 from research.config import (load,validate,variant_config,apply_seed_plan,validate_seed_plan,
     seed_exposure_history,split_seeds,VERIFICATION_VARIANTS,CONTROLLER_VARIANTS,COMPLETED_OPTIMIZER_STATUSES,
-    execution_config,policy_interface,check_pool_interface)
+    execution_config,policy_interface,check_pool_interface,read_policy_manifest,read_training_manifest)
 
 PORTS=[8418,8419,8420,8421]
 write=atomic_json
@@ -209,11 +209,14 @@ def make_protocol(args,out):
         plan,history=campaign_seed_plan(args);prior,ledger=campaign_budget(args)
         if len(plan['final_test'])!=1 or args.max_gpus!=1:raise ValueError('Frozen exploratory pair requires one registered seed and one GPU')
         variant=getattr(args,'pilot_controller','B1-selector-contract')
-        labels=['B1',variant];configs={}
+        baseline=variant=='B0'
+        labels=['B0','B1'] if baseline else ['B1',variant]
+        version='cage4-acd-parity-v1' if baseline else 'cage4-acd-static-selector-pilot-v1'
+        configs={}
         for label in labels:
             c=variant_config(label)
             c.update(iterations=1,experiment_id=str(out),comparison_run_id=str(out),
-                experiment_version='cage4-acd-static-selector-pilot-v1',output=str(out),journal_path=str(out/'journal.sqlite3'))
+                experiment_version=version,output=str(out),journal_path=str(out/'journal.sqlite3'))
             configs[label]=apply_seed_plan(c,plan,history)
         reservation=core_cost_reservation(plan['final_test'])
         if reservation['episode_upper_seconds'] is None:
@@ -228,8 +231,9 @@ def make_protocol(args,out):
             'core_evaluation_reservation':reservation,'required_evaluation_labels':labels,
             'initial_pool_file_sha256':sha(ROOT/'artifacts/initial_pool.json'),
             'training_plan':{'episodes':0,'iterations':0},
-            'scope':'Exploratory static controller factor only. Same initial Pool; no optimization or B4 admission. Both complete episodes required.',
-            'changed_factor':('Reselect once on a new urgent visible case while another family is active.' if variant=='B1-urgent-preemption'
+            'scope':'Exploratory frozen policies. Both complete episodes required.',
+            'changed_factor':('Add the common initial static Skill Pool to the ACD baseline.' if baseline else
+                              'Reselect once on a new urgent visible case while another family is active.' if variant=='B1-urgent-preemption'
                               else 'Selector-only CAGE4 role and action semantics guidance.'),
             'allocation':'Reserve both full 500-nominal episodes plus startup/shutdown before GPU launch.',
             'historical_performance_reference':historical_reference(args)}
@@ -273,11 +277,13 @@ def make_protocol(args,out):
         'selection':'Freeze completed_changed/completed_unchanged/completed_no_eligible_skill only. An interrupted pool is untrained_control, never a trained policy.'}
 
 
-def historical_batch(protocol,root=None):
+def historical_batch(protocol,root=None,*,require_manifest=False):
     """Read old evidence with a read-only SQLite connection; never migrate the old DB."""
     import sqlite3
     from research.progress import _unpack
     source=protocol['fixed_update_source']
+    if require_manifest and not source.get('training_manifest'):
+        raise ValueError('Unbound historical checkpoint is available for inspection only; register its original training manifest')
     def resolve(value):
         path=Path(value)
         if root is None:return path
@@ -286,6 +292,9 @@ def historical_batch(protocol,root=None):
         path=(base/path).resolve()
         if not path.is_relative_to(base):raise ValueError('Historical path escapes restore directory')
         return path
+    required=[source['checkpoint'],source['journal'],source['initial_pool'],*source['training_traces']]
+    if any(path not in source['files_sha256'] for path in required):
+        raise ValueError('Historical checkpoint, journal, initial Pool and traces need registered hashes')
     for path,expected in source['files_sha256'].items():
         if sha(resolve(path))!=expected:raise ValueError('Historical input changed: '+path)
     with sqlite3.connect('file:'+str(resolve(source['journal']))+'?mode=ro',uri=True) as db:
@@ -298,12 +307,13 @@ def historical_batch(protocol,root=None):
     if source.get('training_manifest'):
         if source['training_manifest'] not in source['files_sha256']:
             raise ValueError('Historical training manifest needs a registered hash')
-        manifest=json.loads(resolve(source['training_manifest']).read_text())
-        if manifest.get('stage')!='train':raise ValueError('Expected the historical training manifest')
+        manifest=read_training_manifest(resolve(source['checkpoint']),trained,manifest_ref={
+            'path':str(resolve(source['training_manifest']).resolve()),
+            'sha256':source['files_sha256'][source['training_manifest']]})
         historical=policy_interface(manifest['config'])
         if historical!=source['policy_interface']:
             raise ValueError('Historical training interface differs from the registered study')
-        check_pool_interface(trained,manifest['config'])
+        check_pool_interface(trained,manifest['config'],manifest=manifest)
         if any(policy_interface(config)!=historical for config in protocol['configs'].values()):
             raise ValueError('Fixed update configurations must preserve the historical policy interface')
     return trained,pending,preparation
@@ -319,8 +329,9 @@ def make_fixed_protocol(args,out):
     paths=[source,initial,journal_path,manifest_path,*traces]
     if len(traces)!=2 or any(not p.is_file() for p in paths):
         raise ValueError('Exact committed checkpoint, training manifest, journal and two training traces required')
-    manifest=json.loads(manifest_path.read_text())
+    manifest=read_policy_manifest(manifest_path)
     if manifest.get('stage')!='train':raise ValueError('Expected the historical training manifest')
+    manifest_ref={'path':str(manifest_path),'sha256':sha(manifest_path)}
     old_config=manifest['config'];interface=policy_interface(old_config)
     if args.max_gpus!=1:raise ValueError('Fixed-update study uses one unoccupied GPU')
     probes_only=getattr(args,'diagnosis_probes_only',False)
@@ -335,9 +346,11 @@ def make_fixed_protocol(args,out):
             experiment_version='cage4-historical-facts-v1' if probes_only else 'cage4-support-shift-v3-fixed-update',
             output=str(out),journal_path=str(out/'journal.sqlite3'))
         cfg['evolution']['preflight_required']=False
+        if label=='B2':cfg['pool_manifest']=manifest_ref
         configs[label]=apply_seed_plan(cfg,plan,history)
     frozen=json.loads(source.read_text())
-    check_pool_interface(frozen,old_config)
+    original_manifest=read_training_manifest(source,frozen,manifest_ref=manifest_ref)
+    check_pool_interface(frozen,old_config,manifest=original_manifest)
     if frozen.get('optimizer_status')!='completed_changed' or frozen.get('pending_experiences'):
         raise ValueError('Fixed proposal must come from a completed original training update')
     if frozen.get('training_seeds')!=plan['train']:raise ValueError('Seed plan must name the exact historical training seeds')
@@ -384,11 +397,14 @@ def run_fixed_study(protocol,out,journal,servers,worker,remaining_seconds,switch
     from research.rollout import pool_digest
     from research.rollout_execution import EnvironmentVerifier
     from scripts.audit_training_cost import profile_fixed_update
-    trained,pending,preparation=historical_batch(protocol)
+    trained,pending,preparation=historical_batch(protocol,require_manifest=True)
     if protocol['protocol_kind']=='historical-diagnosis-probes-v1':
         runtime={**protocol['configs']['B3']['model'],'endpoint':f"http://127.0.0.1:{servers[0]['port']}",
             'journal_path':str(journal.path),'request_context':{'experiment':str(out),'arm':'B3','env_stage':'historical_training_probe'}}
-        client=ModelClient(runtime);configure_encoder(client.embed);switch_phase('historical_diagnosis_probes')
+        client=ModelClient(runtime)
+        if client.identity!=trained.get('model_identity'):
+            raise ValueError('Historical diagnosis model identity differs from the recorded training model')
+        configure_encoder(client.embed);switch_phase('historical_diagnosis_probes')
         profile_fixed_update(out,protocol,client,trained,pending,preparation,remaining_seconds,diagnosis_only=True)
         historical_batch(protocol)
         write(out/'historical_inputs_unchanged.json',{'passed':True,'files_sha256':protocol['fixed_update_source']['files_sha256']})
@@ -406,7 +422,10 @@ def run_fixed_study(protocol,out,journal,servers,worker,remaining_seconds,switch
     if preflight['status']!='passed':raise BudgetExceeded('Complete predeclared fixed-update pilot does not fit')
     runtime={**protocol['configs']['B2']['model'],'endpoint':f"http://127.0.0.1:{servers[0]['port']}",
         'journal_path':str(journal.path),'request_context':{'experiment':str(out),'arm':'fixed-update-audit','env_stage':'historical_training_probe'}}
-    client=ModelClient(runtime);configure_encoder(client.embed)
+    client=ModelClient(runtime)
+    if client.identity!=trained.get('model_identity'):
+        raise ValueError('Historical fixed-update model identity differs from the recorded training model')
+    configure_encoder(client.embed)
     old_pool=SecuritySkillPool(previous['pool']['max_size'],previous['pool'].get('seed_set','legacy'));old_pool.restore(previous['pool'])
     new_pool=SecuritySkillPool(trained['pool']['max_size'],trained['pool'].get('seed_set','legacy'));new_pool.restore(trained['pool'])
     accepted=[(r,c) for r in trained['history'][0]['evolution'] for c in r['candidates'] if c.get('accepted')]
@@ -597,9 +616,9 @@ def main():
     parser.add_argument('--reference-report',type=Path,help='Immutable historical metrics JSON for separate context, not new evidence')
     parser.add_argument('--usage-ledger',type=Path,nargs='+',help='Prior cumulative completion ledgers; sessions are deduplicated')
     parser.add_argument('--diagnosis-probes-only',action='store_true',help='Historical training SG probes only; no training or final evaluation')
-    parser.add_argument('--frozen-policy-pilot',action='store_true',help='One preregistered static B1/controller-variant pair')
-    parser.add_argument('--pilot-controller',choices=[name for name,base in CONTROLLER_VARIANTS.items() if base=='B1'],
-                        default='B1-selector-contract',help='Controller variant for --frozen-policy-pilot')
+    parser.add_argument('--frozen-policy-pilot',action='store_true',help='One preregistered frozen-policy pair')
+    parser.add_argument('--pilot-controller',choices=['B0',*[name for name,base in CONTROLLER_VARIANTS.items() if base=='B1']],
+                        default='B1-selector-contract',help='Comparison with static B1 for --frozen-policy-pilot')
     parser.add_argument('--diagnosis-probe-count',type=int,default=6,choices=range(1,13))
     parser.add_argument('--train-episodes',type=int,help='Must equal the explicit training seed count')
     parser.add_argument('--iterations',type=int,default=1,help='Actual training optimizer iterations; full six/three requires explicit plan')
@@ -653,15 +672,19 @@ def main():
         raise RuntimeError('Some recorded processes could not be safely identified/stopped; see cleanup.json')
     if args.cleanup_only:
         write(out/'cleanup.json',{'stopped':cleanup,**verify_release(registry)});return
+    reservation=protocol.get('core_evaluation_reservation',{})
+    required=reservation.get('gpu_seconds_estimate')
     if args.plan_only:
+        labels=protocol.get('required_evaluation_labels',[])
         write(out/'preflight.json',{'status':'not_measured','reason':'No GPU calls in plan-only mode','budget':journal.budget_usage(),
-            'planned_first_arm':'B2','later_arms':'deferred_until_measured_cost_fits'})
+            'planned_first_arm':labels[0] if labels else 'B2',
+            'reserved_evaluation_gpu_seconds':required,
+            'reservation_fits_gpu_cap':required<=protocol['budget_gpu_hours']*3600 if required is not None else None,
+            'later_arms':'deferred_until_measured_cost_fits'})
         print(json.dumps({'status':'planned','output':str(out)}));return
     completed=out/'completion.json'
     if completed.exists() and json.loads(completed.read_text()).get('status')=='completed':
         print(json.dumps({'status':'reused_completed_campaign','new_gpu_sessions':0,'output':str(out)}));return
-    reservation=protocol.get('core_evaluation_reservation',{})
-    required=reservation.get('gpu_seconds_estimate')
     if required is not None and required>protocol['budget_gpu_hours']*3600:
         write(out/'completion.json',{'status':'deferred_budget','reason':'Reserved mandatory core evaluation alone exceeds the cap',
             'core_reservation':reservation,'new_campaign_usage':journal.budget_usage(),'all_owned_resources_released':True})
@@ -788,8 +811,9 @@ def main():
         if protocol['protocol_kind']=='exploratory-frozen-policy-pair-v1':
             switch_phase('exploratory_frozen_pilot')
             for label in protocol['required_evaluation_labels']:
+                pool=None if label=='B0' else ROOT/'artifacts/initial_pool.json'
                 for seed in protocol['pilot_test_seeds']:
-                    _,job=worker(label,'evaluate',servers[0]['port'],seed,pool=ROOT/'artifacts/initial_pool.json')
+                    _,job=worker(label,'evaluate',servers[0]['port'],seed,pool=pool)
                     if job.get('summary_status')!='completed':raise IncompleteOptimization('Required exploratory episode incomplete; no paired claim')
             return
         if protocol['protocol_kind'] in ('fixed-committed-update-verification-v1','historical-diagnosis-probes-v1'):

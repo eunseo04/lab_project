@@ -44,7 +44,7 @@ def split_seeds(config,split):
 def seed_exposure_history(directory):
     """Read actual episode records, partial traces and registrations without editing them."""
     directory=Path(directory);events=[];registered=[]
-    known={s:'historical_development_test' for s in [*range(101000,101100),102000,58000,201000,201001,211000,211001,215000]}
+    known={s:'historical_development_test' for s in [*range(101000,101100),102000,58000,201000,201001,211000,211001,215000,788380683]}
     known.update({s:'historical_training' for s in (91000,91001)})
     known.update({s:'historical_candidate_validation' for s in (213000,213001)})
     events.extend({'seed':s,'role':role,'state':'exposed','source':'provided research history'} for s,role in known.items())
@@ -180,17 +180,110 @@ def policy_interface(config):
             'urgent_preemption':selector.get('urgent_preemption',False)}
 
 
-def check_pool_interface(artifact, config, *, static_initial=False):
+def read_policy_manifest(path, *, expected_sha256=None):
+    """Read the original run record and verify its recorded configuration digest."""
+    path=Path(path)
+    raw=path.read_bytes()
+    if expected_sha256 is not None and hashlib.sha256(raw).hexdigest()!=expected_sha256:
+        raise ValueError('Policy manifest file hash differs from the registered source')
+    manifest=json.loads(raw)
+    if (not isinstance(manifest,dict) or manifest.get('stage') not in ('train','eval')
+            or not isinstance(manifest.get('config'),dict)
+            or manifest.get('config_digest')!=digest(manifest['config'])):
+        raise ValueError('Policy manifest has no verified original configuration digest')
+    if 'policy_interface' in manifest and manifest['policy_interface']!=policy_interface(manifest['config']):
+        raise ValueError('Policy manifest interface disagrees with its verified configuration')
+    return manifest
+
+
+def _frozen_training_manifest(path):
+    """Recover a campaign's registered source from a byte-identical training copy."""
+    if path.parent.name!='frozen':
+        return None
+    def file_hash(file):
+        sha=hashlib.sha256()
+        with file.open('rb') as stream:
+            for chunk in iter(lambda: stream.read(1024*1024), b''):
+                sha.update(chunk)
+        return sha.hexdigest()
+    candidates=[]
+    size=path.stat().st_size
+    source_hash=None
+    for run in (path.parent.parent/'runs').glob(f'{path.stem}-*-train'):
+        manifest=run/'manifest.json'
+        if not manifest.is_file():
+            continue
+        for checkpoint in (run/'checkpoint.json',*run.glob('pool-iteration-*.json')):
+            if not checkpoint.is_file() or checkpoint.stat().st_size!=size:
+                continue
+            matches=checkpoint.samefile(path)
+            if not matches:
+                if source_hash is None:
+                    source_hash=file_hash(path)
+                matches=file_hash(checkpoint)==source_hash
+            if matches:
+                candidates.append(manifest)
+                break
+    if len(candidates)>1:
+        raise ValueError('Frozen checkpoint has more than one matching original training manifest')
+    return candidates[0] if candidates else None
+
+
+def read_training_manifest(artifact_path, artifact, *, manifest_ref=None):
+    """Verify the available original training record against this checkpoint."""
+    artifact_path=Path(artifact_path)
+    if manifest_ref is not None:
+        if (not isinstance(manifest_ref,dict) or not isinstance(manifest_ref.get('path'),str)
+                or not manifest_ref['path'] or not manifest_ref.get('sha256')):
+            raise ValueError('Original training manifest reference needs a path and registered SHA256')
+        path=artifact_path.parent/manifest_ref['path']
+        if not path.is_file():
+            raise ValueError('Registered original training manifest file is unavailable')
+        manifest=read_policy_manifest(path,expected_sha256=manifest_ref['sha256'])
+    else:
+        if not artifact.get('config_digest'):
+            return None
+        path=artifact_path.parent/'manifest.json'
+        if not path.is_file():
+            path=_frozen_training_manifest(artifact_path)
+        if path is None:
+            return None
+        manifest=read_policy_manifest(path)
+    if (manifest['stage']!='train' or artifact.get('config_digest')!=manifest['config_digest']
+            or artifact.get('training_run_id')!=manifest.get('training_run_id')):
+        raise ValueError('Original training manifest does not identify this checkpoint')
+    return manifest
+
+
+def check_pool_interface(artifact, config, *, static_initial=False, manifest=None):
+    """Require a compatible artifact interface or an independently verified run manifest."""
     expected=policy_interface(config)
-    if static_initial and artifact.get('initialization_only') is True and not artifact.get('training_seeds'):
+    unused=(static_initial and artifact.get('episodes_completed')==0
+            and artifact.get('optimizer_status') in (None,'not_started') and not any(
+                artifact.get(key) for key in ('training_seeds','total_training_episodes','inherited_training_episodes',
+                                              'experience','pending_experiences','history','training_completed')))
+    if unused and artifact.get('initialization_only') is True:
         initial=json.loads((ROOT/'artifacts/initial_pool.json').read_text())
-        unused=not any(artifact.get(key) for key in ('total_training_episodes','inherited_training_episodes',
-            'experience','pending_experiences','history'))
-        if artifact.get('pool')==initial['pool'] and artifact.get('episodes_completed')==0 and unused:
+        if artifact.get('pool')==initial['pool']:
             return True
-    if artifact.get('communication_encoder',LEGACY_ENCODER)!=expected['communication_encoder']:
+    recorded=artifact.get('policy_interface')
+    if manifest is not None:
+        original=policy_interface(manifest['config'])
+        if recorded is not None and recorded!=original:
+            raise ValueError('Skill Pool policy interface disagrees with its original manifest')
+        recorded=original
+    encoder=(recorded.get('communication_encoder') if isinstance(recorded,dict)
+             else artifact.get('communication_encoder',LEGACY_ENCODER))
+    if artifact.get('communication_encoder',encoder)!=encoder or encoder!=expected['communication_encoder']:
         raise ValueError('Skill Pool communication encoder differs from this experiment')
-    if artifact.get('policy_interface') is not None and artifact['policy_interface']!=expected:
+    if 'controller_contract' in artifact and artifact['controller_contract']!=expected['selector_contract']:
+        raise ValueError('Skill Pool controller contract differs from this experiment')
+    if recorded is None:
+        # Explicit user-authored static controls predate interface metadata.
+        if unused and config.get('arm')=='E1' and expected==policy_interface({}):
+            return False
+        raise ValueError('Missing Skill Pool policy interface and verified original manifest')
+    if recorded!=expected:
         raise ValueError('Skill Pool policy interface differs from this experiment')
     return False
 

@@ -129,9 +129,17 @@ def candidate_supported(parent,candidate,gradient_records,links=None):
             'candidate_text_sha256':hashlib.sha256(elements[key].encode()).hexdigest(),
             'fact_ids':sorted({f for p in selected for f in p['fact_ids']})}
     if set(linked)!=set(elements):errors.append('unlinked_candidate_changes')
-    # A narrow contradiction of the pinned Remove implementation, not an NLP proof.
-    from .diagnosis import traffic_scope_contradictions
-    contradictions=traffic_scope_contradictions(text)
+    from .diagnosis import TRAFFIC_SCOPE_CONTRADICTION, traffic_scope_contradictions
+    parts=[(None,candidate.name),(('initiation',None),candidate.initiation),
+           *((('execution',i),value) for i,value in enumerate(candidate.policy)),
+           (('termination',None),candidate.termination)]
+    contradictions=[]
+    for key,value in parts:
+        supporting=(facts[i] for i in linked.get(key,{}).get('fact_ids',[]))
+        if traffic_scope_contradictions(value,supporting):
+            contradictions.append(TRAFFIC_SCOPE_CONTRADICTION)
+            break
+    # Keep checking the explicit contradiction of the pinned Remove implementation.
     for sentence in re.split(r'[.!?\n]',text):
         if re.search(r'\b(?:not|never|cannot|can.t)\b',sentence,re.I):continue
         if re.search(r'\bRemove\b.*\b(?:TRUE|success\w*)\b.*\b(?:proves?|guarantees?|means)\b.*\b(?:all|every)\b.*\b(?:privileged|root|admin)\b.*\b(?:eliminat\w*|clear\w*|remov\w*|gone)\b',sentence,re.I):

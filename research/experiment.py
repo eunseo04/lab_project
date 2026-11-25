@@ -17,7 +17,8 @@ from .adapter import (BLUE_AGENTS, CAGE4_SUBNETS, DefensePolicy, make_state, mak
                       executed_actions, plain, traffic_zone_pair)
 from .client import ModelClient, TextModel
 from .config import (digest, compatible_digest, split_seeds, execution_config,
-                     policy_interface, check_pool_interface, ZONE_PAIR_CONTRACT)
+                     policy_interface, check_pool_interface, read_policy_manifest,
+                     read_training_manifest, ZONE_PAIR_CONTRACT)
 from .metrics import JointRewardLedger, aggregate_episodes
 from .skills import SecuritySkillPool
 from .upstream import configure_encoder, Experience
@@ -43,13 +44,14 @@ def experiences_from_rows(rows, config, total, steps):
         for (agent,name),transitions in sorted(grouped.items(),key=lambda item:BLUE_AGENTS.index(item[0][0]))]
 
 
-def recover_episode(result, config, client, text_model, directory):
+def recover_episode(result, config, client, text_model, directory, *, manifest=None):
     expected = "mock_test" if getattr(client,"is_mock",False) else "real_cage4"
     if result.get("kind") != expected: raise ValueError("Cannot mix mock and real training records")
-    check_pool_interface(result, config)
-    rows=[json.loads(line) for line in Path(result["trace"]).open()]
-    if result.get('trace_sha256') and hashlib.sha256(Path(result['trace']).read_bytes()).hexdigest()!=result['trace_sha256']:
-        raise ValueError('Completed training trace hash changed')
+    check_pool_interface(result, config, manifest=manifest)
+    trace=Path(result['trace']).read_bytes()
+    if hashlib.sha256(trace).hexdigest()!=result.get('trace_sha256'):
+        raise ValueError('Completed training trace hash is missing or changed')
+    rows=[json.loads(line) for line in trace.splitlines()]
     if len(rows) != len(BLUE_AGENTS)*result["joint_transitions"] or any(r["seed"] != result["seed"] for r in rows):
         raise ValueError("Incomplete or misaligned archived training trace")
     seed_everything(result["seed"],config["threads"])
@@ -275,7 +277,7 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
         fingerprint = digest(config)
         implementation=implementation_identity(ROOT)
         if identity_path.exists():
-            previous = json.loads(identity_path.read_text())
+            previous = read_policy_manifest(identity_path)
             if not resume: raise FileExistsError(f"Existing experiment {output}; use --resume")
             if previous['stage']!=stage:raise ValueError('Cannot resume with a different execution stage')
             if previous["config_digest"] != fingerprint and compatible_digest(previous["config"]) != compatible_digest(config):
@@ -291,7 +293,7 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
                 "comparison_run_id":config.get('comparison_run_id',config.get('experiment_id',str(output.parent.resolve()))),
                 "sources": json.loads((ROOT/"research_sources.lock.json").read_text()),
                 "implementation_sha256": implementation})
-        manifest=json.loads(identity_path.read_text())
+        manifest=read_policy_manifest(identity_path)
         training_run_id=manifest.get('training_run_id')
         invocation_id = time.time_ns()
         atomic_json(output/"invocations"/f"{invocation_id}.json", {"config_digest": fingerprint,
@@ -304,8 +306,11 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
             runtime_model={**config['model'],'journal_path':config.get('journal_path',str(output/'journal.sqlite3')),
                 'request_context':{'experiment':config.get('experiment_id',str(output.resolve())),
                     'arm':config.get('comparison_id',config['arm']),'red':config['red'],
-                    'env_stage':config.get('evaluation_role','frozen_test' if stage=='eval' else 'collection')}}
+                    'env_stage':config.get('evaluation_role','frozen_test' if stage=='eval' else 'collection'),
+                    'policy_interface':interface,'implementation_sha256':digest(implementation)}}
             client=ModelClient(runtime_model)
+        resume_identity={'config_digest':manifest['config_digest'],'implementation_sha256':digest(implementation),
+                         'policy_interface':interface,'model_identity':client.identity if client else None}
         if client is not None: configure_encoder(client.embed)
         text_model = TextModel(client)
         pool = SecuritySkillPool(config["pool_size"],seed_set=config["skill_seed_set"]) if config["arm"] != "E0" and needs_llm else None
@@ -325,9 +330,10 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
             inherited = json.loads(initial_path.read_text())
             if inherited.get("stage") != "train" or inherited.get("pending_experiences") or inherited.get('validation_only'):
                 raise ValueError("Warm-start requires a committed training snapshot")
-            static_initial=check_pool_interface(inherited,config,static_initial=True)
-            if not static_initial and any(inherited["model_identity"].get(k) != client.identity.get(k) for k in ("model","revision")):
-                raise ValueError("Warm-start policy model differs")
+            source_manifest=read_training_manifest(initial_path,inherited,manifest_ref=config.get('pool_manifest'))
+            static_initial=check_pool_interface(inherited,config,static_initial=True,manifest=source_manifest)
+            if not static_initial and inherited.get("model_identity")!=client.identity:
+                raise ValueError("Warm-start policy model identity differs")
             inherited_seeds = inherited.get("training_seeds", [])
             if set(inherited_seeds) & set(split_seeds(config,'final_test')):
                 raise ValueError("Warm-start training/evaluation seeds overlap")
@@ -335,23 +341,31 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
             if set(inherited_seeds) & reserved_validation:
                 raise ValueError("Warm-start training/validation seeds overlap")
             inherited_episodes = inherited.get("total_training_episodes",inherited["episodes_completed"])
+            original_interface=policy_interface(source_manifest['config']) if source_manifest else inherited.get('policy_interface')
             if not static_initial:
                 lineage_id=inherited.get('training_lineage_id') or inherited.get('training_run_id') or 'historical:'+hashlib.sha256(initial_path.read_bytes()).hexdigest()
             pool.restore(inherited["pool"])
             if evolution: evolution.restore(inherited.get("experience",{}))
             training_provenance = {"path":str(initial_path.resolve()),
                 "sha256":hashlib.sha256(initial_path.read_bytes()).hexdigest(),"total_training_episodes":inherited_episodes,
-                'communication_encoder':inherited.get('communication_encoder',LEGACY_ENCODER) if not static_initial else None,
+                'communication_encoder':original_interface['communication_encoder'] if not static_initial else None,
                 'initial_pool_sha256':inherited.get('initial_pool_sha256'),
                 'segment_initial_pool_sha256':hashlib.sha256(json.dumps(inherited['pool'],sort_keys=True).encode()).hexdigest()}
             atomic_json(output/"initial_pool.json",{"pool":pool.snapshot(),"training_provenance":training_provenance})
         if checkpoint and checkpoint.get("pool") is not None:
-            check_pool_interface(checkpoint, config)
+            if (checkpoint.get('stage')!='train' or checkpoint.get('config_digest')!=manifest['config_digest']
+                    or checkpoint.get('training_run_id')!=training_run_id):
+                raise ValueError('Resume checkpoint does not belong to the original training manifest')
+            if client is not None and checkpoint.get('model_identity')!=client.identity:
+                raise ValueError('Resume checkpoint model identity differs')
+            check_pool_interface(checkpoint,config,manifest=manifest)
             pool.restore(checkpoint["pool"])
             if evolution: evolution.restore(checkpoint.get("experience", {}))
         elif stage == "eval" and (output/"frozen_pool.json").is_file() and pool:
             frozen=json.loads((output/"frozen_pool.json").read_text())
-            check_pool_interface(frozen,config)
+            if frozen.get('model_identity')!=client.identity:
+                raise ValueError('Frozen Pool model identity differs on evaluation resume')
+            check_pool_interface(frozen,config,manifest=manifest)
             pool.restore(frozen["pool"])
         elif stage == "eval" and (config["arm"] in ("E2", "E3") or config["arm"] == "E1" and config.get("pool")):
             pool_path = Path(config.get("pool") or output.parent/"train/checkpoint.json")
@@ -362,11 +376,14 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
                 raise ValueError('Candidate validation snapshots are restricted to rollout evaluation')
             if trained.get("pending_experiences"):
                 raise ValueError("Training has an uncommitted evolution batch; resume training before frozen evaluation")
-            static_initial=check_pool_interface(trained,config,static_initial=True)
-            if not static_initial and any(trained["model_identity"].get(k) != client.identity.get(k) for k in ("model","revision")):
-                raise ValueError("Skill pool was trained with another policy model")
+            manifest_ref=config.get('pool_manifest')
+            source_manifest=read_training_manifest(pool_path,trained,manifest_ref=manifest_ref)
+            static_initial=check_pool_interface(trained,config,static_initial=True,manifest=source_manifest)
+            if not static_initial and trained.get("model_identity")!=client.identity:
+                raise ValueError("Skill pool was trained with another policy model identity")
             if set(trained.get("training_seeds", [])) & set(split_seeds(config,'final_test')):
                 raise ValueError("Training/evaluation seeds overlap with the loaded pool")
+            original_interface=policy_interface(source_manifest['config']) if source_manifest else trained.get('policy_interface')
             pool.restore(trained["pool"])
             training_provenance = {"path": str(pool_path.resolve()),
                 "sha256": hashlib.sha256(pool_path.read_bytes()).hexdigest(),
@@ -374,8 +391,8 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
                 "total_training_episodes": trained.get("total_training_episodes",trained["episodes_completed"]),
                 "training_seeds": trained.get("training_seeds", []), "algorithm": trained.get("algorithm"),
                 "optimizer_status":trained.get('optimizer_status','unknown'),
-                'communication_encoder':trained.get('communication_encoder',LEGACY_ENCODER) if not static_initial else None,
-                'policy_interface':trained.get('policy_interface'),
+                'communication_encoder':original_interface['communication_encoder'] if original_interface and not static_initial else None,
+                'policy_interface':original_interface,
                 "pool_changed":trained.get('pool_changed'),
                 'training_run_id':trained.get('training_run_id'),
                 'training_lineage_id':trained.get('training_lineage_id'),
@@ -386,6 +403,8 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
                 'optimizer_history':[{'iteration':h['iteration'],'optimizer_status':h.get('optimizer_status'),
                     'episodes':h.get('episodes')} for h in trained.get('history',[])],
                 'initial_pool_sha256':trained.get('initial_pool_sha256')}
+            if manifest_ref is not None:
+                training_provenance['training_manifest']=manifest_ref
         if pool and pool.seed_set!=config["skill_seed_set"]:
             raise ValueError("Stored skill seed set differs from the declared experiment")
         if stage == "eval" and pool and not (output/"frozen_pool.json").exists():
@@ -415,7 +434,7 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
             if result_path.is_file() and (stage == "eval" or episode < committed):
                 result = json.loads(result_path.read_text())
                 if result.get("status") == "completed":
-                    check_pool_interface(result, config)
+                    check_pool_interface(result, config, manifest=manifest)
                     completed.append(result)
                     continue
             if limit is not None and counter >= limit: break
@@ -424,7 +443,7 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
             if recovered:
                 result=json.loads(result_path.read_text())
                 if result.get("status") != "completed": raise ValueError("Cannot recover an incomplete episode result")
-                experiences=recover_episode(result,config,client,text_model,output)
+                experiences=recover_episode(result,config,client,text_model,output,manifest=manifest)
             else:
                 result, experiences = run_episode(config, planned_seeds[episode], episode, client, pool, text_model, output)
             completed.append(result); pending_results.append(result); pending_experiences.extend(experiences)
@@ -435,15 +454,21 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
                 preparation_key='preparation:'+str(iteration)+':'+config.get('comparison_id',config['arm'])
                 prepared=journal.restore(preparation_key) if journal else None
                 pending_hash=progress_digest([e.__dict__ for e in pending_experiences])
+                batch_identity={'run':resume_identity,'trace_sha256':[r['trace_sha256'] for r in pending_results]}
+                if prepared and (prepared['pending_hash']!=pending_hash or prepared.get('resume_identity')!=batch_identity):
+                    raise ValueError('Pending training batch or its policy/source identity changed during optimizer resume')
                 if journal:
-                    journal.checkpoint('pending_batch:'+str(iteration)+':'+config.get('comparison_id',config['arm']),{
+                    pending_key='pending_batch:'+str(iteration)+':'+config.get('comparison_id',config['arm'])
+                    stored=journal.restore(pending_key)
+                    if stored and (stored.get('trace_hash')!=pending_hash or stored.get('resume_identity')!=batch_identity):
+                        raise ValueError('Pending evidence no longer matches the recorded training batch')
+                    if stored is None:journal.checkpoint(pending_key,{
                         'trace_hash':pending_hash,'episodes':pending_results,
                         'experiences':[e.__dict__ for e in pending_experiences],
+                        'resume_identity':batch_identity,
                         'environment_episodes_completed':len(completed),'committed_optimizer_loops':len(history)})
-                if prepared and prepared['pending_hash']!=pending_hash:
-                    raise ValueError('Pending training batch changed during optimizer resume')
                 if prepared is None and journal:
-                    prepared={'pending_hash':pending_hash,'status':'before_preparation','before':{
+                    prepared={'pending_hash':pending_hash,'resume_identity':batch_identity,'status':'before_preparation','before':{
                         'pool':pool.snapshot() if pool else None,'baselines':deepcopy(baselines),
                         'evolution':evolution.snapshot() if evolution else None,
                         'model':text_model.snapshot(),'rng':rng_snapshot()}}
@@ -477,7 +502,7 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
                             'allowed_seeds':split_seeds(config,'train'),
                             'forbidden_seeds':split_seeds(config,'final_test')}
                         def verify_selector(previous,proposed):
-                            key='selector_probe:'+progress_digest([previous,proposed,probe_rows,probe_rule,client.identity])
+                            key='selector_probe:'+progress_digest([previous,proposed,probe_rows,probe_rule,resume_identity])
                             cached=journal.restore(key) if journal else None
                             if cached is not None:return cached
                             measured=probe_selection(previous,proposed,probe_rows,client,probe_rule,'training')
@@ -516,7 +541,7 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
                     "training_seeds": sorted(set(inherited_seeds)|set(planned_seeds[:episode+1])),
                     "model_identity": client.identity if client else None, "baselines": baselines,
                     "experience": evolution.snapshot() if evolution else {}, "history": history,
-                    "config_digest": fingerprint, "algorithm": config["evolution"],
+                    "config_digest": manifest['config_digest'], "algorithm": config["evolution"],
                     "communication_encoder":config['communication_encoder'], "policy_interface":interface,
                     'controller_contract':config.get('selector',{}).get('contract','upstream'),
                     'optimizer_status':ev.get('optimizer_status','completed_unchanged'),
@@ -546,6 +571,7 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
                     "experience":evolution.snapshot() if evolution else {}, "history":history,
                     "pending_experiences":[e.__dict__ for e in pending_experiences],
                     "pending_results":pending_results, "algorithm":config["evolution"],
+                    "config_digest":manifest['config_digest'],
                     "communication_encoder":config['communication_encoder'], "policy_interface":interface,
                     'controller_contract':config.get('selector',{}).get('contract','upstream'),
                     "initial_pool_sha256":initial_pool_hash})

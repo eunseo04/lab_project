@@ -90,6 +90,19 @@ def test_seed_plan_applies_noncontiguous_lists_and_variants_do_not_pick_new_hold
     assert split_seeds(c,'train')==[900001,900003] and split_seeds(c,'final_test')==[902001,902004]
 
 
+@pytest.mark.parametrize('role',['final_test','transfer'])
+def test_public_selector_seed_is_exposed_in_a_fresh_checkout(tmp_path,role):
+    from research.config import seed_exposure_history, validate_seed_plan
+    history=seed_exposure_history(tmp_path/'missing-research-outputs')
+    plan={'purpose':'final_evaluation','train':[900001],'validation':[],'final_test':[],'transfer':[]}
+    plan[role]=[788380683]
+    with pytest.raises(ValueError,match='already exposed'):
+        validate_seed_plan(plan,history)
+    for purpose in ('development','reproduction'):
+        plan['purpose']=purpose
+        assert validate_seed_plan(plan,history)['reused_seed_roles'][role]==[788380683]
+
+
 def test_cumulative_budget_ledgers_deduplicate_sessions_and_discover_later_usage(tmp_path,monkeypatch):
     import json
     from types import SimpleNamespace
@@ -341,6 +354,14 @@ def test_static_selector_pilot_reserves_both_complete_episodes_before_launch(tmp
     assert left['arm']==right['arm']=='E1' and left['pool']==right['pool']
     assert left['selector'].get('contract','upstream')=='upstream' and right['selector']['contract']=='cage4_role_v1'
     for key in ('model','steps','communication','action_contract','behavior_context'):assert left[key]==right[key]
+    baseline=campaign.make_protocol(Namespace(frozen_policy_pilot=True,pilot_controller='B0',
+        max_gpus=1,gpu_hours=1,wall_hours=1,minimum_free_mib=24000),tmp_path)
+    assert baseline['required_evaluation_labels']==['B0','B1']
+    assert baseline['core_evaluation_reservation']==p['core_evaluation_reservation']
+    left,right=baseline['configs'].values()
+    assert (left['arm'],right['arm'])==('E0','E1') and not left.get('pool') and right['pool']
+    for key in ('model','steps','communication_encoder','action_contract','behavior_context','experiment_version'):
+        assert left[key]==right[key]
 
 
 def test_visible_cue_chain_keeps_selection_termination_busy_wait_and_completion_separate():

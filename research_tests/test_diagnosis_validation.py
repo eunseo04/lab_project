@@ -421,9 +421,74 @@ def test_traffic_scope_rejects_zone_wide_claims_and_arbitrary_source():
     from research.diagnosis import traffic_scope_contradictions
 
     assert traffic_scope_contradictions("BlockTrafficZone to isolate the entire zone.")
+    assert traffic_scope_contradictions("Do not wait; BlockTrafficZone isolates the entire zone.")
+    assert traffic_scope_contradictions("Do not wait and BlockTrafficZone isolates the entire zone.")
+    assert traffic_scope_contradictions("BlockTrafficZone isolates the entire zone if you do not block first.")
     assert traffic_scope_contradictions("Set from_subnet=office_network_subnet and AllowTrafficZone.")
+    assert traffic_scope_contradictions("Set from_subnet=office_network_subnet.")
+    assert traffic_scope_contradictions("Use BlockTrafficZone to select the source subnet.")
     assert not traffic_scope_contradictions("BlockTrafficZone from the fixed source to the destination only.")
     assert not traffic_scope_contradictions("Do not use BlockTrafficZone to isolate an entire subnet.")
+    assert not traffic_scope_contradictions("BlockTrafficZone cannot isolate the whole zone.")
+    assert not traffic_scope_contradictions("BlockTrafficZone affects one directed pair and not the entire zone.")
+    assert not traffic_scope_contradictions("Select the source subnet to inspect.")
+    assert not traffic_scope_contradictions("BlockTrafficZone uses fixed from_subnet=office_network_subnet.")
+
+
+@pytest.mark.parametrize('agent,source',[('blue_agent_0','restricted_zone_a_subnet'),
+                                        ('blue_agent_4','public_access_zone_subnet')])
+def test_linked_intervention_and_candidate_check_traffic_source_of_acting_blue(agent,source):
+    from research.diagnosis import canonical_fact_catalog, validate_interventions
+    from research.semantic_evidence import candidate_supported
+
+    rows,data=fact_intervention_fixture()
+    rows[0].update(agent=agent,traffic_zone_interface={'fixed_from_subnet':source,
+        'destination_parameter':'subnet:', 'scope':'single_directed_pair'})
+    fact=next(f for f in canonical_fact_catalog(rows) if f['finding']=='observed_pid')
+    hypothesis=data['interventions'][0]
+    hypothesis['supported_fact_ids']=[fact['fact_id']]
+    parent=Skill('parent','visible cue',['Review prior response.'],'Reviewed.')
+    for mention in (f'from_subnet={source}',f'source {source}'):
+        text=f'BlockTrafficZone uses fixed {mention} and one selected destination.'
+        hypothesis['proposed_procedure']=text
+        checked=validate_interventions(data,rows)
+        assert checked['passed'] and not checked['efficacy_verified']
+    records=[{'related':True,'gradient':checked['gradients'],
+              'evidence_audits':[{'passed':True,'structured_proposals':checked}]}]
+    link={'component':'execution','element':0,'proposal_ids':[checked['proposals'][0]['proposal_id']]}
+    for text,expected in ((hypothesis['proposed_procedure'],True),
+            ('BlockTrafficZone uses fixed from_subnet=office_network_subnet.',False),
+            ('Do not wait; BlockTrafficZone isolates the entire zone.',False)):
+        hypothesis['proposed_procedure']=text
+        intervention=validate_interventions(data,rows)
+        assert intervention['passed']==expected and intervention['known_contradiction']!=expected
+        candidate=Skill('child',parent.initiation,[text],parent.termination)
+        result=candidate_supported(parent,candidate,records,[{**link,'candidate_text':text}])
+        assert result['passed']==expected and result['known_contradiction']!=expected
+        assert result['candidate_links_valid'] and not result['semantics_verified']
+
+
+def test_traffic_pair_evidence_distinguishes_observed_completion_from_future_binding():
+    from research.diagnosis import canonical_fact_catalog, traffic_scope_contradictions
+
+    source='public_access_zone_subnet'
+    target='admin_network_subnet'
+    pair={'from_subnet':source,'to_subnet':target}
+    row={'step':2,'agent':'blue_agent_4','requested_action':'BlockTrafficZone subnet:'+target,
+        'policy_invoked':True,'request_applied':True,'requested_traffic_zone_pair':pair,
+        'behavior_outcome':{'completed_action':{'name':'BlockTrafficZone','target':target,
+            'started_at':2,'completed_at':3,'status':'TRUE','traffic_zone_pair':pair}}}
+    facts=canonical_fact_catalog([row])
+    request=next(f for f in facts if f['finding']=='recorded_decision')
+    completion=next(f for f in facts if f['finding']=='completed_success')
+    assert request['traffic_zone_pair']==completion['traffic_zone_pair']==pair
+    matching=f'BlockTrafficZone completed with from_subnet={source} and to_subnet={target}.'
+    mismatching=matching.replace(target,'office_network_subnet')
+    future=mismatching.replace('completed with','can be requested with')
+    assert not traffic_scope_contradictions(matching,[completion])
+    assert traffic_scope_contradictions(mismatching,[completion])
+    assert not traffic_scope_contradictions(mismatching,[request])
+    assert not traffic_scope_contradictions(future,[completion])
 
 
 def test_stale_pid_cannot_be_claimed_fresh_and_completion_stays_host_bound():

@@ -14,7 +14,7 @@ import threading
 import time
 from . import ROOT
 from .rollout import pool_digest,verify_transaction
-from .config import split_seeds, execution_config, policy_interface, check_pool_interface
+from .config import split_seeds, execution_config, policy_interface, check_pool_interface, read_training_manifest
 from .progress import Journal,atomic_json,digest,BudgetExceeded,IncompleteOptimization,implementation_identity
 
 
@@ -31,7 +31,9 @@ class EnvironmentVerifier:
         self.completed_training_episodes=config['train_episodes']
         inherited_path=Path(config['pool']) if config.get('pool') else None
         inherited=json.loads(inherited_path.read_text()) if inherited_path and inherited_path.is_file() else {}
-        if 'pool' in inherited:check_pool_interface(inherited,config,static_initial=True)
+        if 'pool' in inherited:
+            manifest=read_training_manifest(inherited_path,inherited,manifest_ref=config.get('pool_manifest'))
+            check_pool_interface(inherited,config,static_initial=True,manifest=manifest)
         self.inherited_episodes=inherited.get('total_training_episodes',inherited.get('episodes_completed',0))
         self.inherited_seeds=inherited.get('training_seeds',[])
         self.inherited_iterations=len(inherited.get('history',[]))
@@ -114,6 +116,7 @@ class EnvironmentVerifier:
                         summary=json.loads(summary_path.read_text()) if summary_path.exists() else {}
                         if summary.get('status')!='completed':
                             cfg={k:deepcopy(v) for k,v in self.config.items() if k!='execution_stage'}
+                            cfg.pop('pool_manifest',None)  # It belongs to the training input, not this validation snapshot.
                             cfg.update(pool=str(pool_file),eval_seed=seed,eval_seeds=[seed],episodes=1,
                                 evaluation_disabled=False,evaluation_role='rollout',journal_path=str(self.journal.path))
                             cfg['model'].update(endpoint=f'http://127.0.0.1:{port}',scoring_endpoints=[],generation_endpoints=[])

@@ -7,13 +7,14 @@ from pathlib import Path
 import statistics
 
 ROOT=Path(__file__).resolve().parents[1]
-GROUP_FIELDS=('version','red','split','communication_encoder')
+GROUP_FIELDS=('version','red','split','communication_encoder','action_contract','evaluation_scope')
 
 
 def episode_group(episode):
     # Old compact exports omitted the local encoder identifier.
     return (episode['version'],episode['red'],episode['split'],
-            episode.get('communication_encoder','legacy_local_v1'))
+            episode.get('communication_encoder','legacy_local_v1'),episode.get('action_contract','legacy'),
+            episode.get('evaluation_scope',episode['split']))
 
 
 def paired_episodes(before,after):
@@ -32,7 +33,7 @@ def paired_episodes(before,after):
 def recompute(episodes):
     grouped=defaultdict(list)
     for episode in episodes:
-        if episode.get('status')!='completed' or episode.get('kind')!='real_cage4':continue
+        if episode.get('status')!='completed' or episode.get('kind')!='real_cage4' or episode.get('unit_test_fixture_only'):continue
         if not math.isfinite(episode['joint_return']):raise ValueError('Nonfinite completed episode')
         grouped[(*episode_group(episode),episode['label'])].append(episode)
     rows=[];paired=[]

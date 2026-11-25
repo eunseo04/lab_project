@@ -10,7 +10,6 @@ from .config import ARMS, REDS
 from .adapter import ACTIONS
 from .metrics import aggregate_episodes
 from .experiment import atomic_json
-from . import ROOT
 
 
 def render_table(path, headers, rows):
@@ -32,26 +31,40 @@ def unbundled_reference():
             'aggregation_uncertainty': 'Literature result data is not bundled; compare new local runs separately.'}
 
 
-def report(directory, reasoning=False):
+def report(directory, reasoning=False, *, collected=None, output=None):
+    from scripts.report_experiment import collect
+
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    directory = Path(directory)
-    destination = directory/"report"; destination.mkdir(parents=True, exist_ok=True)
-    summaries = []
+    directory = Path(directory).resolve()
+    destination = Path(output) if output else directory/"report"
+    destination.mkdir(parents=True, exist_ok=True)
+    episodes, statuses = collected if collected is not None else collect(directory, include_trace_paths=True)
+    by_source = defaultdict(list)
+    for episode in episodes:
+        by_source[episode["source"]].append(episode)
+    summaries, histories, controls_only = [], [], []
     rejected_mock = []
-    for path in sorted(directory.rglob("summary.json")):
-        if "report" in path.relative_to(directory).parts: continue
+    for status in statuses:
+        run = directory/status["directory"]
+        summary = run/"summary.json"
+        if status["result_kind"] == "mock_test":
+            rejected_mock.append(str(summary))
+        eligible = by_source.get(status["directory"])
+        if not eligible:
+            continue
+        path = summary if summary.is_file() else run/"manifest.json"
         value = json.loads(path.read_text())
-        if "config" not in value or "stage" not in value: continue
-        if value.get("result_kind") != "real_cage4":
-            rejected_mock.append(str(path)); continue
-        if value["stage"] != "eval": continue
-        value["episodes"] = [e for e in value.get("episodes", [])
-                             if e.get("status") == "completed" and e.get("kind") == "real_cage4"]
-        if not value["episodes"]: continue
-        value["path"] = str(path)
-        summaries.append(value)
+        value.update(episodes=eligible, source_path=str(path), status=status["status"],
+                     split=status["split"], evaluation_role=status["evaluation_role"],
+                     comparison_run_id=status["comparison_run_id"])
+        if status["stage"] == "train":
+            histories.append(value)
+        elif status["split"] == "untrained_control":
+            controls_only.append(value)
+        elif status["stage"] == "eval":
+            summaries.append(value)
     groups = defaultdict(list)
     controls = []
     for s in summaries:
@@ -59,7 +72,7 @@ def report(directory, reasoning=False):
         encoder=c.get('communication_encoder',LEGACY_ENCODER)
         if c["composition"] in ("no_blue", "all_rl"):
             m=aggregate_episodes(s["episodes"])
-            controls.append([c["composition"],c["red"],c["steps"],c["scoring"],c["communication"],encoder,m["n"],
+            controls.append([s["split"],c["composition"],c["red"],c["steps"],c["scoring"],c["communication"],encoder,m["n"],
                 number(m["mean_joint_reward"]),number(m["reward_std"]),number(m["execution_time_s"])])
         if c["composition"] not in ("hybrid", "all_llm"): continue
         if c["arm"] in ("E2","E3") and not c["evolution"].get("enabled",True): continue
@@ -69,10 +82,28 @@ def report(directory, reasoning=False):
                model["model"], model["revision"], model.get("temperature", 1), model.get("max_tokens", 192), c["evolution"]["gate_mode"],
                c["evolution"].get("maintenance_mode", "official_code"), c["skip_busy_policy"],
                c["selector"]["epsilon"], c["selector"]["max_skill_age"],encoder,c.get('action_contract','legacy'),
-               c['selector'].get('contract','upstream'),c['selector'].get('urgent_preemption',False))
+               c['selector'].get('contract','upstream'),c['selector'].get('urgent_preemption',False),
+               s["episodes"][0]["version"],s["split"],s["comparison_run_id"])
         groups[key].append(s)
-    diagnostics = {"excluded_mock_summaries": rejected_mock, "groups": [], "unexecuted_cells": "N/A"}
-    render_table(destination/"control_baselines", ["Composition","Red","Nominal steps","Scoring","Communication","Encoder","N","Mean Reward","Sample Std","Seconds"], controls)
+    diagnostics = {"excluded_mock_summaries": rejected_mock, "groups": [], "unexecuted_cells": "N/A",
+                   "omitted_ambiguous_legacy_groups": []}
+    for key, items in list(groups.items()):
+        cells = {(item["config"]["arm"],item["config"]["red"]) for item in items}
+        if len(cells)!=len(items):
+            diagnostics["omitted_ambiguous_legacy_groups"].append({
+                "comparison_key":list(key),"sources":[item["source_path"] for item in items],
+                "reason":"Multiple runs share an internal arm and Red cell. Use the labeled canonical report."})
+            del groups[key]
+    render_table(destination/"control_baselines", ["Split","Composition","Red","Nominal steps","Scoring","Communication","Encoder","N","Mean Reward","Sample Std","Seconds"], controls)
+    control_rows = []
+    for s in controls_only:
+        metrics = aggregate_episodes(s["episodes"])
+        case = s["episodes"][0]
+        control_rows.append([case["label"],case["red"],s["evaluation_role"] or "unspecified",
+            case["communication_encoder"],case["training_provenance_state"],metrics["n"],
+            number(metrics["mean_joint_reward"])])
+    render_table(destination/"untrained_controls",
+                 ["Arm","Red","Evaluation role","Encoder","Training evidence","N","Mean Reward"],control_rows)
     # Architecture is a description of actual implemented modules, not performance data.
     fig, ax = plt.subplots(figsize=(13, 5)); ax.axis("off")
     boxes = [("Blue observation\nCAGE4 observable state",.12,.73),
@@ -113,10 +144,10 @@ def report(directory, reasoning=False):
         by_arm_red = {}
         for item in items:
             case=(item["config"]["arm"],item["config"]["red"])
-            if case in by_arm_red: raise ValueError(f"Duplicate run for {case}; report one experiment root at a time")
             by_arm_red[case]=item
         arm_metrics, arm_episodes, available_metrics = {}, {}, {}
         automatic_counts = {a: Counter() for a in ARMS}
+        trace_counts = Counter()
         red_rows, counts = [], {a: Counter() for a in ARMS}
         paired_seeds = {}
         available_seed_pairs = {}
@@ -126,7 +157,7 @@ def report(directory, reasoning=False):
             paired = set.intersection(*sets) if all(sets) else set()
             paired_seeds[red] = sorted(paired)
             nonempty = [s for s in sets if s]
-            displayed = set.intersection(*nonempty) if nonempty else set()
+            displayed = set.intersection(*nonempty) if len(nonempty)>=2 else set()
             available_seed_pairs[red] = sorted(displayed)
             row = [red]
             for arm in ARMS:
@@ -153,7 +184,11 @@ def report(directory, reasoning=False):
             available_metrics[arm] = aggregate_episodes(episodes)
             arm_metrics[arm] = aggregate_episodes(episodes if complete_red_coverage else [])
             for episode in episodes:
-                for line in Path(episode["trace"]).read_text().splitlines():
+                trace = episode.get("trace")
+                if not trace or not Path(trace).is_file():
+                    continue
+                trace_counts[arm] += 1
+                for line in Path(trace).read_text().splitlines():
                     row = json.loads(line)
                     if row.get("policy") != "llm": continue
                     if row.get("automatic_monitor"): automatic_counts[arm]["Monitor"] += 1
@@ -167,10 +202,11 @@ def report(directory, reasoning=False):
         render_table(folder/"table1_overall", ["Metric", "ACD KEEP (Paper Reference)", "ACD GPT-4o-mini (Paper Reference)", *ARMS], rows)
         render_table(folder/"table2_red_strategy", ["Red Strategy", *ARMS], red_rows)
         render_table(folder/"pairwise_available", ["Red","Comparison","Paired N","Left Mean","Right Mean","Mean difference","Sample Std of differences"],pairwise_rows)
+        traced_arms={a for a in ARMS if trace_counts[a] and trace_counts[a]==len(arm_episodes[a])}
         render_table(folder/"table3_executed_actions", ["Action (actual LLM-Blue execution totals)", *ARMS],
-            [[action, *[counts[arm][action] if arm_episodes[arm] else "N/A" for arm in ARMS]] for action in ACTIONS])
+            [[action, *[counts[arm][action] if arm in traced_arms else "N/A" for arm in ARMS]] for action in ACTIONS])
         render_table(folder/"table3_automatic_actions", ["Automatic action (LLM Blue, separate)", *ARMS],
-            [["Monitor", *[automatic_counts[arm]["Monitor"] if arm_episodes[arm] else "N/A" for arm in ARMS]]])
+            [["Monitor", *[automatic_counts[arm]["Monitor"] if arm in traced_arms else "N/A" for arm in ARMS]]])
         render_table(folder/"paired_available_policies", ["Arm", "Paired N", "Mean Reward", "Sample Std", "Seconds"],
             [[a, available_metrics[a]["n"], *[number(available_metrics[a][k]) for k in ("mean_joint_reward","reward_std","execution_time_s")]] for a in ARMS])
         completed_rows = []
@@ -202,12 +238,12 @@ def report(directory, reasoning=False):
         fig.tight_layout();fig.savefig(folder/"figure3_red_strategy.png",dpi=180);plt.close(fig)
         fig,ax=plt.subplots(figsize=(10,4))
         for j,arm in enumerate(ARMS):
-            if arm_episodes[arm]: ax.bar(np.arange(len(ACTIONS))+j*.18,[counts[arm][a]/len(arm_episodes[arm]) for a in ACTIONS],.18,label=arm)
+            if arm in traced_arms: ax.bar(np.arange(len(ACTIONS))+j*.18,[counts[arm][a]/len(arm_episodes[arm]) for a in ACTIONS],.18,label=arm)
         ax.set_xticks(np.arange(len(ACTIONS))+.27,ACTIONS,rotation=35,ha="right")
         ax.set_title("Actual LLM-Blue actions per episode; automatic Monitor separate")
         if ax.patches: ax.legend()
         fig.tight_layout();fig.savefig(folder/"figure4_actions.png",dpi=180);plt.close(fig)
-        info = {"comparison_key": list(key), "paired_seeds": paired_seeds,
+        info = {"comparison_key": list(key), "split":key[-2], "comparison_run_id":key[-1], "paired_seeds": paired_seeds,
             "table2_available_arm_paired_seeds":available_seed_pairs,
             "action_red_scope":[red for red in REDS if paired_seeds[red]],
             "overall_requires_all_five_reds": True, "complete_red_coverage": complete_red_coverage,
@@ -217,27 +253,26 @@ def report(directory, reasoning=False):
             "paper_reference_aggregation": reference["aggregation_uncertainty"]}
         atomic_json(folder/"comparison.json",info);diagnostics["groups"].append(info)
     # Training/skill plots are distinct from held-out evaluation metrics.
-    histories = []
-    for path in sorted(directory.rglob("summary.json")):
-        s=json.loads(path.read_text())
-        if s.get("stage")=="train" and s.get("result_kind")=="real_cage4":
-            s["source_path"]=str(path);histories.append(s)
     diagnostics["training_groups"]=training_figures(histories,destination)
     ablations=[]
-    for path in directory.rglob("summary.json"):
-        s=json.loads(path.read_text())
-        if s.get("stage")=="eval" and s.get("result_kind")=="real_cage4":
-            e=s["config"]["evolution"]
-            labels=[name for flag,name in [("semantic_gradient","Without Semantic Gradient"),("ppo_gate","Without PPO Gate"),("score_maintenance","Without Score Maintenance")] if not e.get(flag,True)]
-            if not e.get("enabled",True): labels.append("Without Skill Evolution")
-            if len(labels)>1: labels=["Combined: "+" + ".join(labels)]
-            if not labels: labels=["Proposed" if s["config"]["arm"]=="E3" else "Full Skill-Pro"] if s["config"]["arm"] in ("E2","E3") else []
-            for label in labels:
-                m=aggregate_episodes(s.get("episodes",[]));ablations.append([label,s["config"]["composition"],s["config"]["red"],s["config"]["steps"],e["gate_mode"],e.get("maintenance_mode","official_code"),m["n"],number(m["mean_joint_reward"]),number(m["reward_std"]),number(m["execution_time_s"])])
+    for s in summaries:
+        config=s["config"];e=config["evolution"]
+        arm=s["episodes"][0]["label"]
+        labels=[name for flag,name in [("semantic_gradient","Without Semantic Gradient"),("ppo_gate","Without PPO Gate"),("score_maintenance","Without Score Maintenance")] if not e.get(flag,True)]
+        if not e.get("enabled",True): labels.append("Without Skill Evolution")
+        if len(labels)>1: labels=["Combined: "+" + ".join(labels)]
+        if not labels and config["arm"] in ("E2","E3"):
+            labels=[{"E2":"Full Skill-Pro","B2":"Full Skill-Pro","E3":"Proposed"}.get(arm,arm)]
+        for label in labels:
+            m=aggregate_episodes(s["episodes"])
+            ablations.append([label,config["composition"],config["red"],config["steps"],e["gate_mode"],
+                e.get("maintenance_mode","official_code"),m["n"],number(m["mean_joint_reward"]),
+                number(m["reward_std"]),number(m["execution_time_s"]),s["split"],s["episodes"][0]["communication_encoder"],
+                config.get("action_contract","legacy"),arm,s["comparison_run_id"]])
     known={r[0] for r in ablations}
     for label in ["Without Semantic Gradient","Without PPO Gate","Without Score Maintenance","Full Skill-Pro","Proposed"]:
-        if label not in known: ablations.append([label,"N/A","N/A","N/A","N/A","N/A",0,"N/A","N/A","N/A"])
-    render_table(destination/"table4_ablation",["Configuration","Composition","Red","Nominal steps","Gate mode","Maintenance mode","N","Mean Reward","Sample Std","Time"],ablations)
+        if label not in known: ablations.append([label,"N/A","N/A","N/A","N/A","N/A",0,*["N/A"]*8])
+    render_table(destination/"table4_ablation",["Configuration","Composition","Red","Nominal steps","Gate mode","Maintenance mode","N","Mean Reward","Sample Std","Time","Split","Encoder","Action contract","Arm","Run"],ablations)
     reasoning_status=destination/"figure7_reasoning_status.json"
     previous=json.loads(reasoning_status.read_text()) if reasoning_status.exists() else {}
     if reasoning or previous.get("status")!="completed":
@@ -326,9 +361,10 @@ def reasoning_analysis(summaries,destination):
     from sklearn.cluster import KMeans
     from sklearn.metrics import silhouette_score
     import matplotlib.pyplot as plt
-    candidates=[s for s in summaries if s.get("episodes") and s["config"]["composition"] in ("hybrid","all_llm")]
+    candidates=[(s,e) for s in summaries if s["config"]["composition"] in ("hybrid","all_llm")
+                for e in s["episodes"] if e.get("trace") and Path(e["trace"]).is_file()]
     if not candidates: return
-    source=candidates[0]; episode=source["episodes"][0]
+    source,episode=candidates[0]
     rows=[json.loads(line) for line in Path(episode["trace"]).read_text().splitlines()]
     rows=[r for r in rows if r["agent"]=="blue_agent_4" and r["step"]>0 and r.get("reason") and not r.get("parse_error") and r.get("policy_invoked")]
     if len(rows)<5: return

@@ -1,9 +1,12 @@
 """Exercise validation serialization through the actual evaluation loader."""
 from copy import deepcopy
+import hashlib
 import json
+from pathlib import Path
 import pytest
 from research.progress import BudgetExceeded
-from research.config import execution_config, variant_config
+from research.config import (check_pool_interface, digest, execution_config, policy_interface,
+                             read_training_manifest, variant_config)
 from research.experiment import run
 from research.rollout_execution import EnvironmentVerifier
 from research.skills import SecuritySkillPool
@@ -67,7 +70,8 @@ def test_partial_rollout_resume_reuses_completed_seeds_and_waits_for_all(offline
             calls.append(seed)
             frozen=json.loads(__import__('pathlib').Path(cfg['pool']).read_text())
             (dest/'frozen_pool.json').write_text(json.dumps(frozen))
-            ep={**episodes()[0],'seed':seed,'communication_encoder':cfg['communication_encoder']}
+            ep={**episodes()[0],'seed':seed,'communication_encoder':cfg['communication_encoder'],
+                'policy_interface':policy_interface(cfg)}
             (dest/'summary.json').write_text(json.dumps({'status':'completed','model_identity':offline.identity,'pool_frozen':True,'episodes':[ep]}))
         def poll(self):return 0
     monkeypatch.setattr('research.rollout_execution.subprocess.Popen',Worker)
@@ -90,3 +94,92 @@ def test_original_communication_cannot_warm_start_or_evaluate_a_legacy_learned_p
     for stage in ('train','eval'):
         with pytest.raises(ValueError,match='communication encoder differs'):
             run(config,stage=stage,output=tmp_path/stage,client=offline)
+
+
+def test_legacy_pool_checks_original_manifest_before_warm_start_or_evaluation(offline,tmp_path,monkeypatch):
+    config=variant_config('B2')
+    config.update(communication_encoder='legacy_local_v1',action_contract='explicit',
+                  steps=6,episodes=1,iterations=1,train_episodes=2,composition='all_llm')
+    source=tmp_path/'source'
+    source.mkdir()
+    pool_path=source/'checkpoint.json'
+    manifest_path=source/'manifest.json'
+    snapshot=json.loads(Path(config['pool']).read_text())['pool']
+    checkpoint={'stage':'train','pool':snapshot,'episodes_completed':2,'training_seeds':[1,2],
+                'model_identity':offline.identity,'controller_contract':'upstream','config_digest':digest(config)}
+    pool_path.write_text(json.dumps(checkpoint))
+    manifest={'stage':'train','config':config,'config_digest':digest(config)}
+    manifest_path.write_text(json.dumps(manifest))
+    ref={'path':str(manifest_path),'sha256':hashlib.sha256(manifest_path.read_bytes()).hexdigest()}
+    assert read_training_manifest(pool_path,checkpoint,manifest_ref=ref)==manifest
+    campaign=tmp_path/'historical-campaign'
+    frozen=campaign/'frozen'/'B2.json'
+    frozen.parent.mkdir(parents=True)
+    original=campaign/'runs'/'B2-finite-train'
+    original.mkdir(parents=True)
+    frozen.write_bytes(pool_path.read_bytes())
+    (original/'checkpoint.json').write_bytes(pool_path.read_bytes())
+    (original/'manifest.json').write_bytes(manifest_path.read_bytes())
+    assert read_training_manifest(frozen,checkpoint)==manifest
+    (original/'checkpoint.json').write_text('{}')
+    assert read_training_manifest(frozen,checkpoint) is None
+    with pytest.raises(ValueError,match='Missing Skill Pool policy interface'):
+        check_pool_interface(checkpoint,config)
+    with pytest.raises(ValueError,match='controller contract'):
+        check_pool_interface({**checkpoint,'controller_contract':'cage4_role_v1',
+                              'policy_interface':policy_interface(config)},config)
+    with pytest.raises(ValueError,match='controller contract'):
+        check_pool_interface({**checkpoint,'controller_contract':'cage4_role_v1'},config,manifest=manifest)
+    other_contract={**config,'action_contract':'explicit_zone_pair_v1'}
+    with pytest.raises(ValueError,match='disagrees with its original manifest'):
+        check_pool_interface({**checkpoint,'policy_interface':policy_interface(other_contract)},
+                             other_contract,manifest=manifest)
+    original_restore=SecuritySkillPool.restore
+    restores=[]
+    def observe_restore(self,value):
+        restores.append(value)
+        return original_restore(self,value)
+    monkeypatch.setattr(SecuritySkillPool,'restore',observe_restore)
+    for stage in ('train','eval'):
+        exact={**config,'pool':str(pool_path)}
+        different={**exact,'action_contract':'explicit_zone_pair_v1'}
+        before=len(restores)
+        with pytest.raises(ValueError,match='policy interface differs'):
+            run(different,stage,output=tmp_path/(stage+'-different'),client=offline,limit=0)
+        assert len(restores)==before
+        measured=run(exact,stage,output=tmp_path/stage,client=offline,limit=0)
+        assert measured['status']=='partial' and len(restores)==before+1
+        mismatched={**checkpoint,'model_identity':{**offline.identity,'dtype':'float16'}}
+        pool_path.write_text(json.dumps(mismatched))
+        with pytest.raises(ValueError,match='policy model identity'):
+            run(exact,stage,output=tmp_path/(stage+'-different-model'),client=offline,limit=0)
+        assert len(restores)==before+1
+        pool_path.write_text(json.dumps(checkpoint))
+    manifest_path.write_text(json.dumps({**manifest,'extra_fixture_field':True}))
+    with pytest.raises(ValueError,match='file hash'):
+        read_training_manifest(pool_path,checkpoint,manifest_ref=ref)
+    manifest_path.write_text(json.dumps({**manifest,'config':{**config,'action_contract':'explicit_zone_pair_v1'}}))
+    with pytest.raises(ValueError,match='configuration digest'):
+        read_training_manifest(pool_path,checkpoint)
+
+
+def test_resume_checks_explicit_checkpoint_against_its_run_manifest(offline,tmp_path,monkeypatch):
+    config=variant_config('B2')
+    config.update(steps=6,iterations=1,train_episodes=2,composition='all_llm')
+    run(config,'train',output=tmp_path,client=offline,limit=0)
+    manifest=json.loads((tmp_path/'manifest.json').read_text())
+    interface=policy_interface(manifest['config'])
+    checkpoint={'stage':'train','pool':{'fixture_only':True},'config_digest':manifest['config_digest'],
+                'training_run_id':manifest['training_run_id'],'model_identity':offline.identity,
+                'policy_interface':interface}
+    def forbid_restore(*_):
+        pytest.fail('Mismatched checkpoint was restored')
+    monkeypatch.setattr(SecuritySkillPool,'restore',forbid_restore)
+    for overrides,reason in [
+        ({'policy_interface':{**interface,'action_contract':'explicit'}},'disagrees with its original manifest'),
+        ({'controller_contract':'cage4_role_v1'},'controller contract'),
+        ({'training_run_id':'different-run'},'does not belong to the original training manifest'),
+    ]:
+        (tmp_path/'checkpoint.json').write_text(json.dumps({**checkpoint,**overrides}))
+        with pytest.raises(ValueError,match=reason):
+            run(config,'train',output=tmp_path,resume=True,client=offline,limit=0)
