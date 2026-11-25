@@ -3,6 +3,7 @@ import argparse
 from collections import Counter, defaultdict
 from copy import deepcopy
 import json
+import math
 from pathlib import Path
 import random
 import statistics
@@ -15,9 +16,11 @@ import sqlite3
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from scripts.recompute_public_metrics import recompute,paired_episodes
+from scripts.recompute_public_metrics import recompute,paired_episodes,episode_group,GROUP_FIELDS
 from research.progress import Journal,atomic_json
-from research.config import comparison_metadata,VERIFICATION_VARIANTS,CONTROLLER_VARIANTS,COMPLETED_OPTIMIZER_STATUSES
+from research.config import (comparison_metadata,VERIFICATION_VARIANTS,CONTROLLER_VARIANTS,
+    COMPLETED_OPTIMIZER_STATUSES,check_pool_interface)
+from acd.config import LEGACY_ENCODER
 
 
 def load(path):
@@ -51,6 +54,10 @@ def training_evidence(config,summary,run,cache):
     actual,trained=cache[key]
     if actual!=p['sha256']:
         result['state']='training_artifact_hash_mismatch';return result
+    try:
+        check_pool_interface(trained,config)
+    except ValueError:
+        result['state']='training_policy_interface_mismatch';return result
     algorithm=trained.get('algorithm');declared=p.get('algorithm')
     if not isinstance(algorithm,dict) or declared!=algorithm:
         result['state']='unknown_or_inconsistent_training_method';return result
@@ -88,7 +95,12 @@ def training_evidence(config,summary,run,cache):
     final=hashlib.sha256(json.dumps(trained.get('pool'),sort_keys=True).encode()).hexdigest()
     frozen=run/'frozen_pool.json'
     if frozen.is_file():
-        frozen_hash=hashlib.sha256(json.dumps(load(frozen).get('pool'),sort_keys=True).encode()).hexdigest()
+        frozen_record=load(frozen)
+        try:
+            check_pool_interface(frozen_record,config)
+        except ValueError:
+            result['state']='frozen_policy_interface_mismatch';return result
+        frozen_hash=hashlib.sha256(json.dumps(frozen_record.get('pool'),sort_keys=True).encode()).hexdigest()
     else:frozen_hash=None
     if (not seeds or not initial or p.get('initial_pool_sha256')!=initial or
             p.get('training_seeds')!=seeds or p.get('episodes_completed')!=trained.get('episodes_completed') or
@@ -146,11 +158,14 @@ def collect(directory, include_trace=False):
                 raise ValueError(f'Episode summary disagrees with its completed record: {path}')
             found[key] = episode
         completed = 0
+        encoder=config.get('communication_encoder',LEGACY_ENCODER)
         for episode in found.values():
             if episode.get('status') != 'completed' or episode.get('kind') != 'real_cage4':
                 continue
             if config.get('steps') == 500 and (episode.get('joint_transitions'), episode.get('scored_transitions')) != (499, 498):
                 raise ValueError('Invalid official 500-step episode evidence')
+            if episode.get('communication_encoder',LEGACY_ENCODER)!=encoder:
+                raise ValueError('Episode communication encoder differs from its config')
             identity = episode.get('model_identity') or summary.get('model_identity') or {}
             signature = json.dumps({
                 'conditions': {k: config.get(k) for k in ('steps', 'composition', 'profile', 'scoring', 'communication', 'behavior_context', 'skip_busy_policy', 'action_contract')},
@@ -159,7 +174,7 @@ def collect(directory, include_trace=False):
                 'keep_weights': {k: v.get('sha256') for k, v in (episode.get('weights') or {}).items()},
                 'implementation':manifest.get('implementation_sha256'),
             }, sort_keys=True)
-            group = (version, config['red'], split)
+            group = (version, config['red'], split, encoder)
             if group in signatures and signatures[group] != signature:
                 raise ValueError('Comparison conditions differ within the same version/red/split')
             signatures[group] = signature
@@ -179,6 +194,7 @@ def collect(directory, include_trace=False):
             policy_signatures[policy_key]=policy_value
             item = {k: episode[k] for k in ('seed', 'status', 'kind', 'joint_return', 'execution_time_s')}
             item.update(version=version, label=label, red=config['red'], split=split,
+                        communication_encoder=encoder,
                         comparison_run_id=comparison_run,training_run_id=provenance.get('training_run_id'),
                         training_identity=provenance.get('training_identity'),
                         requires_training=provenance.get('requires_training',comparison_metadata(config)['requires_training']),
@@ -193,16 +209,21 @@ def collect(directory, include_trace=False):
                     path = run/path
                 counts, flags, busy = Counter(), Counter(), 0
                 if path.is_file():
+                    visible_rows=[]
                     for line in path.open():
                         row = json.loads(line)
                         if row.get('policy') != 'llm':
                             continue
+                        visible_rows.append(row)
                         if row.get('policy_invoked') and not row.get('parse_error'):
                             counts[(row.get('requested_action') or 'unknown').split()[0]] += 1
                         elif not row.get('policy_invoked'):
                             busy += 1
                         for key in ('repeated_analysis_same_evidence', 'duplicate_successful_decoy', 'sleep_with_open_case'):
                             flags[key] += bool((row.get('behavior_outcome') or {}).get(key))
+                    from research.attribution import response_opportunity_audit
+                    audit=response_opportunity_audit(visible_rows)
+                    item['response_opportunities']={k:v for k,v in audit.items() if k!='cases'}
                     item['llm_behavior'] = {'free_actions': dict(counts), 'automatic_busy_ticks': busy, 'observable_flags': dict(flags)}
             episodes.append(item); completed += 1
         statuses.append({'directory': str(run.relative_to(directory)), 'label': label, 'red': config.get('red'),
@@ -219,14 +240,14 @@ def collect(directory, include_trace=False):
 COMPARISONS=(('B1','B0'),('B2','B1'),('B2','B0'),('B4','B2'),('B4','B0'),
              ('B3-no-support','B2'),('B3','B3-no-support'),('B3','B2'),('B4','B3'),
              *[(name,metadata['base']) for name,metadata in VERIFICATION_VARIANTS.items()],
-             ('B1-selector-contract','B1'),('B3-selector-contract','B1-selector-contract'))
+             *[(name,'B1' if base=='B1' else 'B1'+name[2:]) for name,base in CONTROLLER_VARIANTS.items()])
 
 
 def paired_comparisons(episodes):
     groups=defaultdict(lambda:defaultdict(list))
-    for e in episodes:groups[(e['version'],e['red'],e['split'])][e['label']].append(e)
+    for e in episodes:groups[episode_group(e)][e['label']].append(e)
     output=[]
-    for (version,red,split),arms in sorted(groups.items()):
+    for (version,red,split,encoder),arms in sorted(groups.items()):
         comparisons=list(dict.fromkeys([*COMPARISONS,*[(name,'B0') for name in arms if name!='B0']]))
         for new,old in comparisons:
             keys,before,after=paired_episodes(arms.get(old,[]),arms.get(new,[]))
@@ -234,7 +255,7 @@ def paired_comparisons(episodes):
             reps={label:training_summary(items) for label,items in ((old,before),(new,after))}
             learned=[v for v in reps.values() if v['status']!='not_applicable']
             repetitions=min(v['count'] for v in learned) if learned and all(v['count'] is not None for v in learned) else None
-            row={'comparison':new+'-'+old,'version':version,'red':red,'split':split,'paired_n':len(seeds),
+            row={'comparison':new+'-'+old,'version':version,'red':red,'split':split,'communication_encoder':encoder,'paired_n':len(seeds),
                 'seeds':seeds,'differences':delta,'mean_difference':statistics.mean(delta) if delta else None,
                 'median_difference':statistics.median(delta) if delta else None,
                 'win_tie_loss':[sum(d>0 for d in delta),sum(d==0 for d in delta),sum(d<0 for d in delta)] if delta else None,
@@ -263,6 +284,48 @@ def paired_comparisons(episodes):
     return output
 
 
+def rollout_progress(validation, admission_mode=None):
+    """Count measured pairs, including old results with checked reward differences."""
+    if not validation:
+        return {'rollout_pending':admission_mode=='rollout' or None,'rollout_completed':None,
+                'rollout_status':'unrecorded' if admission_mode=='rollout' else 'not_applicable',
+                'rollout_completed_pairs':None,'rollout_required_pairs':None}
+
+    def valid_seed_list(values):
+        if not isinstance(values,list) or any(type(seed) is not int for seed in values):
+            return []
+        return values if len(set(values))==len(values) else []
+
+    registered=valid_seed_list(validation.get('registered_seeds',validation.get('seeds')))
+    measured=valid_seed_list(validation.get('completed_paired_seeds',validation.get('paired_seeds')))
+    required=validation.get('required_approval_pairs',len(registered) or None)
+    if type(required) is not int or required<20:
+        required=None
+    differences=validation.get('differences')
+    reason=validation.get('reason')
+    full_result=reason in ('passed','failed_registered_criteria')
+    if isinstance(differences,dict):
+        recorded_deltas={str(k):value for k,value in differences.items()}
+    elif full_result and isinstance(differences,list) and len(differences)==len(registered):
+        # Legacy compare_rollouts emits one delta per registered seed only after checking both episodes.
+        measured=measured or registered
+        recorded_deltas=dict(zip(map(str,registered),differences))
+    else:
+        recorded_deltas={}
+    complete_pairs={s for s in measured if (not registered or s in registered)
+                    and type(recorded_deltas.get(str(s))) in (int,float)
+                    and math.isfinite(recorded_deltas[str(s)])}
+    completed=(full_result and validation.get('validation_complete') is not False and
+               required is not None and required==len(registered)==len(complete_pairs) and
+               set(registered)==complete_pairs)
+    prefix=reason in ('failed_registered_worst_seed_early','reject_screen_inconclusive')
+    stopped=reason=='failed_registered_worst_seed_early' or validation.get('early_approval_allowed') is False
+    state='complete' if completed else 'reject_only' if prefix else 'partial' if complete_pairs else 'planned' if registered else 'unrecorded'
+    return {'rollout_pending':not (completed or stopped),'rollout_completed':completed,
+            'rollout_status':state,'rollout_completed_pairs':len(complete_pairs),
+            'rollout_required_pairs':required}
+
+
 def optimizer_report(directory,output,statuses):
     states=[];changes=[];diagnoses=[];tasks=[];usage=None;candidate_stages=[]
     db=directory/'journal.sqlite3'
@@ -284,8 +347,7 @@ def optimizer_report(directory,output,statuses):
                         'planned':True,'collected':True,'grounded':(candidate.get('semantic_support') or {}).get('passed'),
                         'candidates_generated':bool(candidate.get('skill')),'scored':candidate.get('score') is not None,
                         'ppo_passed':candidate.get('score',0)>0 if candidate.get('score') is not None else None,
-                        'rollout_pending':validation is None if candidate.get('ppo_accepted') else None,
-                        'rollout_completed':bool(validation.get('validation_complete') or validation.get('seeds')) if validation else None,
+                        **rollout_progress(validation,candidate.get('admission_mode')),
                         'committed_changed':bool(candidate.get('accepted')) and state['status'] in COMPLETED_OPTIMIZER_STATUSES,
                         'used_next_batch':None,'frozen_evaluated':None,
                         'admission_mode':candidate.get('admission_mode'),'efficacy_verified':candidate.get('efficacy_verified'),
@@ -348,7 +410,7 @@ def reproduction_bundle(directory,output):
     required=source_info.get('files_sha256',{})
     def dependency_path(value):
         p=Path(value);return p if p.is_absolute() else directory/p
-    referenced=[source_info[k] for k in ('checkpoint','journal','initial_pool') if source_info.get(k)]+source_info.get('training_traces',[])
+    referenced=[source_info[k] for k in ('checkpoint','journal','initial_pool','training_manifest') if source_info.get(k)]+source_info.get('training_traces',[])
     if any(str(p) not in required for p in referenced):raise ValueError('Historical dependency lacks a registered file hash')
     for path,expected in required.items():
         if not dependency_path(path).is_file() or hashlib.sha256(dependency_path(path).read_bytes()).hexdigest()!=expected:
@@ -435,12 +497,12 @@ def report_experiment(directory, output=None, include_trace=False, include_bundl
     metrics['paired_comparisons']=paired_comparisons(episodes)
     for pair in metrics['paired_vs_B0']:
         checked=next(p for p in metrics['paired_comparisons'] if p['comparison']==pair['label']+'-B0' and
-            all(p[k]==pair[k] for k in ('version','red','split')))
+            episode_group(p)==episode_group(pair))
         for key in ('median_difference','paired_bootstrap_95ci','bootstrap_unit'):
             pair[key]=checked.get(key)
     for group in metrics['groups']:
         group['mean_execution_time_s']=group['total_execution_time_s']/group['n']
-        items=[e for e in episodes if all(e[k]==group[k] for k in ('version','red','split','label'))]
+        items=[e for e in episodes if e['label']==group['label'] and episode_group(e)==episode_group(group)]
         group['training_repetitions']=training_summary(items)
         if all(e.get('reward_components') is not None for e in items):
             components=set().union(*(e['reward_components'] for e in items))
@@ -451,6 +513,8 @@ def report_experiment(directory, output=None, include_trace=False, include_bundl
         if 'rollout-verification' in path.relative_to(directory).parts:
             decisions.append({'source': str(path.relative_to(directory)),
                               **{k: v for k, v in load(path).items() if k != 'verified_pool'}})
+    for decision in decisions:
+        decision.update(rollout_progress(decision))
     output.mkdir(parents=True, exist_ok=True)
     (output/'episodes.json').write_text(json.dumps({'schema': 'compact-episode-metrics-v1', 'episodes': episodes}, ensure_ascii=False, indent=2)+'\n')
     (output/'metrics.json').write_text(json.dumps(metrics, ensure_ascii=False, indent=2)+'\n')
@@ -459,27 +523,27 @@ def report_experiment(directory, output=None, include_trace=False, include_bundl
     fmt = lambda value: 'N/A' if value is None else f'{value:.2f}' if isinstance(value, float) else str(value)
     lines = ['# Experiment comparison', '',
              'Only completed real CAGE4 episodes are counted. Train, test and untrained controls are separate. Candidate-validation episodes are excluded from final-test metrics.', '',
-             '| Version | Red | Split | Arm | N | Mean reward | Sample SD | Total seconds | Paired gain vs B0 | Win rate | Median gain | 95% bootstrap CI |',
-             '|---|---|---|---|---|---|---|---|---|---|---|---|']
-    cases = sorted({tuple(g[k] for k in ('version', 'red', 'split')) for g in metrics['groups']})
-    for version, red, split in cases:
-        groups = {g['label']: g for g in metrics['groups'] if (g['version'], g['red'], g['split']) == (version, red, split)}
-        paired = {g['label']: g for g in metrics['paired_vs_B0'] if (g['version'], g['red'], g['split']) == (version, red, split)}
+             '| Version | Red | Split | Communication encoder | Arm | N | Mean reward | Sample SD | Total seconds | Paired gain vs B0 | Win rate | Median gain | 95% bootstrap CI |',
+             '|---|---|---|---|---|---|---|---|---|---|---|---|---|']
+    cases = sorted({episode_group(g) for g in metrics['groups']})
+    for case in cases:
+        groups = {g['label']: g for g in metrics['groups'] if episode_group(g)==case}
+        paired = {g['label']: g for g in metrics['paired_vs_B0'] if episode_group(g)==case}
         for label in sorted(set(groups)|set(('B0', 'B1', 'B2', 'B3', 'B4'))):
             group, pair = groups.get(label, {}), paired.get(label, {})
-            row = [version, red, split, label, group.get('n', 0), group.get('mean'), group.get('sample_std'), group.get('total_execution_time_s'),
+            row = [*case, label, group.get('n', 0), group.get('mean'), group.get('sample_std'), group.get('total_execution_time_s'),
                    pair.get('mean_difference'), pair.get('win_rate'), pair.get('median_difference'), pair.get('paired_bootstrap_95ci')]
             lines.append('| '+' | '.join(fmt(v).replace('|', '/') for v in row)+' |')
     if not cases:
         for label in ('B0','B1','B2','B3-no-support','B3','B4'):
-            lines.append('| registered | finite | test | '+label+' | 0 | N/A | N/A | N/A | N/A | N/A | N/A | N/A |')
+            lines.append('| registered | finite | test | N/A | '+label+' | 0 | N/A | N/A | N/A | N/A | N/A | N/A | N/A |')
         lines += ['', 'No completed real episodes. Mock or partial runs are not performance samples.']
     lines += ['', 'Small samples and bootstrap intervals do not establish a general performance gain. Environment completion and committed optimizer iterations are reported separately in run_status.json.', '']
-    lines += ['', '| Comparison | Version | Red | Split | Paired N | Mean gain | Median | Win/tie/loss | 95% CI |',
-        '|---|---|---|---|---|---|---|---|---|']
+    lines += ['', '| Comparison | Version | Red | Split | Communication encoder | Paired N | Mean gain | Median | Win/tie/loss | 95% CI |',
+        '|---|---|---|---|---|---|---|---|---|---|']
     for pair in metrics['paired_comparisons']:
         lines.append('| '+' | '.join(fmt(pair.get(k)).replace('|','/') for k in
-            ('comparison','version','red','split','paired_n','mean_difference','median_difference','win_tie_loss','paired_bootstrap_95ci'))+' |')
+            ('comparison',*GROUP_FIELDS,'paired_n','mean_difference','median_difference','win_tie_loss','paired_bootstrap_95ci'))+' |')
     protocol=load(directory/'protocol.json') if (directory/'protocol.json').exists() else {}
     reference=protocol.get('historical_performance_reference')
     if reference:

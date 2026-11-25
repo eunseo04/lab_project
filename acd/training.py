@@ -7,6 +7,7 @@ import time
 
 import numpy as np
 import torch
+from .config import LEGACY_ENCODER
 
 from CybORG.Agents.CybermonicAgents.cage4 import InductiveGraphPPOAgent, load
 from CybORG.Agents.CybermonicAgents.memory_buffer import MultiPPOMemory
@@ -31,7 +32,8 @@ def rollout(agents, config, seed):
     """
     seed_everything(seed, config["threads"])
     env = make_env(seed=seed, steps=config["steps"], red=config["red"],
-                   communication=config["communication"], horizon=config["horizon"])
+                   communication=config["communication"], horizon=config["horizon"],
+                   communication_encoder=config.get("communication_encoder", LEGACY_ENCODER))
     states, _ = env.reset(seed=seed)
     memories = MultiPPOMemory(config["training"]["batch_size"])
     pending = {}
@@ -82,7 +84,8 @@ def train(config, output=None):
         raise FileExistsError(f"Training output already contains files: {destination}; choose a new output directory")
     destination.mkdir(parents=True, exist_ok=True)
     seed_everything(config["seed"], config["threads"])
-    probe = make_env(seed=config["seed"], steps=config["steps"], communication=config["communication"], horizon=config["horizon"])
+    probe = make_env(seed=config["seed"], steps=config["steps"], communication=config["communication"], horizon=config["horizon"],
+                     communication_encoder=config.get("communication_encoder", LEGACY_ENCODER))
     feature_dimension = probe.feature_dimension
     agents = [InductiveGraphPPOAgent(feature_dimension, bs=hp["batch_size"], epochs=hp["epochs"],
         a_kwargs={"lr": hp["actor_lr"], "hidden1": hp["hidden"], "hidden2": hp["embedding"]},
@@ -127,6 +130,7 @@ def train(config, output=None):
         restored = load(str(destination / f"gnn_ppo-{i}.pt"))
         reload_matches.append(fingerprint(restored) == fingerprint(agent))
     result = {"config": config, "communication": config["communication"],
+        "communication_encoder":config.get("communication_encoder", LEGACY_ENCODER),
         "input_features": feature_dimension, "episodes_trained": hp["episodes"],
         "validation_only": hp["episodes"] < 50000,
         "policy_quality_evaluated": False, "elapsed_seconds": time.perf_counter() - started,

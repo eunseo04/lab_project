@@ -11,6 +11,7 @@ from CybORG.Agents.Wrappers.CybermonicWrappers.graph_wrapper import GraphWrapper
 from CybORG.Agents.Wrappers.CybermonicWrappers.observation_graph import ObservationGraph
 
 from .communication import create_message
+from .config import LEGACY_ENCODER, validate_communication_encoder
 
 BLUE_AGENTS = tuple(f"blue_agent_{i}" for i in range(5))
 RED_CLASSES = {
@@ -39,10 +40,11 @@ def red_class(name):
 
 
 class ExperimentEnv(GraphWrapper):
-    def __init__(self, env, communication="paper"):
+    def __init__(self, env, communication="paper", communication_encoder=LEGACY_ENCODER):
         if communication not in ("paper", "keep"):
             raise ValueError("communication must be paper or keep")
         self.communication = communication
+        self.communication_encoder = validate_communication_encoder(communication, communication_encoder)
         super().__init__(env)
 
     @property
@@ -63,9 +65,12 @@ class ExperimentEnv(GraphWrapper):
             observations[agent].setdefault("message", [np.zeros(8, dtype=bool) for _ in range(4)])
         return observations
 
-    def paper_messages(self):
+    def _paper_message(self, agent):
         ec = self.env.environment_controller
-        return {a: create_message(ec.get_last_observation(a), ec.hostname_ip_map) for a in BLUE_AGENTS}
+        return create_message(ec.get_last_observation(agent), ec.hostname_ip_map, self.communication_encoder)
+
+    def paper_messages(self):
+        return {agent: self._paper_message(agent) for agent in BLUE_AGENTS}
 
     def step(self, action, messages=None):
         if self.communication == "paper" and messages is None:
@@ -92,9 +97,7 @@ class ExperimentEnv(GraphWrapper):
         if self.communication == "keep":
             return tab, phase, legacy
         owner = next(name for name, g in self.graphs.items() if g is graph)
-        ec = self.env.environment_controller
-        message = create_message(ec.get_last_observation(owner), ec.hostname_ip_map)
-        return tab, phase, message
+        return tab, phase, self._paper_message(owner)
 
     def _to_obs(self, x, ei, masks, phase, other_msg, my_msg):
         if self.communication == "keep":
@@ -114,8 +117,9 @@ class ExperimentEnv(GraphWrapper):
         return (torch.cat([packed[0][:, :-3], features], dim=1), *packed[1:])
 
 
-def make_env(*, seed, steps, red="finite", communication="paper", horizon="fixed"):
+def make_env(*, seed, steps, red="finite", communication="paper", horizon="fixed",
+             communication_encoder=LEGACY_ENCODER):
     scenario_class = EnterpriseScenarioGenerator if horizon == "native" else FixedHorizonScenario
     scenario = scenario_class(blue_agent_class=SleepAgent,
         green_agent_class=EnterpriseGreenAgent, red_agent_class=red_class(red), steps=steps)
-    return ExperimentEnv(CybORG(scenario, "sim", seed=seed), communication)
+    return ExperimentEnv(CybORG(scenario, "sim", seed=seed), communication, communication_encoder)

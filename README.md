@@ -154,8 +154,12 @@ B3의 영구 보류와 cross-host observation 거부를 수정했다. 기존 SG 
 
 새 exploratory frozen pair는 기존 run_campaign.py의 --frozen-policy-pilot로 실행한다. 같은 초기 Pool의 B1과 B1-selector-contract를 사전 등록한 시드 하나에서 각각 500 nominal-step으로 평가한다. 두 episode와 기동·정리를 먼저 예약한다. 자동 Skill 개선·B4 승인·미사용 최종 holdout 성능의 증거는 아니다. 실제 결과는 기존 최종 보고서 research_outputs/audit-fields-ece94dbe/report/performance.md와 새 실험 selector-pilot-23071375의 원시 결과에 구분한다.
 
-현재 B0는 ACD 기반 Qwen 공통조건 대조군이다. 원논문의 모델·통신 재학습 KEEP·관찰 조건을 그대로 재현한 절대 점수가 아니다. 일부 PID/connection severity가 원본 2와 현재 1로 다르고 공개 KEEP용 8→3 projection은 정보 손실이 있다. Block/Allow의 출발 구역은 HQ 담당 Qwen에서 public_access_zone_subnet으로 고정된다. 모두 현재 비교의 공통 조건이며 확인된 보상 하락의 원인이라고 단정하지 않는다. official arithmetic parity는 보상 산술 검사로, 전체 actor hook·궤적 동일성은 아니다. paper online score와 공개 코드 모드는 별도이며 두 번 정규화하는 오류라는 이유로 원래 식을 바꾸지 않았다.
+새 공통 비교 `cage4-acd-parity-v1`의 B0–B4는 고정한 원본 ACD 함수로 송신 메시지와 자기 관찰 벡터를 생성한다. 이전 결과에서 encoder를 명시하지 않은 설정은 `legacy_local_v1`로 읽는다. 원래 조건을 재현하려면 해당 결과의 등록된 config를 사용한다. 연구 CLI와 ACD CLI는 `--communication-encoder`로 모드를 선택할 수 있다. 원본의 severity 변화는 공개 KEEP의 기존 8→3 projection 입력에도 영향을 주므로 새 B0부터 평가한다. KEEP 가중치는 공개 CAGE4 제출본을 사용한다.
+
+새 `explicit_zone_pair_v1` 행동 계약은 각 Blue의 원본 고정 출발 구역과 목적지 한 개를 명시한다. HQ의 출발 구역은 `public_access_zone_subnet`이다. trace에서 요청한 구역 쌍, 실행된 구역 쌍, 관찰된 호출 완료를 각각 확인할 수 있다. 학습된 Pool과 경험은 기록된 encoder 조건에서 재개한다. B4 동결 평가와 후보 검증은 훈련의 등록 승인 규칙을 보존하고 optimizer 없이 실행된다. 최종 평가의 seed는 후보 검증용 seed와 분리한다.
+
+`B1-urgent-preemption`과 `B3-urgent-preemption`은 같은 controller를 쓰는 정적·학습 비교군이다. 현재 관찰로 대응 가능한 새 긴급 단서가 생기고 다른 종류의 Skill이 활성화되어 있으면 원본 selector에 한 번 다시 선택을 요청한다. `--frozen-policy-pilot --pilot-controller B1-urgent-preemption`은 정적 한 쌍을 예약하며, 훈련 캠페인에 `--arms B3-urgent-preemption`을 포함하면 대응 정적 대조군도 함께 평가한다. 각 실행의 전체 비용 예약을 함께 적용한다.
 
 후속 실제 정적 paired pilot(seed 788380683, development)은 B1 -121 / B1-selector-contract -122, 차이 -1이었다. N=1의 SD/CI는 N/A이며 개선이나 자동 Skill 최적화 효과를 입증하지 못했다. LWF/ASF/RIA 합계는 같고 공동 action cost만 -1이었다. 모델 호출은 698→733회였고 전체 평가 시간은 각각 906.69/899.15초다. 이 차이를 처리속도 개선이나 특정 Qwen 행동의 인과 효과로 해석하지 않는다. 다음 최종 holdout에는 이 seed를 쓰지 않는다.
 
-최종 CPU 회귀 329개가 통과했다. 실측 종료 후 관측-only action=null, 기록 없는 busy placeholder의 pending 추론 거부, 선택/종료/요청/완료 연결, 보고서 수동 설명과 이전 source bundle 보존을 추가 검사했다. 실제 정적 정책의 actor/selector/model/reward source는 그 후 변경하지 않았다. 실측 source와 최종 CPU 감사 source를 기존 최종 보고서에 분리했다. 이번 추가 GPU는 0.506023시간, 기존 승인 누적 7.388473/8시간, 잔여 0.611527시간이며 등록 Qwen/worker 종료와 GPU·8418–8421 포트 해제를 실제 확인했다. 새 실제 SG·후보·PPO·optimizer loop는 0이고 B3/B4 학습 후 성능은 N/A다.
+위 정적 실측 직후의 CPU 회귀는 329개였다. 최신 원본 정렬 작업에서는 실제 CybORG와 테스트 모델로 B4 동결 1 episode를 CPU에서 마쳤다. 같은 보고서 맨 위에 최신 검사와 과거 실측을 구분해 기록했다. 기존 승인 누적 사용량은 7.388473/8 GPU-hour이며 잔여는 0.611527 GPU-hour다. 새 공통 조건의 Qwen 점수와 학습 후 B3/B4 점수는 N/A다.

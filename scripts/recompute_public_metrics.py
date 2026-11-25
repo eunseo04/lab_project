@@ -7,6 +7,13 @@ from pathlib import Path
 import statistics
 
 ROOT=Path(__file__).resolve().parents[1]
+GROUP_FIELDS=('version','red','split','communication_encoder')
+
+
+def episode_group(episode):
+    # Old compact exports omitted the local encoder identifier.
+    return (episode['version'],episode['red'],episode['split'],
+            episode.get('communication_encoder','legacy_local_v1'))
 
 
 def paired_episodes(before,after):
@@ -27,7 +34,7 @@ def recompute(episodes):
     for episode in episodes:
         if episode.get('status')!='completed' or episode.get('kind')!='real_cage4':continue
         if not math.isfinite(episode['joint_return']):raise ValueError('Nonfinite completed episode')
-        grouped[tuple(episode[k] for k in ['version','red','split','label'])].append(episode)
+        grouped[(*episode_group(episode),episode['label'])].append(episode)
     rows=[];paired=[]
     for key,items in sorted(grouped.items()):
         seeds=[e['seed'] for e in items]
@@ -39,17 +46,18 @@ def recompute(episodes):
             if series is not None and sum(series)!=episode['joint_return']:raise ValueError('Step reward total mismatch')
             components=episode.get('reward_components')
             if components is not None and sum(components.values())!=episode['joint_return']:raise ValueError('Component total mismatch')
-        rows.append(dict(zip(['version','red','split','label'],key),n=len(items),mean=statistics.mean(rewards),
+        rows.append(dict(zip((*GROUP_FIELDS,'label'),key),n=len(items),mean=statistics.mean(rewards),
             sample_std=statistics.stdev(rewards) if len(items)>1 else None,
             total_execution_time_s=sum(e['execution_time_s'] for e in items),
             rewards_by_seed={e['seed']:e['joint_return'] for e in items} if len(seeds)==len(set(seeds)) else None,
             unique_eval_seed_count=len(set(seeds)),
             rewards_by_run_seed=[{'comparison_run_id':e.get('comparison_run_id','legacy'),
                 'training_run_id':e.get('training_run_id'),'seed':e['seed'],'reward':e['joint_return']} for e in items]))
-        if key[-1]=='B0' or key[:3]+('B0',) not in grouped:continue
-        common,before,after=paired_episodes(grouped[key[:3]+('B0',)],items)
+        incumbent=(*key[:-1],'B0')
+        if key[-1]=='B0' or incumbent not in grouped:continue
+        common,before,after=paired_episodes(grouped[incumbent],items)
         delta=[b['joint_return']-a['joint_return'] for a,b in zip(before,after)]
-        paired.append(dict(zip(['version','red','split','label'],key),paired_n=len(common),seeds=[k[1] for k in common],
+        paired.append(dict(zip((*GROUP_FIELDS,'label'),key),paired_n=len(common),seeds=[k[1] for k in common],
             paired_run_seeds=[{'comparison_run_id':k[0],'seed':k[1]} for k in common],
             differences=delta,mean_difference=statistics.mean(delta) if delta else None,
             win_rate=sum(d>0 for d in delta)/len(delta) if delta else None))

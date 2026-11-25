@@ -3,11 +3,11 @@
     "gate.py": "9fae1dba41d0f18ffb571d675516011d4509d5b736bfb20c0d8acbfa77b02231",
     "metrics.py": "fa5acc93526659ae96497d0ddcefefe9c720de75e5521467ce1bad9cfa97c918",
     "paper_algorithm.py": "656bd2e674b69f8dfe2fa4974d7c21dd01ba8a189cc57bd83501e1bab448eff6",
-    "adapter.py": "ad39ac101b8f93cea887605f83be331e226afb85dfb20140226b37e74c988b92",
+    "adapter.py": "0759d743e76d6a550990729a21a045c626d263567288efc0caf0b1b967b71fd0",
     "model_server.py": "7acc0c79caa693479615bf4b362ef5b90055047df0606a7077b5898c0cdb4ea0",
     "client.py": "68c43e791d11e0e7d0e7f15ea713c5bb76511b42c69c95acb63a58895c4cd1c3",
-    "skills.py": "4d78a2d5690fa83e9fc669cf82f45358a45871de8e108c5221ff290b17df638f",
-    "behavior.py": "098f38d3ad7ba6a4dfc3155096672905281aec9f30d49f0d04c1f93b3f3d06e0"
+    "skills.py": "7de7cc07ab1c1388dbc631d2c614c5f0f340b8896c986cc654f7bf669644f95c",
+    "behavior.py": "444d9a3a202436fd15831cb31ab4fdf9c2bbf872535ec95ad301290b242e3ae7"
   },
   "rollout_thresholds": {
     "minimum_mean_gain": 0.0,
@@ -32,5 +32,42 @@
   "authorized_skill_extension": {
     "baseline_sha256": "d1f60712fce84093aff12df02a5a66eea87740dd84f805a027b0cc9c0dac77cf",
     "scope": "Optional selector-only contract and passive selection/termination audit. Default upstream prompt/RNG and maturity floor retained; protected Pool/verifier/seed/probe AST unchanged."
+  },
+  "unchanged_interface_ast_sha256": {
+    "research/adapter.py": {
+      "validate_visible_observation": "1110da39a082a479fe136cb59164f7d1f8100f35480700c0dd003bcd019279b6",
+      "make_state": "42aaed8226ffac64ae289c78b51dd3d10b91528ae66d2ae4a7a16f71aaf45823",
+      "messages_for": "3737f9d000533954af0d702bbfa880e11f1c06cfd1d915f7d1e02420c913b1e2",
+      "DefensePolicy.__init__": "56cad9a542c841e2c17fdc8ed1d1d911f7be32dfc7620205dfc18d97f46a013e",
+      "DefensePolicy.prepare_state": "ac91bb6e917155447d9398b9925e001250e98c89bd056445bbdb41428491655f",
+      "DefensePolicy.observe_transition": "adcab92a5b54835fd976bc2a20cd661077d8e2d6fbe14d31fa438607efb7ff8a"
+    },
+    "research/behavior.py": {
+      "visible_evidence": "8bbf9259ab676d8f04ce77f6ebcc17faa26d322ded6ae47b4f99f3a0dffbfec5",
+      "chosen_action": "05bd77cd19bf069e05a1bfc13a7da140ce9919673ea683a70828ce6bf493f692",
+      "ObservableCaseLedger.observe": "3967f9c4639642176efd1bb0adf4b7eae6a3da3c327db8b21fe12f250661c9b7",
+      "ObservableCaseLedger.context": "aa069999a23c78715252d6628a2da89cce97ecf47607a7e25414482bc7ade0ac"
+    },
+    "acd/llm_agent.py": {
+      "LLMDefender.__init__": "41f69c0bb1cf0dd507d3cc11c6263a48ef995de7d62a9cb9a39ee4aed8dfd673"
+    },
+    "research/evolution.py": {
+      "Evolution._scored": "0d8f5b38a2b7e1cd573c4cbbe0c8d100de932d3cfd9f707db21f470bb6d1d355",
+      "Evolution.probabilities": "5c01fd3c16296b2740ef66167524c39cccc2389d59a286d6f0319648cc4285bf"
+    }
+  },
+  "authorized_acd_alignment_extensions": {
+    "adapter.py": {
+      "previous_sha256": "ad39ac101b8f93cea887605f83be331e226afb85dfb20140226b37e74c988b92",
+      "scope": "Pinned encoder forwarding, existing KEEP projection for the own wire vector, and opt-in fixed traffic pair prompt and logging."
+    },
+    "behavior.py": {
+      "previous_sha256": "098f38d3ad7ba6a4dfc3155096672905281aec9f30d49f0d04c1f93b3f3d06e0",
+      "scope": "Visible case response opportunities and recording the requested traffic pair through the existing completion ledger."
+    },
+    "skills.py": {
+      "previous_sha256": "4d78a2d5690fa83e9fc669cf82f45358a45871de8e108c5221ff290b17df638f",
+      "scope": "Opt-in urgent case preemption once per observed cue for named experimental arms. Default selector, age limit and RNG are preserved."
+    }
   }
 }

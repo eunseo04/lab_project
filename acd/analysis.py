@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import numpy as np
+from .config import LEGACY_ENCODER
 from .runner import write_json
 
 
@@ -21,7 +22,9 @@ def plot_results(directory):
         short_training = any((weight.get("training") or {}).get("validation_only", False)
                              for weight in summary.get("weights", {}).values())
         rows.append({"path": str(path), "team": c["team"], "red": c["red"],
-                     "communication": c["communication"], "kind": summary["result_kind"],
+                     "communication": c["communication"],
+                     "communication_encoder": c.get("communication_encoder", LEGACY_ENCODER),
+                     "kind": summary["result_kind"],
                      "steps": c["steps"], "episodes": c["episodes"],
                      "short_training_checkpoint": short_training,
                      "reward_mean": summary["reward"]["mean"],
@@ -32,9 +35,8 @@ def plot_results(directory):
         writer = csv.DictWriter(stream, fieldnames=rows[0])
         writer.writeheader()
         writer.writerows(rows)
-    # Do not mix mock-pipeline measurements with model evaluations in the same plot.
-    for kind in sorted({r["kind"] for r in rows}):
-        selected = [r for r in rows if r["kind"] == kind]
+    for kind, encoder in sorted({(r["kind"], r["communication_encoder"]) for r in rows}):
+        selected = [r for r in rows if (r["kind"], r["communication_encoder"]) == (kind, encoder)]
         fig, ax = plt.subplots(figsize=(max(8, len(selected) * 0.65), 5))
         ax.bar(range(len(selected)), [r["reward_mean"] for r in selected],
                yerr=[r["reward_stdev"] or 0 for r in selected], capsize=3)
@@ -45,9 +47,10 @@ def plot_results(directory):
         title = titles.get(kind, "CC4 simulation evaluation")
         if any(r["short_training_checkpoint"] for r in selected):
             title += " — short-training verification"
-        ax.set_title(title)
+        ax.set_title(f"{title} / {encoder}")
         fig.tight_layout()
-        fig.savefig(directory / f"rewards-{kind}.png", dpi=160)
+        suffix = "" if encoder == LEGACY_ENCODER else f"-{encoder}"
+        fig.savefig(directory / f"rewards-{kind}{suffix}.png", dpi=160)
         plt.close(fig)
     return rows
 

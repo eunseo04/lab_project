@@ -150,11 +150,26 @@ class SkillController:
         self.proposed = proposed
         self.verifier = CAGEVerifier(config.get("verification_history", "legacy_ticks"),config.get("domain_verification_revision","v4"))
         self.last_event = {}
+        self.seen_urgent_cues = set()
 
     def choose(self, state, step):
         events = []
         selection_audit=None
         termination_audit=None
+        if self.config.get('urgent_preemption') and 'IN_PROGRESS' not in str(state['observation'].get('success','')):
+            from .behavior import case_response_options
+            urgent=[o for o in case_response_options(state.get('behavior_context',{}),state.get('hosts',[])) if o['priority']>=2]
+            if urgent:
+                by_cue={(o['host'],o['restore_epoch'],o['evidence_version'],o['action']):o for o in urgent}
+                top=max(o['priority'] for o in urgent)
+                fresh=[o for cue,o in by_cue.items() if cue not in self.seen_urgent_cues and o['priority']==top]
+                self.seen_urgent_cues.update(by_cue)
+                if fresh and self.active is not None and step-self.started<self.config.get('max_skill_age',8):
+                    family=getattr(self.active,'family',self.active.name)
+                    if family not in {o['family'] for o in urgent if o['priority']==top}:
+                        events.append({'terminated':self.active.name,'reason':'new_observable_urgent_case',
+                                       'case_options':fresh})
+                        self.active=None
         if self.active is not None:
             if step - self.started >= self.config.get("max_skill_age", 8):
                 events.append({"terminated": self.active.name, "reason": "maximum_age"})

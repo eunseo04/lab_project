@@ -5,6 +5,17 @@ from . import ROOT
 
 TEAMS = ("none", "all_rl", "all_llm", "mixed")
 REDS = ("finite", "aggressive", "stealthy", "impact", "degrade")
+LEGACY_ENCODER = "legacy_local_v1"
+ORIGINAL_ENCODER = "acd_original_v1"
+COMMUNICATION_ENCODERS = (LEGACY_ENCODER, ORIGINAL_ENCODER)
+
+
+def validate_communication_encoder(communication, encoder):
+    if encoder not in COMMUNICATION_ENCODERS:
+        raise ValueError(f"Unknown communication encoder: {encoder}")
+    if communication in ("keep", "keep_native") and encoder != LEGACY_ENCODER:
+        raise ValueError("Native KEEP communication does not use the ACD encoder")
+    return encoder
 
 
 def load_config(path):
@@ -41,6 +52,8 @@ def validate(config):
         raise ValueError(f"team must be in {TEAMS}; red must be in {REDS}")
     if c["communication"] not in ("keep", "paper"):
         raise ValueError("communication must be keep or paper")
+    c["communication_encoder"] = validate_communication_encoder(
+        c["communication"], c.get("communication_encoder", LEGACY_ENCODER))
     if c["horizon"] not in ("native", "fixed"):
         raise ValueError("horizon must be native or fixed")
     if not isinstance(c["model"], dict):

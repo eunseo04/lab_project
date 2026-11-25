@@ -44,7 +44,8 @@ def reject_screen(previous,candidate,rule):
     failed={s:d for s,d in delta.items() if d < -rule['maximum_seed_loss']}
     return {'accepted':False,'decision_type':'rejected' if failed else 'deferred',
         'reason':'failed_registered_worst_seed_early' if failed else 'reject_screen_inconclusive',
-        'validation_complete':False,'paired_seeds':sorted(old),'differences':delta,
+        'validation_complete':False,'registered_seeds':list(rule['seeds']),
+        'paired_seeds':sorted(old),'completed_paired_seeds':sorted(old),'differences':delta,
         'irreversible_registered_failures':failed,'required_approval_pairs':len(rule['seeds']),
         'acceptance_criteria_unchanged':True,'early_approval_allowed':False,
         'proof':'A completed seed below the registered worst-loss limit cannot be repaired by additional seeds.'}
@@ -64,13 +65,20 @@ def compare_rollouts(previous,candidate,rule):
     old={r['seed']:r for r in previous};new={r['seed']:r for r in candidate}
     expected=set(approval_seeds(rule))
     if len(old)!=len(previous) or len(new)!=len(candidate):raise ValueError('Duplicate validation seed')
+    measured={}
+    incomplete=[]
+    for seed in sorted(expected & old.keys() & new.keys()):
+        if all(_checked_episode(episode) for episode in (old[seed],new[seed])):
+            measured[seed]=new[seed]['joint_return']-old[seed]['joint_return']
+        else:
+            incomplete.append(seed)
+    progress={'registered_seeds':sorted(expected),'required_approval_pairs':len(expected),
+              'completed_paired_seeds':list(measured),'differences':measured,'validation_complete':False}
     if set(old)!=expected or set(new)!=expected:
-        return {'accepted':False,'reason':'incomplete_validation','previous_n':len(old),'candidate_n':len(new)}
-    for seed in expected:
-        for episode in [old[seed],new[seed]]:
-            if not _checked_episode(episode):
-                return {'accepted':False,'reason':'incomplete_episode_status','seed':seed}
-    seeds=sorted(expected);delta=[new[s]['joint_return']-old[s]['joint_return'] for s in seeds]
+        return {**progress,'accepted':False,'reason':'incomplete_validation','previous_n':len(old),'candidate_n':len(new)}
+    if incomplete:
+        return {**progress,'accepted':False,'reason':'incomplete_episode_status','seed':incomplete[0]}
+    seeds=list(measured);delta=list(measured.values())
     old_values=[old[s]['joint_return'] for s in seeds];new_values=[new[s]['joint_return'] for s in seeds]
     old_sd=statistics.stdev(old_values) if len(seeds)>1 else 0.
     new_sd=statistics.stdev(new_values) if len(seeds)>1 else 0.
@@ -82,7 +90,8 @@ def compare_rollouts(previous,candidate,rule):
         'green_local_work':green_delta['LWF']>=-rule['maximum_mean_lwf_loss'],
         'green_access_service':green_delta['ASF']>=-rule['maximum_mean_asf_loss'],
         'spread':new_sd<=max(old_sd*rule['maximum_std_ratio'],old_sd+rule['maximum_std_increase'])}
-    return {'accepted':all(checks.values()),'reason':'passed' if all(checks.values()) else 'failed_registered_criteria',
+    return {**progress,'validation_complete':True,
+        'accepted':all(checks.values()),'reason':'passed' if all(checks.values()) else 'failed_registered_criteria',
         'checks':checks,'seeds':seeds,'differences':delta,'mean_difference':statistics.mean(delta),
         'median_difference':statistics.median(delta),'win_rate':sum(x>0 for x in delta)/len(delta),
         'previous_mean':statistics.mean(old_values),'candidate_mean':statistics.mean(new_values),

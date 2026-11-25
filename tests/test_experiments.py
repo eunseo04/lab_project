@@ -42,6 +42,79 @@ def test_scan_is_01_and_user_compromise_is_10():
     assert create_message({"host": {"Files": [{"File Name": "cmd.sh"}]}}, {})[5:7].tolist() == [True, False]
 
 
+@pytest.mark.parametrize('case,bits',[
+    ('pid',(1,0,0)),('duplicate_first_remote',(1,0,0)),('duplicate_second_remote',(0,0,0)),
+    ('user_file',(1,0,0)),('admin_file',(1,1,0)),('sessions',(1,0,0)),('metadata_only',(0,0,1)),
+    ('two_keys',(0,0,0)),
+])
+def test_original_encoder_matches_pinned_observation_on_actual_runtime(case,bits):
+    from ipaddress import IPv4Address
+    from CybORG.Agents.LLMAgents.comm_vector import CommVectorGenerator
+    from CybORG.Shared.Observation import Observation
+    from acd.config import ORIGINAL_ENCODER
+    one,two,three=map(IPv4Address,('10.0.0.1','10.0.0.2','10.0.0.3'))
+    cases={
+        'pid':{'Processes':[{'PID':7}]},
+        'duplicate_first_remote':{'Processes':[{'Connections':[{'remote_address':one}]}]*2},
+        'duplicate_second_remote':{'Processes':[{'Connections':[{'remote_address':ip},{'remote_address':three}]} for ip in (one,two)]},
+        'user_file':{'Files':[{'File Name':'cmd.sh'}]},'admin_file':{'Files':[{'File Name':'escalate.exe'}]},
+        'sessions':{'Sessions':[{},{}]},'metadata_only':{},'two_keys':{'Processes':[{'PID':7}]},
+    }
+    raw={'success':TernaryEnum.IN_PROGRESS if case=='metadata_only' else TernaryEnum.UNKNOWN,'host':cases[case]}
+    if case!='two_keys':raw.update(message=[],phase=1,action=None)
+    mapping={'operational_zone_b_subnet_user_host_0':one,'office_network_subnet_user_host_0':two}
+    observation=Observation();observation.data=raw
+    direct=CommVectorGenerator.create_comm_message(observation,None,mapping)
+    for supplied in (observation,raw):
+        actual=create_message(supplied,mapping,ORIGINAL_ENCODER)
+        assert actual.dtype==np.bool_ and actual.shape==(8,)
+        assert actual.tolist()==direct.astype(bool).tolist()
+        assert tuple(actual[5:])==bits
+        if case=='duplicate_first_remote':assert actual[3]
+    assert observation.data is raw
+
+
+@pytest.mark.parametrize('raw,error',[
+    ({},KeyError),
+    ({'success':TernaryEnum.UNKNOWN,'phase':1,'host':{'Processes':[{'Connections':[{'remote_address':'unmapped'}]}]*2}},StopIteration),
+    ({'success':TernaryEnum.UNKNOWN,'phase':1,'host':{'Processes':[{'Connections':[]}]}},IndexError),
+])
+def test_original_encoder_preserves_source_exceptions(raw,error):
+    from acd.config import ORIGINAL_ENCODER
+    with pytest.raises(error):create_message(raw,{},ORIGINAL_ENCODER)
+
+
+def test_original_wire_reaches_all_five_outgoing_and_self_graph_inputs(monkeypatch):
+    from copy import deepcopy
+    from CybORG.Agents.LLMAgents.comm_vector import CommVectorGenerator
+    from research.adapter import make_environment
+    from research.config import variant_config
+    from acd.config import ORIGINAL_ENCODER
+    env=make_environment({**variant_config('B0'),'steps':6},42)
+    assert env.communication_encoder==ORIGINAL_ENCODER
+    env.reset(seed=42)
+    ec=env.env.environment_controller
+    # The source receives each agent's real Observation and original map.
+    actual=CommVectorGenerator.create_comm_message
+    calls=[]
+    def record(obs,last,mapping):
+        calls.append((obs,mapping));return actual(obs,last,mapping)
+    monkeypatch.setattr(CommVectorGenerator,'create_comm_message',record)
+    expected={agent:actual(ec.get_last_observation(agent),None,ec.hostname_ip_map).astype(bool) for agent in BLUE_AGENTS}
+    original_step=env.env.parallel_step
+    delivered=[]
+    def step(*args,**kwargs):
+        delivered.append(deepcopy(kwargs['messages']));return original_step(*args,**kwargs)
+    monkeypatch.setattr(env.env,'parallel_step',step)
+    graphs,*_=env.step({agent:Sleep() for agent in BLUE_AGENTS})
+    assert len(calls)==10 and all(mapping is ec.hostname_ip_map for _,mapping in calls)
+    assert set(delivered[0])==set(BLUE_AGENTS)
+    assert all(np.array_equal(delivered[0][agent],expected[agent]) for agent in BLUE_AGENTS)
+    assert all(np.array_equal(env.msg[agent],actual(ec.get_last_observation(agent),None,ec.hostname_ip_map)) for agent in BLUE_AGENTS)
+    assert {entry[0][0].shape[1] for entry in graphs.values()}=={192}
+    assert ec.step_count==1
+
+
 @pytest.mark.parametrize("protocol,dimension", [("keep", 192), ("paper", 197)])
 def test_all_five_agents_single_tick_reset_and_termination(protocol, dimension):
     env = make_env(seed=42, steps=6, communication=protocol)
@@ -78,6 +151,60 @@ def test_parser_preserves_json_reason_and_builds_real_action():
     assert type(action).__name__ == "Analyse"
     assert action.hostname == "allowed" and error is None
     assert reason == 'Comma, quote: "ok"'
+
+
+@pytest.mark.parametrize('command',['BlockTrafficZone','AllowTrafficZone'])
+@pytest.mark.parametrize('agent',BLUE_AGENTS)
+def test_traffic_parser_matches_original_command_parameters(command,agent):
+    import ast
+    from types import SimpleNamespace
+    from CybORG.Simulator.Actions.ConcreteActions.ControlTraffic import AllowTrafficZone, BlockTrafficZone
+    from CybORG.Agents.LLMAgents.llm_adapter.utils.constants import CAGE4_SUBNETS
+
+    pinned = ROOT/'third_party/llms-are-acd/CybORG/Agents/LLMAgents/llm_policy.py'
+    policy_class = next(node for node in ast.parse(pinned.read_text()).body
+                        if isinstance(node, ast.ClassDef) and node.name=='LLMDefenderPolicy')
+    initializer, extractor = [next(node for node in policy_class.body if node.name==name)
+                              for name in ('__init__','extract_action')]
+    fixed_source = next(node for node in initializer.body if isinstance(node, ast.Assign)
+                        and any(isinstance(t, ast.Attribute) and t.attr=='subnet' for t in node.targets))
+    scope = {'self':SimpleNamespace(name=agent), 'CAGE4_SUBNETS':CAGE4_SUBNETS,
+             'BlockTrafficZone':BlockTrafficZone, 'AllowTrafficZone':AllowTrafficZone,
+             'Logger':SimpleNamespace(debug=lambda *_:None),
+             'wandb':SimpleNamespace(log=lambda *_, **__:None, run=SimpleNamespace(step=0))}
+    exec(compile(ast.Module(body=[fixed_source,extractor],type_ignores=[]),str(pinned),'exec'),scope)
+    dest='admin_network_subnet' if command=='BlockTrafficZone' else 'office_network_subnet'
+    response=json.dumps({'action':f'{command} subnet:{dest}','reason':'fixture'})
+    expected=scope['extract_action'](scope['self'],response)
+    action,_,error=parse_response(response,agent,[],[dest])
+    assert error is None
+    assert type(action) is type(expected)
+    assert (type(action).__name__,action.agent,action.session,action.from_subnet,action.to_subnet)==(
+        command,agent,0,CAGE4_SUBNETS[int(agent[-1])],dest)
+    assert (action.agent,action.session,action.from_subnet,action.to_subnet)==(
+        expected.agent,expected.session,expected.from_subnet,expected.to_subnet)
+
+
+@pytest.mark.parametrize('dest',['admin_network_subnet','office_network_subnet'])
+def test_hq_traffic_changes_only_one_directed_pair_in_actual_cage4(dest):
+    from copy import deepcopy
+    from research.adapter import traffic_zone_pair
+
+    env=make_env(seed=42,steps=6)
+    env.reset(seed=42)
+    state=env.env.environment_controller.state
+    agent='blue_agent_4'
+    source='public_access_zone_subnet'
+    before=deepcopy(state.blocks)
+    for command in ('BlockTrafficZone','AllowTrafficZone'):
+        response=json.dumps({'action':f'{command} subnet:{dest}','reason':'fixture'})
+        action,_,error=parse_response(response,agent,[],[dest])
+        assert error is None and traffic_zone_pair(action)=={'from_subnet':source,'to_subnet':dest}
+        assert action.execute(state).data['success']==TernaryEnum.TRUE
+        assert (source in state.blocks[dest])==(command=='BlockTrafficZone')
+        assert {key:value for key,value in state.blocks.items() if key!=dest}=={
+            key:value for key,value in before.items() if key!=dest}
+    assert state.blocks[dest]==before.get(dest,[])
 
 
 def test_api_requires_manual_implementation_and_never_imports_sdk():

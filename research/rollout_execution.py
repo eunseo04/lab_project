@@ -14,7 +14,7 @@ import threading
 import time
 from . import ROOT
 from .rollout import pool_digest,verify_transaction
-from .config import split_seeds
+from .config import split_seeds, execution_config, policy_interface, check_pool_interface
 from .progress import Journal,atomic_json,digest,BudgetExceeded,IncompleteOptimization,implementation_identity
 
 
@@ -31,6 +31,7 @@ class EnvironmentVerifier:
         self.completed_training_episodes=config['train_episodes']
         inherited_path=Path(config['pool']) if config.get('pool') else None
         inherited=json.loads(inherited_path.read_text()) if inherited_path and inherited_path.is_file() else {}
+        if 'pool' in inherited:check_pool_interface(inherited,config,static_initial=True)
         self.inherited_episodes=inherited.get('total_training_episodes',inherited.get('episodes_completed',0))
         self.inherited_seeds=inherited.get('training_seeds',[])
         self.inherited_iterations=len(inherited.get('history',[]))
@@ -40,7 +41,7 @@ class EnvironmentVerifier:
         local_iteration=support['iteration']-self.inherited_iterations
         self.completed_training_episodes=min(planned,(local_iteration*planned+iterations-1)//iterations)
         decision_rule={k:v for k,v in self.rule.items() if k not in ('ports','deadline_unix')}
-        case_key=digest([support,pool.snapshot(),candidate.__dict__,proposed_snapshot,self.identity,self.source,decision_rule])
+        case_key=digest([support,self._reuse_identity(pool.snapshot(),None),candidate.__dict__,proposed_snapshot,decision_rule])
         case=self.directory/f"iteration-{support['iteration']:04d}-{case_key[:20]}"
         case.mkdir(exist_ok=True)
         with (case/'.lock').open('w') as stream:
@@ -68,10 +69,11 @@ class EnvironmentVerifier:
     def _reuse_identity(self,snapshot,seed):
         cfg=deepcopy(self.config)
         # Placement and deadlines affect scheduling, never policy/environment identity.
-        for key in ('output','journal_path','rollout_validation','experiment_id'):cfg.pop(key,None)
+        for key in ('output','journal_path','rollout_validation','experiment_id','execution_stage'):cfg.pop(key,None)
         for key in ('endpoint','scoring_endpoints','generation_endpoints','sg_workers','score_batch_size','timeout_seconds','journal_path','request_context','deadline_unix'):
             cfg['model'].pop(key,None)
         cfg.pop('pool',None)
+        cfg.update(policy_interface(self.config))
         return digest({'pool':snapshot,'seed':seed,'model':self.identity,'config':cfg,'source':self.source})
 
     def evaluate(self,snapshot,role,case,seeds=None):
@@ -79,10 +81,12 @@ class EnvironmentVerifier:
         if not requested or len(set(requested))!=len(requested) or not set(requested)<=set(self.rule['seeds']):
             raise ValueError('Validation tasks must belong to the registered seed set')
         key=pool_digest(snapshot);pool_file=case/f'{role}-pool.json'
+        interface=policy_interface(self.config)
         payload={'stage':'train','pool':snapshot,'episodes_completed':self.completed_training_episodes,
             'total_training_episodes':self.inherited_episodes+self.completed_training_episodes,
             'training_seeds':sorted(set(self.inherited_seeds)|set(split_seeds(self.config,'train')[:self.completed_training_episodes])),
-            'model_identity':self.identity,'validation_only':True}
+            'model_identity':self.identity,'validation_only':True,
+            'communication_encoder':interface['communication_encoder'],'policy_interface':interface}
         provenance=self.config.get('verification_pool_provenance',{}).get(key)
         if self.config.get('verification_pool_provenance') and provenance is None:
             raise ValueError('Exact validation snapshot lacks registered training provenance')
@@ -109,12 +113,12 @@ class EnvironmentVerifier:
                         summary_path=dest/'summary.json'
                         summary=json.loads(summary_path.read_text()) if summary_path.exists() else {}
                         if summary.get('status')!='completed':
-                            cfg=deepcopy(self.config);cfg.update(pool=str(pool_file),eval_seed=seed,eval_seeds=[seed],episodes=1,
-                                evaluation_disabled=False,validation_seeds=[],
-                                validation_episodes=0,evaluation_role='rollout',journal_path=str(self.journal.path))
-                            cfg.pop('rollout_validation',None);cfg['evolution']['rollout_verification']=False
+                            cfg={k:deepcopy(v) for k,v in self.config.items() if k!='execution_stage'}
+                            cfg.update(pool=str(pool_file),eval_seed=seed,eval_seeds=[seed],episodes=1,
+                                evaluation_disabled=False,evaluation_role='rollout',journal_path=str(self.journal.path))
                             cfg['model'].update(endpoint=f'http://127.0.0.1:{port}',scoring_endpoints=[],generation_endpoints=[])
                             cfg['diagnostics']={'reward_events':True}
+                            cfg=execution_config(cfg,'eval')
                             config_path=dest/'case-config.json'
                             # A resumed run retains its original config/placement. The task ID is independent of the endpoint.
                             if config_path.exists():cfg=json.loads(config_path.read_text())
@@ -150,8 +154,10 @@ class EnvironmentVerifier:
                         if summary['model_identity']!=self.identity:raise ValueError('Validation model identity changed')
                         if not summary['pool_frozen']:raise ValueError('Validation altered the pool')
                         frozen=json.loads((dest/'frozen_pool.json').read_text())
+                        check_pool_interface(frozen,self.config)
                         if pool_digest(frozen['pool'])!=key:raise ValueError('Reused validation Pool differs')
                         episode={**summary['episodes'][0],'summary':str(summary_path),'validated_pool_sha256':key}
+                        check_pool_interface(episode,self.config)
                         if episode['seed']!=seed:raise ValueError('Validation seed differs')
                         record=self.journal.task(task)
                         if record and record['status']!='completed':self.journal.finish(task,episode,{'reused':False})

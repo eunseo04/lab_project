@@ -3,6 +3,7 @@ from pathlib import Path
 import hashlib
 import json
 import yaml
+from acd.config import LEGACY_ENCODER, validate_communication_encoder
 from . import ROOT
 
 ARMS = ("E0", "E1", "E2", "E3")
@@ -13,7 +14,9 @@ VERIFICATION_VARIANTS = {name:{'base':'B4' if name.startswith('B4-') else 'B2',
     for name in ('B2-ASV','B2-SSV','B2-ASV-SSV','B2-ASV-SSV-RV',
                  'B2-ASV-SSV-RV-screen','B4-ASV','B4-SSV','B4-ASV-SSV')}
 COMPLETED_OPTIMIZER_STATUSES=frozenset(('completed_changed','completed_unchanged','completed_no_eligible_skill'))
-CONTROLLER_VARIANTS={'B1-selector-contract':'B1','B3-selector-contract':'B3'}
+CONTROLLER_VARIANTS={'B1-selector-contract':'B1','B3-selector-contract':'B3',
+                     'B1-urgent-preemption':'B1','B3-urgent-preemption':'B3'}
+ZONE_PAIR_CONTRACT = 'explicit_zone_pair_v1'
 
 
 def comparison_metadata(config):
@@ -123,8 +126,13 @@ def variant_config(name,seed_plan=None):
     """Named overrides of existing configs; no copied YAML or silent B2/B3/B4 redefinition."""
     if name in CONTROLLER_VARIANTS:
         base=CONTROLLER_VARIANTS[name];c=load(ROOT/f'research_configs/rollout-{base}.yaml')
-        c['selector']['contract']='cage4_role_v1'
-        c.update(comparison_id=name,base_comparison_id=base,experiment_version='cage4-selector-contract-v1')
+        if name.endswith('-urgent-preemption'):
+            c['selector']['urgent_preemption']=True
+            version='cage4-acd-urgent-preemption-v1'
+        else:
+            c['selector']['contract']='cage4_role_v1'
+            version='cage4-acd-selector-contract-v1'
+        c.update(comparison_id=name,base_comparison_id=base,experiment_version=version)
         return apply_seed_plan(c,seed_plan) if seed_plan is not None else validate(c)
     if name not in VERIFICATION_VARIANTS:
         c=load(ROOT/f'research_configs/rollout-{name}.yaml')
@@ -144,7 +152,7 @@ def variant_config(name,seed_plan=None):
         c['rollout_validation'].update(reject_screen_pairs=2,reject_screen_only=True,
             procedure_version='necessary-worst-seed-rejection-v1')
     c.setdefault('seed_use','legacy_reproduction')
-    c.update(comparison_id=name,experiment_version='cage4-fact-intervention-v1',base_comparison_id=base)
+    c.update(comparison_id=name,base_comparison_id=base)
     if seed_plan is not None:return apply_seed_plan(c,seed_plan)
     return validate(c)
 
@@ -152,6 +160,39 @@ def variant_config(name,seed_plan=None):
 def load(path):
     config = yaml.safe_load(Path(path).read_text())
     return validate(config)
+
+
+def execution_config(config, stage):
+    """Bind the runtime stage while retaining the registered training method."""
+    if stage not in ('train','eval'):
+        raise ValueError('Stage must be train or eval')
+    if config.get('execution_stage', stage) != stage:
+        raise ValueError('Execution stage does not match the registered configuration')
+    return validate({**config, 'execution_stage':stage})
+
+
+def policy_interface(config):
+    selector=config.get('selector',{})
+    return {'communication':config.get('communication','paper_projected_keep'),
+            'communication_encoder':config.get('communication_encoder',LEGACY_ENCODER),
+            'action_contract':config.get('action_contract','legacy'),
+            'selector_contract':selector.get('contract','upstream'),
+            'urgent_preemption':selector.get('urgent_preemption',False)}
+
+
+def check_pool_interface(artifact, config, *, static_initial=False):
+    expected=policy_interface(config)
+    if static_initial and artifact.get('initialization_only') is True and not artifact.get('training_seeds'):
+        initial=json.loads((ROOT/'artifacts/initial_pool.json').read_text())
+        unused=not any(artifact.get(key) for key in ('total_training_episodes','inherited_training_episodes',
+            'experience','pending_experiences','history'))
+        if artifact.get('pool')==initial['pool'] and artifact.get('episodes_completed')==0 and unused:
+            return True
+    if artifact.get('communication_encoder',LEGACY_ENCODER)!=expected['communication_encoder']:
+        raise ValueError('Skill Pool communication encoder differs from this experiment')
+    if artifact.get('policy_interface') is not None and artifact['policy_interface']!=expected:
+        raise ValueError('Skill Pool policy interface differs from this experiment')
+    return False
 
 
 def validate(config):
@@ -186,8 +227,8 @@ def validate(config):
     if c["profile"] not in ("paper-compatible", "controlled-comparison"):
         raise ValueError("Invalid action/prompt comparison profile")
     if c["scoring"] not in ("official", "terminal_inclusive"): raise ValueError("Invalid scoring profile")
-    if c["action_contract"] not in ("legacy", "explicit"):
-        raise ValueError("action_contract must be legacy or explicit")
+    if c["action_contract"] not in ("legacy", "explicit", ZONE_PAIR_CONTRACT):
+        raise ValueError("Unknown action contract")
     if c["behavior_context"] not in ("legacy", "evidence_v1"):
         raise ValueError("Invalid observable behavior context")
     if c["case_presentation"] not in ("json","readable"):
@@ -207,6 +248,12 @@ def validate(config):
     if c["profile"] == "paper-compatible" and c["action_contract"] != "legacy":
         raise ValueError("Unmodified ACD paper-compatible prompts require the legacy action contract")
     if c["communication"] not in ("paper_projected_keep", "keep_native"): raise ValueError("Invalid communication profile")
+    c['communication_encoder']=validate_communication_encoder(c['communication'],c.get('communication_encoder',LEGACY_ENCODER))
+    if c.get('execution_stage') not in (None,'train','eval'):
+        raise ValueError('Invalid execution stage')
+    rollout_eval=c.get('evaluation_role')=='rollout'
+    if rollout_eval and (c.get('execution_stage')!='eval' or not c['evolution'].get('rollout_verification')):
+        raise ValueError('Candidate rollout needs a registered rollout evaluation configuration')
     for key in ("steps", "episodes", "train_episodes", "iterations", "threads", "pool_size"):
         if type(c[key]) is not int or c[key] < 1: raise ValueError(f"{key} must be a positive integer")
     if c["steps"] < 3: raise ValueError("CC4 requires at least 3 steps")
@@ -222,7 +269,12 @@ def validate(config):
     if e.get('evidence_schema','typed_claims_v8') not in ('typed_claims_v8','fact_interventions_v1'):raise ValueError('Invalid evidence schema')
     if e.get('evidence_schema')=='fact_interventions_v1' and not (e.get('diagnosis_verification') and e.get('method_version')):raise ValueError('Fact interventions require a versioned diagnosis method')
     if c['selector'].get('contract','upstream') not in ('upstream','cage4_role_v1'):raise ValueError('Unknown selector contract')
-    if c['selector'].get('contract')=='cage4_role_v1' and c.get('comparison_id') not in CONTROLLER_VARIANTS:raise ValueError('Selector change requires its own controller ablation')
+    if c['selector'].get('contract')=='cage4_role_v1' and c.get('comparison_id') not in ('B1-selector-contract','B3-selector-contract'):raise ValueError('Selector change requires its own controller ablation')
+    if type(c['selector'].get('urgent_preemption',False)) is not bool:
+        raise ValueError('Urgent preemption must be a boolean')
+    if c['selector'].get('urgent_preemption') and (c.get('comparison_id') not in ('B1-urgent-preemption','B3-urgent-preemption') or
+            c['selector'].get('contract','upstream')!='upstream' or c['behavior_context']!='evidence_v1' or not c['skip_busy_policy']):
+        raise ValueError('Urgent preemption needs its observable-case ablation with the upstream selector')
     if e.get('diagnosis_verification',False) and not e.get('evidence_verification',False):
         raise ValueError('CAGE4 diagnosis verification requires trace evidence verification')
     minimum=e.get('minimum_independent_episodes',0)
@@ -285,7 +337,9 @@ def validate(config):
             raise ValueError('Explicit unique rollout validation seeds required')
         from .rollout import approval_seeds
         approval_seeds(rule)
-        if set(seeds)&(train_seeds|eval_seeds|validation_seeds):
+        if rollout_eval and not eval_seeds <= set(seeds):
+            raise ValueError('Candidate evaluation seeds must belong to the registered rollout validation set')
+        if set(seeds)&(train_seeds|validation_seeds|(set() if rollout_eval else eval_seeds)):
             raise ValueError('Rollout validation seeds overlap other splits')
         required=('minimum_mean_gain','minimum_win_rate','minimum_median_gain','maximum_seed_loss',
             'maximum_mean_lwf_loss','maximum_mean_asf_loss','maximum_std_ratio','maximum_std_increase','ports')
@@ -312,6 +366,7 @@ def digest(config):
 def compatible_digest(config):
     """Normalize newly explicit defaults without changing a recorded manifest."""
     c = validate(config)
+    c.pop('execution_stage', None)  # run() checks stage separately, including old manifests.
     c.pop("maintenance_mode", None)  # former unused top-level default
     for key in ('endpoint','scoring_endpoints','generation_endpoints','sg_workers','score_batch_size','timeout_seconds'):
         c['model'].pop(key,None)

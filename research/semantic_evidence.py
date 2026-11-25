@@ -130,7 +130,8 @@ def candidate_supported(parent,candidate,gradient_records,links=None):
             'fact_ids':sorted({f for p in selected for f in p['fact_ids']})}
     if set(linked)!=set(elements):errors.append('unlinked_candidate_changes')
     # A narrow contradiction of the pinned Remove implementation, not an NLP proof.
-    contradictions=[]
+    from .diagnosis import traffic_scope_contradictions
+    contradictions=traffic_scope_contradictions(text)
     for sentence in re.split(r'[.!?\n]',text):
         if re.search(r'\b(?:not|never|cannot|can.t)\b',sentence,re.I):continue
         if re.search(r'\bRemove\b.*\b(?:TRUE|success\w*)\b.*\b(?:proves?|guarantees?|means)\b.*\b(?:all|every)\b.*\b(?:privileged|root|admin)\b.*\b(?:eliminat\w*|clear\w*|remov\w*|gone)\b',sentence,re.I):

@@ -11,9 +11,10 @@ validation_seed: 99000
 validation_episodes: 0
 threads: 1
 profile: controlled-comparison
-action_contract: explicit
+action_contract: explicit_zone_pair_v1
 scoring: official
 communication: paper_projected_keep
+communication_encoder: acd_original_v1
 skip_busy_policy: true
 pool_size: 24
 weights: third_party/cage-4-submission/weights
@@ -62,4 +63,4 @@ diagnostics:
   reward_events: true
   skill_attribution: true
 comparison_id: B1
-experiment_version: cage4-skillpro-durable-full
+experiment_version: cage4-acd-parity-v1

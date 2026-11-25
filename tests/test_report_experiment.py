@@ -147,7 +147,9 @@ def test_completed_original_update_cannot_be_relabeled_as_trained_proposed(tmp_p
     assert rows[0]['split']=='untrained_control' and rows[0]['training_provenance_state']=='training_method_mismatch'
 
 
-def test_historical_inputs_restore_without_original_absolute_paths(tmp_path):
+@pytest.mark.parametrize('with_training_manifest',[False,True])
+def test_historical_inputs_restore_without_original_absolute_paths(tmp_path,with_training_manifest):
+    from research.config import policy_interface
     from research.progress import Journal
     from scripts.run_campaign import historical_batch
     original=tmp_path/'original';original.mkdir();current=tmp_path/'current';current.mkdir();report=current/'report';report.mkdir()
@@ -162,10 +164,18 @@ def test_historical_inputs_restore_without_original_absolute_paths(tmp_path):
     protocol={'fixed_update_source':{'checkpoint':str(checkpoint),'initial_pool':str(initial),
         'journal':str(original/'journal.sqlite3'),'training_traces':list(map(str,traces)),
         'files_sha256':{str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}}}
+    if with_training_manifest:
+        training_manifest=original/'manifest.json'
+        config={'communication':'paper_projected_keep','action_contract':'explicit'}
+        training_manifest.write_text(json.dumps({'stage':'train','config':config}))
+        source=protocol['fixed_update_source']
+        source.update(training_manifest=str(training_manifest),policy_interface=policy_interface(config))
+        source['files_sha256'][str(training_manifest)]=hashlib.sha256(training_manifest.read_bytes()).hexdigest()
+        protocol['configs']={'B2':config}
     (current/'protocol.json').write_text(json.dumps(protocol));(current/'frozen.json').write_bytes(checkpoint.read_bytes())
     reporter.reproduction_bundle(current,report)
     manifest=json.loads((report/'reproducibility_manifest.json').read_text())
-    assert len(manifest['historical_dependencies'])==5
+    assert len(manifest['historical_dependencies'])==5+int(with_training_manifest)
     original.rename(tmp_path/'original_unavailable')
     restored=tmp_path/'isolated';mapped=reporter.restore_reproduction_bundle(report/'reproduction_bundle.tar.gz',restored)
     assert not any(Path(p).is_absolute() for p in mapped['fixed_update_source']['files_sha256'])
@@ -174,6 +184,10 @@ def test_historical_inputs_restore_without_original_absolute_paths(tmp_path):
     assert prep=={'ready':{'pool':'original'}}
     assert [json.loads((restored/p).read_text())['seed'] for p in mapped['fixed_update_source']['training_traces']]==[7,8]
     assert mapped['original_fixed_update_source']==protocol['fixed_update_source']
+    if with_training_manifest:
+        mapped['configs']['B2']['communication_encoder']='acd_original_v1'
+        with pytest.raises(ValueError,match='preserve the historical policy interface'):
+            historical_batch(mapped,root=restored)
 
 
 def test_source_or_frozen_pool_mismatch_is_not_merged(tmp_path):
@@ -203,3 +217,49 @@ def test_regeneration_after_source_change_preserves_existing_immutable_bundle(tm
     before=manifest.read_bytes();result=reporter.report_experiment(tmp_path)
     assert result['bundle_action']=='preserved_registered_source_snapshot'
     assert hashlib.sha256(archive.read_bytes()).hexdigest()==digest and manifest.read_bytes()==before
+
+
+def test_encoder_groups_split_full_reports_and_keep_implicit_legacy_compatible(tmp_path):
+    for directory,label in ((tmp_path/'legacy','B0'),(tmp_path/'original','B0'),(tmp_path/'original','B1')):
+        directory.mkdir(exist_ok=True)
+        run=write_run(directory,label,'eval',[-4])
+        if directory.name=='legacy':continue
+        summary_path=run/'summary.json';episode_path=run/'episode-0000.json'
+        summary=json.loads(summary_path.read_text());summary['config']['communication_encoder']='acd_original_v1'
+        record=summary['episodes'][0];record['communication_encoder']='acd_original_v1'
+        episode_path.write_text(json.dumps(record));summary_path.write_text(json.dumps(summary))
+    explicit=tmp_path/'legacy-explicit';explicit.mkdir()
+    run=write_run(explicit,'B1','eval',[-7]);path=run/'summary.json';value=json.loads(path.read_text())
+    # The two legacy arms share a comparison run even though one recorded the default explicitly.
+    value['config'].update(communication_encoder='legacy_local_v1',comparison_run_id='legacy')
+    path.write_text(json.dumps(value))
+    out=reporter.report_experiment(tmp_path,include_bundle=False)['output']
+    metrics=json.loads((Path(out)/'metrics.json').read_text())
+    assert {(g['label'],g['communication_encoder']) for g in metrics['groups']}=={
+        (label,encoder) for label in ('B0','B1') for encoder in ('acd_original_v1','legacy_local_v1')}
+    assert {p['communication_encoder']:p['mean_difference'] for p in metrics['paired_vs_B0']}=={
+        'acd_original_v1':0,'legacy_local_v1':-3}
+
+
+def test_optimizer_report_distinguishes_registered_seeds_from_completed_pairs(tmp_path):
+    seeds=list(range(20));journal=reporter.Journal(tmp_path/'journal.sqlite3')
+    candidates=[
+        ('planned',{'seeds':seeds}),
+        ('partial',{'reason':'incomplete_validation','registered_seeds':seeds,
+                    'completed_paired_seeds':[0,1],'differences':{'0':1.0,'1':2.0},'validation_complete':False}),
+        ('early',{'reason':'failed_registered_worst_seed_early','paired_seeds':[0],
+                  'differences':{'0':-51.0},'required_approval_pairs':20,'validation_complete':False}),
+        ('legacy',{'reason':'failed_registered_criteria','seeds':seeds,'differences':[0.0]*20}),
+        ('complete',{'reason':'passed','registered_seeds':seeds,'completed_paired_seeds':seeds,
+                     'seeds':seeds,'differences':[1.0]*20,'validation_complete':True}),
+        ('claimed',{'reason':'passed','seeds':seeds,'validation_complete':True}),
+    ]
+    journal.checkpoint('optimizer:loop',{'status':'completed_unchanged','attempts':1,'result':{'evolution':[
+        {'candidates':[{'skill':{'name':name},'admission_mode':'rollout','rollout_validation':validation}
+                       for name,validation in candidates]}]}})
+    journal.db.close()
+    out=tmp_path/'report';out.mkdir();reporter.optimizer_report(tmp_path,out,[])
+    report=json.loads((out/'optimizer_progress.json').read_text())['candidate_stages']
+    actual={item['name']:(item['rollout_status'],item['rollout_completed_pairs'],item['rollout_completed']) for item in report}
+    assert actual=={'planned':('planned',0,False),'partial':('partial',2,False),'early':('reject_only',1,False),
+                    'legacy':('complete',20,True),'complete':('complete',20,True),'claimed':('planned',0,False)}

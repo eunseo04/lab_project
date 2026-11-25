@@ -19,7 +19,8 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 from research.progress import Journal,atomic_json,BudgetExceeded,IncompleteOptimization,digest,implementation_identity
 from research.config import (load,validate,variant_config,apply_seed_plan,validate_seed_plan,
-    seed_exposure_history,split_seeds,VERIFICATION_VARIANTS,COMPLETED_OPTIMIZER_STATUSES)
+    seed_exposure_history,split_seeds,VERIFICATION_VARIANTS,CONTROLLER_VARIANTS,COMPLETED_OPTIMIZER_STATUSES,
+    execution_config,policy_interface,check_pool_interface)
 
 PORTS=[8418,8419,8420,8421]
 write=atomic_json
@@ -207,13 +208,16 @@ def make_protocol(args,out):
     if getattr(args,'frozen_policy_pilot',False):
         plan,history=campaign_seed_plan(args);prior,ledger=campaign_budget(args)
         if len(plan['final_test'])!=1 or args.max_gpus!=1:raise ValueError('Frozen exploratory pair requires one registered seed and one GPU')
-        labels=['B1','B1-selector-contract'];configs={}
+        variant=getattr(args,'pilot_controller','B1-selector-contract')
+        labels=['B1',variant];configs={}
         for label in labels:
             c=variant_config(label)
             c.update(iterations=1,experiment_id=str(out),comparison_run_id=str(out),
-                experiment_version='cage4-static-selector-pilot-v1',output=str(out),journal_path=str(out/'journal.sqlite3'))
+                experiment_version='cage4-acd-static-selector-pilot-v1',output=str(out),journal_path=str(out/'journal.sqlite3'))
             configs[label]=apply_seed_plan(c,plan,history)
         reservation=core_cost_reservation(plan['final_test'])
+        if reservation['episode_upper_seconds'] is None:
+            raise ValueError('A comparable measured episode cost is required before reserving both policies')
         reservation.update(episodes=2,gpu_seconds_estimate=2*reservation['episode_upper_seconds']+390)
         return {'schema':'durable-campaign-v1','registered_unix':time.time(),'experiment_id':str(out),
             'protocol_kind':'exploratory-frozen-policy-pair-v1','source_sha256':source_identity(),'configs':configs,
@@ -225,16 +229,19 @@ def make_protocol(args,out):
             'initial_pool_file_sha256':sha(ROOT/'artifacts/initial_pool.json'),
             'training_plan':{'episodes':0,'iterations':0},
             'scope':'Exploratory static controller factor only. Same initial Pool; no optimization or B4 admission. Both complete episodes required.',
-            'changed_factor':'Selector-only CAGE4 role/action-semantics guidance; no filtering, preemption, actor change or gain threshold override.',
+            'changed_factor':('Reselect once on a new urgent visible case while another family is active.' if variant=='B1-urgent-preemption'
+                              else 'Selector-only CAGE4 role and action semantics guidance.'),
             'allocation':'Reserve both full 500-nominal episodes plus startup/shutdown before GPU launch.',
             'historical_performance_reference':historical_reference(args)}
     if getattr(args,'fixed_update_from',None):return make_fixed_protocol(args,out)
     plan,history=campaign_seed_plan(args);prior,ledger=campaign_budget(args)
-    requested=list(dict.fromkeys(['B2',*args.arms]));labels=['B0','B1',*requested];configs={}
+    requested=list(dict.fromkeys(['B2',*args.arms]))
+    controller_baselines={arm:'B1'+arm[2:] for arm in requested if CONTROLLER_VARIANTS.get(arm)=='B3'}
+    labels=['B0','B1',*requested,*controller_baselines.values()];configs={}
     for label in labels:
         cfg=variant_config(label)
         cfg.update(iterations=args.iterations,experiment_id=str(out),comparison_run_id=str(out),
-                   experiment_version='cage4-boundary-audit-v2',
+                   experiment_version='cage4-acd-parity-v1',
                    output=str(out),journal_path=str(out/'journal.sqlite3'))
         cfg['evolution']['preflight_required']=True
         configs[label]=apply_seed_plan(cfg,plan,history)
@@ -247,6 +254,7 @@ def make_protocol(args,out):
         'known_development_seeds':history['exposed_seeds'],
         'generalization_seeds':plan['transfer'],'generalization_requested':args.generalization,
         'core_evaluation_labels':['B0','B1','B2'],'optional_training_arms':[a for a in requested if a!='B2'],
+        'controller_baselines':controller_baselines,
         'core_evaluation_reservation':core_cost_reservation(plan['final_test']),
         'all_arms_required':getattr(args,'require_all_arms',False),
         'budget_gpu_hours':args.gpu_hours,'maximum_wall_seconds':args.wall_hours*3600,
@@ -286,7 +294,19 @@ def historical_batch(protocol,root=None):
             if record is None:raise ValueError('Missing committed historical input: '+key)
             return _unpack(record[0])
         pending=get('pending_batch:1:B2');preparation=get('preparation:1:B2')
-    return json.loads(resolve(source['checkpoint']).read_text()),pending,preparation
+    trained=json.loads(resolve(source['checkpoint']).read_text())
+    if source.get('training_manifest'):
+        if source['training_manifest'] not in source['files_sha256']:
+            raise ValueError('Historical training manifest needs a registered hash')
+        manifest=json.loads(resolve(source['training_manifest']).read_text())
+        if manifest.get('stage')!='train':raise ValueError('Expected the historical training manifest')
+        historical=policy_interface(manifest['config'])
+        if historical!=source['policy_interface']:
+            raise ValueError('Historical training interface differs from the registered study')
+        check_pool_interface(trained,manifest['config'])
+        if any(policy_interface(config)!=historical for config in protocol['configs'].values()):
+            raise ValueError('Fixed update configurations must preserve the historical policy interface')
+    return trained,pending,preparation
 
 
 def make_fixed_protocol(args,out):
@@ -294,27 +314,39 @@ def make_fixed_protocol(args,out):
     plan,history=campaign_seed_plan(args);prior,ledger=campaign_budget(args)
     source=args.fixed_update_from.resolve();campaign=source.parent.parent
     initial=ROOT/'artifacts/initial_pool.json';training=campaign/'runs/B2-finite-train'
-    paths=[source,initial,campaign/'journal.sqlite3',*sorted(training.glob('episode-????.jsonl'))]
-    if len(paths)!=5 or any(not p.is_file() for p in paths):raise ValueError('Exact committed checkpoint, journal and two training traces required')
+    traces=sorted(training.glob('episode-????.jsonl'))
+    manifest_path=training/'manifest.json';journal_path=campaign/'journal.sqlite3'
+    paths=[source,initial,journal_path,manifest_path,*traces]
+    if len(traces)!=2 or any(not p.is_file() for p in paths):
+        raise ValueError('Exact committed checkpoint, training manifest, journal and two training traces required')
+    manifest=json.loads(manifest_path.read_text())
+    if manifest.get('stage')!='train':raise ValueError('Expected the historical training manifest')
+    old_config=manifest['config'];interface=policy_interface(old_config)
     if args.max_gpus!=1:raise ValueError('Fixed-update study uses one unoccupied GPU')
     probes_only=getattr(args,'diagnosis_probes_only',False)
     labels=['B0','B2','B3'] if probes_only else ['B0','B1','B2','B3','B4',*VERIFICATION_VARIANTS];configs={}
     for label in labels:
         cfg=variant_config(label)
+        for key in ('communication','action_contract','profile','skip_busy_policy','behavior_context','case_presentation','connection_leads'):
+            if key in old_config:cfg[key]=deepcopy(old_config[key])
+        cfg['communication_encoder']=interface['communication_encoder']
+        cfg['selector']=deepcopy(old_config['selector'])
         cfg.update(iterations=1,experiment_id=str(out),comparison_run_id=str(out),
-            experiment_version='cage4-diagnosis-boundaries-v3' if probes_only else 'cage4-support-shift-v2-fixed-update',
+            experiment_version='cage4-historical-facts-v1' if probes_only else 'cage4-support-shift-v3-fixed-update',
             output=str(out),journal_path=str(out/'journal.sqlite3'))
         cfg['evolution']['preflight_required']=False
         configs[label]=apply_seed_plan(cfg,plan,history)
     frozen=json.loads(source.read_text())
+    check_pool_interface(frozen,old_config)
     if frozen.get('optimizer_status')!='completed_changed' or frozen.get('pending_experiences'):
         raise ValueError('Fixed proposal must come from a completed original training update')
     if frozen.get('training_seeds')!=plan['train']:raise ValueError('Seed plan must name the exact historical training seeds')
     version='historical-diagnosis-probes-v1' if probes_only else 'fixed-committed-update-verification-v1'
     return {'schema':'durable-campaign-v1','registered_unix':time.time(),'experiment_id':str(out),
         'source_sha256':source_identity(),'configs':configs,'protocol_kind':version,
-        'fixed_update_source':{'checkpoint':str(source),'journal':str(campaign/'journal.sqlite3'),'initial_pool':str(initial),
-            'training_traces':[str(p) for p in paths[3:]],'files_sha256':{str(p):sha(p) for p in paths}},
+        'fixed_update_source':{'checkpoint':str(source),'journal':str(journal_path),'initial_pool':str(initial),
+            'training_manifest':str(manifest_path),'policy_interface':interface,
+            'training_traces':[str(p) for p in traces],'files_sha256':{str(p):sha(p) for p in paths}},
         'scope':'Verify the exact historical whole committed B2 update against the exact initial pool. No regenerated proposal or new training loop; full B3/B4 training remains separate.',
         'seed_plan':plan,'seed_exposure_history':history,
         'historical_performance_reference':historical_reference(args),
@@ -461,7 +493,7 @@ def run_fixed_study(protocol,out,journal,servers,worker,remaining_seconds,switch
         'retained_policy_measurement':'B1 fresh frozen-test episodes; only decisions with that exact Pool hash use this mapping',
         'additional_environment_episodes':0,'new_B3_B4_training_completed':False,
         'inference_equivalence':{k:protocol['configs']['B1'].get(k)==protocol['configs']['B2'].get(k) for k in
-            ('composition','profile','behavior_context','action_contract','selector','skill_seed_set','model','scoring','communication','skip_busy_policy')},
+            ('composition','profile','behavior_context','action_contract','selector','skill_seed_set','model','scoring','communication','communication_encoder','skip_busy_policy')},
         'inference_note':'E1 and E2 use the same SkillController with proposed=False during frozen evaluation; no evolution is invoked.'})
     if protocol['generalization_requested']:
         recent=[json.loads(p.read_text())['execution_time_s'] for p in out.glob('runs/*-evaluate-*/episode-0000.json')]
@@ -479,6 +511,10 @@ def run_training_study(protocol,out,journal,servers,worker,remaining_seconds,swi
     """Complete the registered core first; budget-only optional deferrals retain it."""
     from scripts.audit_training_cost import audit,profile_optimizer,preflight
     core=protocol.get('core_evaluation_labels',['B0','B1','B2']);extensions={};trained_labels=[]
+    def evaluation_block(label):
+        if label=='B2':return core
+        static=protocol.get('controller_baselines',{}).get(label)
+        return [static,label] if static else [label]
     def train(label):
         switch_phase('training_'+label)
         dest,job=worker(label,'train',servers[0]['port']);checkpoint=dest/'checkpoint.json'
@@ -487,7 +523,7 @@ def run_training_study(protocol,out,journal,servers,worker,remaining_seconds,swi
             if not pending:raise IncompleteOptimization('No complete pending training batch for '+label)
             measurements=profile_optimizer(out,label,pending,servers[0]['port'])
             estimate=preflight(protocol,measurements,journal.budget_usage(),len(servers),label,
-                evaluation_labels=core if label=='B2' else [label])
+                evaluation_labels=evaluation_block(label))
             journal.checkpoint('preflight:'+label,estimate);write(out/('preflight-'+label+'.json'),estimate)
             if estimate['status']!='passed':raise BudgetExceeded('Measured training plus reserved evaluation does not fit: '+label)
             dest,job=worker(label,'train',servers[0]['port'])
@@ -514,7 +550,8 @@ def run_training_study(protocol,out,journal,servers,worker,remaining_seconds,swi
                 try:label,seed,red=pending.get_nowait()
                 except queue.Empty:return
                 try:
-                    pool=None if label=='B0' else ROOT/'artifacts/initial_pool.json' if label=='B1' else out/'frozen'/f'{label}.json'
+                    static=label=='B1' or CONTROLLER_VARIANTS.get(label)=='B1'
+                    pool=None if label=='B0' else ROOT/'artifacts/initial_pool.json' if static else out/'frozen'/f'{label}.json'
                     _,job=worker(label,'evaluate',port,seed,red,pool)
                     if job['status']!='completed' or job.get('summary_status')!='completed':raise IncompleteOptimization('Required evaluation incomplete')
                 except BaseException:abort.set();raise
@@ -528,18 +565,18 @@ def run_training_study(protocol,out,journal,servers,worker,remaining_seconds,swi
         if label=='B2':continue
         first=journal.restore('profile:B2') or {}
         estimate=preflight(protocol,first,journal.budget_usage(),len(servers),label,
-            include_collection=True,evaluation_labels=[label])
+            include_collection=True,evaluation_labels=evaluation_block(label))
         journal.checkpoint('extension_plan:'+label,estimate)
         if estimate['status']!='passed':
             extensions[label]={'status':'deferred_budget','estimate':estimate};write(out/'extension_status.json',extensions)
             if protocol.get('all_arms_required'):raise BudgetExceeded('Required extension does not fit: '+label)
             continue
-        try:train(label);switch_phase('optional_frozen_test_'+label);evaluate([label],protocol['pilot_test_seeds'])
+        try:train(label);switch_phase('optional_frozen_test_'+label);evaluate(evaluation_block(label),protocol['pilot_test_seeds'])
         except BudgetExceeded as exc:
             extensions[label]={'status':'deferred_budget','reason':str(exc)};write(out/'extension_status.json',extensions)
             if protocol.get('all_arms_required'):raise
             continue
-        trained_labels.append(label);extensions[label]={'status':'completed'};write(out/'extension_status.json',extensions)
+        trained_labels.extend(evaluation_block(label));extensions[label]={'status':'completed'};write(out/'extension_status.json',extensions)
     if protocol.get('generalization_requested'):
         switch_phase('generalization_test')
         try:evaluate(core+trained_labels,protocol['generalization_seeds'],('aggressive','stealthy','impact','degrade'))
@@ -560,14 +597,17 @@ def main():
     parser.add_argument('--reference-report',type=Path,help='Immutable historical metrics JSON for separate context, not new evidence')
     parser.add_argument('--usage-ledger',type=Path,nargs='+',help='Prior cumulative completion ledgers; sessions are deduplicated')
     parser.add_argument('--diagnosis-probes-only',action='store_true',help='Historical training SG probes only; no training or final evaluation')
-    parser.add_argument('--frozen-policy-pilot',action='store_true',help='One preregistered static B1/selector-contract pair; no training or B4 admission')
+    parser.add_argument('--frozen-policy-pilot',action='store_true',help='One preregistered static B1/controller-variant pair')
+    parser.add_argument('--pilot-controller',choices=[name for name,base in CONTROLLER_VARIANTS.items() if base=='B1'],
+                        default='B1-selector-contract',help='Controller variant for --frozen-policy-pilot')
     parser.add_argument('--diagnosis-probe-count',type=int,default=6,choices=range(1,13))
     parser.add_argument('--train-episodes',type=int,help='Must equal the explicit training seed count')
     parser.add_argument('--iterations',type=int,default=1,help='Actual training optimizer iterations; full six/three requires explicit plan')
     parser.add_argument('--require-all-arms',action='store_true',help='Treat all registered arms as required rather than optional extensions')
     parser.add_argument('--prior-gpu-hours',type=float,default=None,help='Carry-in from the existing eight GPU-hour authorization; required for --fixed-update-from')
     parser.add_argument('--test-episodes',type=int,default=None,choices=range(1,101))
-    parser.add_argument('--arms',nargs='+',choices=['B2','B3-no-support','B3','B4',*VERIFICATION_VARIANTS,'B3-selector-contract'],default=['B2'])
+    parser.add_argument('--arms',nargs='+',choices=['B2','B3-no-support','B3','B4',*VERIFICATION_VARIANTS,
+        *[name for name,base in CONTROLLER_VARIANTS.items() if base=='B3']],default=['B2'])
     parser.add_argument('--generalization',action='store_true')
     parser.add_argument('--resume',action='store_true')
     parser.add_argument('--plan-only',action='store_true')
@@ -683,8 +723,8 @@ def main():
         if stage=='evaluate':
             cfg.update(episodes=1,eval_seed=seed,eval_seeds=[seed],evaluation_disabled=False,
                 red=red,pool=str(pool) if pool else None,evaluation_role='exploratory_frozen_pilot' if protocol['protocol_kind']=='exploratory-frozen-policy-pair-v1' else 'frozen_test' if red=='finite' else 'transfer_test')
-            cfg['evolution']['rollout_verification']=False;cfg.pop('rollout_validation',None)
         elif cfg['evolution'].get('rollout_verification'):cfg['rollout_validation'].update(ports=[s['port'] for s in servers])
+        cfg=execution_config(cfg,'eval' if stage=='evaluate' else 'train')
         config_path=dest/'config.json'
         if config_path.exists():cfg=json.loads(config_path.read_text())
         else:write(config_path,cfg)

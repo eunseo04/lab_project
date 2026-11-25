@@ -206,6 +206,20 @@ PROPOSAL_FINDINGS = {
 }
 
 
+def traffic_scope_contradictions(text):
+    """Check explicit claims beyond the fixed ACD traffic pair."""
+    import re
+    for sentence in re.split(r'[.!?\n]',text):
+        if re.search(r'\b(?:do not|cannot|never|avoid)\b',sentence,re.I):
+            continue
+        traffic=re.search(r'\b(?:BlockTrafficZone|AllowTrafficZone|block|allow|isolate)\b',sentence,re.I)
+        broad=re.search(r'\b(?:all sources|any source subnet|any from_subnet|entire (?:subnet|zone)|whole (?:subnet|zone)|all (?:incoming|outgoing) traffic)\b',sentence,re.I)
+        assigns_source=re.search(r'\bfrom_subnet\s*[:=]\s*[\w]+_subnet\b',sentence,re.I)
+        if traffic and (broad or assigns_source):
+            return ['ACD_traffic_control_has_one_fixed_source_and_one_destination']
+    return []
+
+
 def canonical_proposals(data, validation):
     """Quarantine prose; only validated facts and model-selected typed hypotheses flow on.
 
@@ -292,7 +306,8 @@ def canonical_fact_catalog(rows):
         if decision['policy_invoked'] and decision['request_applied'] and not decision['parse_error'] and decision['recorded_request']:
             add('recorded_decision','after',decision['target'],decision['name'])
         if op['recorded_operation'] and op.get('status') in ('TRUE','FALSE') and op.get('completed_at') is not None and op.get('started_at') is not None and op['started_at']<=op['completed_at']<=row['step']+1:
-            add('completed_success' if op['status']=='TRUE' else 'completed_failure','after',op.get('target'),op.get('name'))
+            pair={'traffic_zone_pair':op['traffic_zone_pair']} if op.get('traffic_zone_pair') else {}
+            add('completed_success' if op['status']=='TRUE' else 'completed_failure','after',op.get('target'),op.get('name'),**pair)
         if op['recorded_operation'] and op.get('status')=='IN_PROGRESS' and op.get('completed_at') is None:
             add('pending','after',op.get('target'),op.get('name'))
         for phase in ('before','after'):
@@ -337,6 +352,9 @@ def validate_interventions(data,rows):
         if binding not in ('observed_host','none') or (binding=='observed_host' and any(f.get('target') is None for f in selected)):
             errors.append('unsupported_runtime_binding');continue
         text=' '.join(hypothesis[k] for k in required)
+        contradictions=traffic_scope_contradictions(text)
+        if contradictions:
+            errors.extend(contradictions);continue
         if re.search(r'\b(?:\d{1,3}\.){3}\d{1,3}\b|\b[FP][a-f0-9]{16}\b|\bE\d+\b',text) or any(re.search(r'(?<!\w)'+re.escape(host)+r'(?!\w)',text) for host in hosts):
             errors.append('instance_identifier_in_intervention');continue
         # A selected fact proves only its exact visible content, not the stated problem/efficacy.
@@ -375,8 +393,9 @@ Use initiation/policy/termination components. target_binding is observed_host or
 Use no hostname/IP/seed/fact IDs inside procedural text. No facts means is_related=false
 and interventions=[]. Free diagnosis/semantic_gradient prose is audit-only. Facts are
 verified separately from hypotheses, candidate links, PPO admission and real efficacy.
-Block/Allow control traffic FROM public_access_zone_subnet to the selected destination;
-they cannot isolate an arbitrary source zone. Monitor is automatic; IN_PROGRESS is
+Block/Allow use the fixed source of this Blue and one selected destination, as shown
+in the recorded traffic_zone_interface when present. Bind the destination to visible
+evidence. One call cannot isolate a whole zone. Monitor is automatic; IN_PROGRESS is
 waiting, Remove TRUE does not establish privileged cleanup; Restore has availability cost.
 # Exact fact catalogue:
 '''

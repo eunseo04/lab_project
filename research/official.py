@@ -9,13 +9,16 @@ from CybORG.Agents import SleepAgent
 from CybORG.Simulator.Scenarios import EnterpriseScenarioGenerator
 from CybORG.Evaluation import evaluation as official_evaluator
 from acd.runner import seed_everything, load_agents
+from acd.config import LEGACY_ENCODER
 from .adapter import ResearchEnv, DefensePolicy, make_state, red_class, BLUE_AGENTS
 from .client import ModelClient, TextModel, stable_seed
 from .experiment import atomic_json, policy_roles
 from .metrics import JointRewardLedger
+from .config import execution_config
 
 
 def run_official(config, output):
+    config=execution_config(config,'eval')
     if config["arm"] != "E0" or config["steps"] != 500 or config["episodes"] < 2:
         raise ValueError("Official entrypoint is E0, 500 steps and >=2 episodes")
     directory = Path(output); directory.mkdir(parents=True, exist_ok=False)
@@ -51,7 +54,7 @@ def run_official(config, output):
     agents = {a: SleepAgent(a) for a in BLUE_AGENTS}
     if "rl" in roles.values():
         c = {**config, "team": "mixed" if config["composition"] == "hybrid" else "all_rl",
-             "communication": "keep", "deterministic_rl": False}
+             "communication": "keep", "communication_encoder": LEGACY_ENCODER, "deterministic_rl": False}
         agents.update(load_agents(c, 192)[0])
     for a, role in roles.items():
         if role == "llm": agents[a] = ModelProxy(a)
@@ -61,7 +64,7 @@ def run_official(config, output):
         AGENTS = agents
         @staticmethod
         def wrap(env):
-            wrapper = Wrapper(env, config["communication"])
+            wrapper = Wrapper(env, config["communication"], config['communication_encoder'])
             wrapper_ref.append(wrapper)
             return wrapper
 

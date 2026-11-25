@@ -18,6 +18,37 @@ def visible_evidence(body):
     return level, pids, iocs
 
 
+def case_response_options(context, assigned_hosts):
+    """Defensive procedures supported by a visible case and an addressable host."""
+    if context.get('pending_action'):
+        return []
+    hosts=set(assigned_hosts)
+    options=[]
+    for case in context.get('open_cases',[]):
+        host=case['host']
+        version=case.get('evidence_version')
+        if host not in hosts or type(version) is not int:
+            continue
+        level=case['observed_level']
+        files=set(case.get('file_indicators',[]))
+        last_restore=case.get('last_restore') or {}
+        last_remove=case.get('last_remove') or {}
+        last_analysis=case.get('last_analysis') or {}
+        if level==3 and files & ADMIN_IOCS and last_restore.get('evidence_version')!=version:
+            action,family,priority='Restore','PrivilegedRecovery',3
+        elif level in (1,2) and (case.get('flagged_pids') or files & USER_IOCS) and case.get('response_due') and last_remove.get('evidence_version')!=version:
+            action,family,priority='Remove','RapidProcessResponse',2
+        elif (case.get('verification_due') and last_remove.get('completed_at',-1)>last_analysis.get('completed_at',-1)
+              or case.get('analysis_due') and last_analysis.get('evidence_version')!=version):
+            action,family,priority='Analyse','EscalationDiagnosis',1
+        else:
+            continue
+        options.append({'host':host,'action':action,'family':family,'priority':priority,
+                        'evidence_version':version,'restore_epoch':case.get('last_successful_restore_at',-1),
+                        'evidence_age':case.get('evidence_age')})
+    return options
+
+
 def chosen_action(row):
     text = row.get("requested_action") or "Sleep"
     if row.get("response") and not row.get("parse_error"):
@@ -218,6 +249,8 @@ class ObservableCaseLedger:
             if self.pending is not None:
                 raise RuntimeError("An available policy decision must not overwrite an unfinished own action")
             self.pending={"name":name,"target":target,"started_at":step,"evidence_version":version}
+            if row.get('requested_traffic_zone_pair'):
+                self.pending['traffic_zone_pair']=deepcopy(row['requested_traffic_zone_pair'])
         status=str(row["observation_after"].get("success","UNKNOWN"))
         # A successful own Restore resets pre-restore evidence. Process its
         # returned target observation after the reset, so same-name indicators

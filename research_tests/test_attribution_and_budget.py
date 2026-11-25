@@ -360,3 +360,48 @@ def test_visible_cue_chain_keeps_selection_termination_busy_wait_and_completion_
     assert event['first_selection_after_cue']['step']==2 and event['first_termination_after_cue']['raw_status_not_recorded']
     assert response['busy_ticks_before_request']==1 and response['free_decisions_before_request']==0
     assert response['selection']['selected']=='RapidProcessResponse' and response['completion']['completed_at']==4
+
+
+def test_urgent_cue_reselects_once_after_busy_without_forcing_a_primitive(offline):
+    import json
+    from research import ROOT
+    from research.config import variant_config
+    from research.skills import SkillController
+    c=variant_config('B1-urgent-preemption');p=SecuritySkillPool(24,'response_v1');calls=[]
+    p.restore(json.loads((ROOT/c['pool']).read_text())['pool'])
+    assert c['selector']['urgent_preemption'] and variant_config('B3-urgent-preemption')['selector']==c['selector']
+    assert not variant_config('B2')['selector'].get('urgent_preemption')
+    def model(prompt,**kwargs):
+        calls.append(kwargs.get('purpose','selector'))
+        return '<status>CONTINUE</status>' if 'purpose' in kwargs else '<choice>RiskBasedInvestigation</choice>'
+    controller=SkillController(p,model,{**c['selector'],'epsilon':0})
+    state={'user_prompt':'visible','observation':{'success':'UNKNOWN'},'hosts':['h1'],'behavior_context':{'open_cases':[]}}
+    assert controller.choose(state,0).name=='RiskBasedInvestigation'
+    case={'host':'h1','observed_level':3,'file_indicators':['escalate.sh'],'evidence_version':1,'evidence_age':0}
+    state['behavior_context']['open_cases']=[case];state['observation']['success']='IN_PROGRESS'
+    controller.choose(state,1);assert calls==['selector','termination']
+    state['observation']['success']='UNKNOWN';controller.choose(state,2)
+    assert calls[-1]=='selector' and controller.last_event['events'][0]['reason']=='new_observable_urgent_case'
+    # Reselection is still the upstream selector. It chose the same skill.
+    assert controller.active.name=='RiskBasedInvestigation'
+    controller.choose(state,3);assert calls[-1]=='termination'
+    case['evidence_version']=2;controller.choose(state,4);assert calls[-1]=='selector'
+
+
+def test_opportunity_denominators_require_recorded_host_access_and_link_own_completion():
+    from research.attribution import response_opportunity_audit
+    case={'host':'h1','observed_level':1,'flagged_pids':['7'],'response_due':True,
+          'evidence_version':1,'evidence_age':0}
+    row={'policy':'llm','agent':'blue_agent_4','seed':1,'episode_id':0,
+         'policy_invoked':True,'request_applied':True,'requested_action':'Sleep',
+         'behavior_context':{'open_cases':[case]},'assigned_hosts':['h1'],'step':0}
+    busy={**row,'step':1,'policy_invoked':False,'request_applied':False}
+    request={**row,'step':2,'skill_id':'RapidProcessResponse','requested_action':'Remove h1'}
+    completion={**busy,'step':3,'behavior_outcome':{'completed_action':{
+        'name':'Remove','target':'h1','started_at':2,'completed_at':4,'status':'TRUE'}}}
+    unsupported={**row,'step':4,'assigned_hosts':['h2']}
+    report=response_opportunity_audit([row,busy,request,completion,unsupported]);counts=report['counts']
+    assert counts['open_case_free_decisions']==3 and counts['urgent_free_opportunities']==2
+    assert counts['addressable_case_requests']==counts['linked_completed_calls']==1
+    assert report['median_first_request_delay_free_decisions']==1
+    assert report['observable_resolution_rate'] is None

@@ -7,10 +7,10 @@ import yaml
 from CybORG.Simulator.Actions import Sleep, Remove, Restore, DeployDecoy, Analyse
 from CybORG.Simulator.Actions.ConcreteActions.ControlTraffic import BlockTrafficZone, AllowTrafficZone
 from CybORG.Agents.LLMAgents.llm_adapter import obs_formatter
+from CybORG.Agents.LLMAgents.llm_adapter.utils.constants import CAGE4_SUBNETS
 from CybORG.Agents.LLMAgents.llm_adapter.utils.logger import Logger
 
 from . import RUNTIME
-from .communication import AGENT_SUBNETS
 
 Logger.set_debug_mode(False)
 
@@ -48,7 +48,7 @@ def parse_response(response, agent, allowed_hosts, allowed_subnets):
             if subnet not in allowed_subnets:
                 raise ValueError(f"Unknown subnet: {subnet}")
             # Match the published policy: HQ traffic actions originate at public access.
-            origin = AGENT_SUBNETS[int(agent[-1])][0]
+            origin = CAGE4_SUBNETS[int(agent[-1])]
             return ZONE_ACTIONS[name](session=0, agent=agent, from_subnet=origin,
                                      to_subnet=subnet), value["reason"], None
         raise ValueError("Unsupported action or parameter")

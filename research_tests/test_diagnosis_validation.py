@@ -417,6 +417,15 @@ def test_fact_id_intervention_retains_procedure_as_hypothesis_and_rejects_wrong_
         assert not json.loads(b('original chunk'))['is_related']
 
 
+def test_traffic_scope_rejects_zone_wide_claims_and_arbitrary_source():
+    from research.diagnosis import traffic_scope_contradictions
+
+    assert traffic_scope_contradictions("BlockTrafficZone to isolate the entire zone.")
+    assert traffic_scope_contradictions("Set from_subnet=office_network_subnet and AllowTrafficZone.")
+    assert not traffic_scope_contradictions("BlockTrafficZone from the fixed source to the destination only.")
+    assert not traffic_scope_contradictions("Do not use BlockTrafficZone to isolate an entire subnet.")
+
+
 def test_stale_pid_cannot_be_claimed_fresh_and_completion_stays_host_bound():
     data,rows=evidence('Analyse','TRUE');rows[0]['observation_before']={'h1':{'Processes':[{'PID':77}]}}
     rows[0]['observation_after']={'h1':{'Processes':[{'PID':77}]}}

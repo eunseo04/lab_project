@@ -7,11 +7,11 @@ import sys
 from zoneinfo import ZoneInfo
 
 from . import ROOT
-from .config import load_config, validate, TEAMS, REDS
+from .config import load_config, validate, TEAMS, REDS, COMMUNICATION_ENCODERS
 
 
 def overrides(config, args):
-    for name in ("episodes", "steps", "seed", "team", "red", "threads", "weights", "communication", "horizon"):
+    for name in ("episodes", "steps", "seed", "team", "red", "threads", "weights", "communication", "communication_encoder", "horizon"):
         if getattr(args, name, None) is not None:
             config[name] = getattr(args, name)
     return validate(config)
@@ -30,6 +30,7 @@ def main():
         p.add_argument("--threads", type=int)
         p.add_argument("--weights")
         p.add_argument("--communication", choices=("keep", "paper"))
+        p.add_argument("--communication-encoder", choices=COMMUNICATION_ENCODERS)
         p.add_argument("--horizon", choices=("native", "fixed"))
         p.add_argument("--red", choices=REDS)
         if command != "train":

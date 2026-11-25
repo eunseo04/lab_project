@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from statistics import mean, stdev
 import numpy as np
+from acd.config import LEGACY_ENCODER
 from .config import ARMS, REDS
 from .adapter import ACTIONS
 from .metrics import aggregate_episodes
@@ -55,9 +56,10 @@ def report(directory, reasoning=False):
     controls = []
     for s in summaries:
         c = s["config"]
+        encoder=c.get('communication_encoder',LEGACY_ENCODER)
         if c["composition"] in ("no_blue", "all_rl"):
             m=aggregate_episodes(s["episodes"])
-            controls.append([c["composition"],c["red"],c["steps"],c["scoring"],c["communication"],m["n"],
+            controls.append([c["composition"],c["red"],c["steps"],c["scoring"],c["communication"],encoder,m["n"],
                 number(m["mean_joint_reward"]),number(m["reward_std"]),number(m["execution_time_s"])])
         if c["composition"] not in ("hybrid", "all_llm"): continue
         if c["arm"] in ("E2","E3") and not c["evolution"].get("enabled",True): continue
@@ -66,10 +68,11 @@ def report(directory, reasoning=False):
         key = (c["composition"], c["profile"], c["scoring"], c["communication"], c["steps"],
                model["model"], model["revision"], model.get("temperature", 1), model.get("max_tokens", 192), c["evolution"]["gate_mode"],
                c["evolution"].get("maintenance_mode", "official_code"), c["skip_busy_policy"],
-               c["selector"]["epsilon"], c["selector"]["max_skill_age"])
+               c["selector"]["epsilon"], c["selector"]["max_skill_age"],encoder,c.get('action_contract','legacy'),
+               c['selector'].get('contract','upstream'),c['selector'].get('urgent_preemption',False))
         groups[key].append(s)
     diagnostics = {"excluded_mock_summaries": rejected_mock, "groups": [], "unexecuted_cells": "N/A"}
-    render_table(destination/"control_baselines", ["Composition","Red","Nominal steps","Scoring","Communication","N","Mean Reward","Sample Std","Seconds"], controls)
+    render_table(destination/"control_baselines", ["Composition","Red","Nominal steps","Scoring","Communication","Encoder","N","Mean Reward","Sample Std","Seconds"], controls)
     # Architecture is a description of actual implemented modules, not performance data.
     fig, ax = plt.subplots(figsize=(13, 5)); ax.axis("off")
     boxes = [("Blue observation\nCAGE4 observable state",.12,.73),
@@ -256,6 +259,8 @@ def training_figures(histories,destination):
     for s in histories:
         c=s["config"];e=c["evolution"]
         scope={k:c[k] for k in ("composition","red","steps","profile","scoring","communication","skip_busy_policy","selector")}
+        scope["communication_encoder"]=c.get("communication_encoder",LEGACY_ENCODER)
+        scope["action_contract"]=c.get("action_contract","legacy")
         scope["model"]={k:c["model"].get(k) for k in ("model","revision","temperature","max_tokens")}
         scope["algorithm"]={k:e.get(k,True) for k in ("enabled","semantic_gradient","ppo_gate","score_maintenance")}
         scope["algorithm"].update(gate_mode=e["gate_mode"],maintenance_mode=e.get("maintenance_mode","official_code"))

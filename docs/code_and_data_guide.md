@@ -216,7 +216,7 @@ ASV/SSV는 `research.config.variant_config()`에서 기존 설정의 명시적 o
 
 `run_campaign.py --fixed-update-from`은 이전 완료 B2 전체 update를 고정한다. `--diagnosis-probes-only`는 그 과거 훈련의 원래 SG chunk로 Qwen 진단만 측정하며 새 training/최종 CAGE4 성능이 아니다. JSON 형식·관찰 사실·proposal 연결·후보 생성·PPO·실제 채택을 분리하며 미실행 단계는 N/A다. 과거 SQLite는 read-only로 읽고 입력 해시를 전후 대조한다. `--prior-gpu-hours`보다 실제 연결 ledger가 더 많이 사용됐으면 더 작은 잔여 한도를 쓴다. screen 보류, 보상 거부, 승인 및 완료 unchanged loop를 서로 다르게 센다.
 
-보고기는 내부 E0/E1/E2/E3, base_comparison_id, 정확한 optimizer 완료 상태와 hash-matched checkpoint·history·동결 Pool을 검사한다. 완료한 원본 B2를 학습된 B4-ASV-SSV로 이름만 바꿀 수 없다. 여러 training run은 comparison_run_id/train lineage와 seed로 구분한다. B0/B1의 training repetition은 해당 없음이고 missing provenance는 미상이다. source/model 조건이 다른 결과는 합치지 않는다. 작은 summary의 산술 재계산은 raw trajectory·optimizer 재현과 다르다.
+보고기는 내부 E0/E1/E2/E3, base_comparison_id, 정확한 optimizer 완료 상태와 hash-matched checkpoint·history·동결 Pool을 검사한다. 여러 training run은 comparison_run_id/train lineage와 seed로 구분한다. B0/B1의 training repetition은 해당 없음이고 missing provenance는 미상이다. source/model/encoder별로 결과를 집계한다. 후보 검증 진행률은 실제 완료한 유한 보상 쌍으로 계산한다. 작은 summary의 산술 재계산은 raw trajectory·optimizer 재현과 다르다.
 
 후속 typed schema v9의 canonical_operations는 requested_decision과 completed_or_pending_operation을 분리하고 각각 대상별 as_of/Restore epoch를 제공한다. candidate-proposal-links-v2는 변경 요소의 정확한 텍스트·proposal/fact ID 연결만 검사하며 자연어 의미와 보상 효과를 증명하지 않는다. 새 factual_ppo B3는 사실·연결·알려진 모순 검사를 통과한 양수 PPO 후보를 효과 미검증 상태로 채택할 수 있다. B4는 실제 20쌍 rollout 승인을 유지한다. ASV는 경험 지원 부족/미분류를 구분하며 변경 자체를 일괄 veto하지 않는다. SSV-only는 capacity 정리 후 전체 최종 Pool을 다시 검사하며 SSV를 체류·termination·보상 검증이라고 부르지 않는다.
 
@@ -229,3 +229,7 @@ v2 bundle은 output 밖의 historical checkpoint/journal/두 훈련 trace/초기
 B1-selector-contract/B3-selector-contract는 같은 selector 역할 지침을 쓰는 정적/최적화 대조군이며 강제 controller가 아니다. 기본 군과 E3를 바꾸지 않는다. upstream의 성숙 Skill 필터는 감사만 추가하고 그대로 둔다. optimizer_progress.json의 candidate_stages는 grounded/candidates_generated/scored/ppo_passed/rollout/committed_changed/used_next_batch/frozen_evaluated를 분리하며 미확인은 null이다. CPU 통합 검사에서 채택·frozen reload·다음 actor의 Skill 주입을 확인하는 것과 실제 두 번째 training update의 완료는 다르다.
 
 후속 검증은 같은 기존 report에 추가했다. offline_validation_followup.xml은 최종 CPU 329개, diagnosis_evaluation.json의 followup은 같은 원문 SG 12건 재검사·채택 계약·source hash, probe_analysis.json의 followup_frozen_pilot은 정적 실제 paired 결과다. 기존 SG-only raw 파일과 원래 source archive는 바꾸지 않는다. 새 selector-pilot-23071375는 2,495행 trace 두 개와 token/call 로그를 보관하며 초기 Pool은 양쪽 완전히 같다. 정적 점수 -121/-122는 N=1 development 표본이고 B3/B4 학습 후 점수가 아니다. 누적 GPU는 7.388473/8시간이다. 보고서를 재집계할 때 수동 설명을 유지하며 과거 protocol의 source와 현재 source가 다르면 검증된 이전 bundle을 보존한다.
+
+최신 원본 정렬은 같은 보고서 상단에 있다. `acd_original_v1`은 고정한 ACD `create_comm_message`를 호출해 8-bit wire를 만들고 공개 KEEP용 192-feature 관찰에 기존 projection을 적용한다. 이전 결과의 암시적 encoder는 `legacy_local_v1`이다. `policy_interface`는 encoder, 통신 형식, 행동 계약, selector 조건을 새 manifest·checkpoint·동결 Pool에 기록한다. 과거 fixed-update 재현을 새로 등록할 때는 원래 training manifest도 해시 대상에 포함한다.
+
+`explicit_zone_pair_v1` trace의 `traffic_zone_interface`와 `requested_traffic_zone_pair`는 고정 출발 구역 및 실제 요청을 기록한다. `executed_actions`와 `behavior_outcome.completed_action`에서 실행 단계와 관찰된 완료를 확인한다. `--reasoning`의 `response_opportunities`는 관찰된 case·담당 호스트·자유 결정을 기준으로 주소 지정 가능한 기회와 Skill/행동·대상 일치, 완료, 요청 지연을 집계한다. 부분 관찰 자료의 실제 단서 해결률은 N/A로 표시한다.

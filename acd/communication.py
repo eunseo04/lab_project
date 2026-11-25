@@ -1,6 +1,9 @@
-"""The paper's 8-bit wire format, based on its published CommVectorGenerator."""
+"""Pinned ACD and historical local encoders for the eight-bit wire."""
 import numpy as np
 from CybORG.Shared.Enums import TernaryEnum
+from CybORG.Shared.Observation import Observation
+from CybORG.Agents.LLMAgents.comm_vector import CommVectorGenerator
+from .config import LEGACY_ENCODER, ORIGINAL_ENCODER
 
 AGENT_SUBNETS = (
     ("restricted_zone_a_subnet",),
@@ -18,7 +21,23 @@ def subnet_owner(hostname):
     return None
 
 
-def create_message(observation, host_ip_map):
+def create_message(observation, host_ip_map, encoder=LEGACY_ENCODER):
+    if encoder == ORIGINAL_ENCODER:
+        if isinstance(observation, dict):
+            wrapped = Observation()
+            wrapped.data = observation
+            observation = wrapped
+        # The pinned function does not use its last_action argument.
+        message = np.asarray(CommVectorGenerator.create_comm_message(observation, None, host_ip_map))
+        if message.shape != (8,):
+            raise ValueError(f"Expected eight ACD message bits, got {message.shape}")
+        return message.astype(bool)
+    if encoder != LEGACY_ENCODER:
+        raise ValueError(f"Unknown communication encoder: {encoder}")
+    return _legacy_message(observation, host_ip_map)
+
+
+def _legacy_message(observation, host_ip_map):
     """Only agent-visible events enter this summary; never read red sessions/state.
 
     Bits 0..4: suspicious remote owners. Bits 5..6: max observed severity

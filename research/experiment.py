@@ -11,11 +11,13 @@ import random
 import time
 
 from acd.runner import seed_everything, load_agents
+from acd.config import LEGACY_ENCODER
 from CybORG.Simulator.Actions import Sleep
-from .adapter import (BLUE_AGENTS, DefensePolicy, make_state, make_environment,
-                      executed_actions, plain)
+from .adapter import (BLUE_AGENTS, CAGE4_SUBNETS, DefensePolicy, make_state, make_environment,
+                      executed_actions, plain, traffic_zone_pair)
 from .client import ModelClient, TextModel
-from .config import digest, compatible_digest, split_seeds
+from .config import (digest, compatible_digest, split_seeds, execution_config,
+                     policy_interface, check_pool_interface, ZONE_PAIR_CONTRACT)
 from .metrics import JointRewardLedger, aggregate_episodes
 from .skills import SecuritySkillPool
 from .upstream import configure_encoder, Experience
@@ -44,6 +46,7 @@ def experiences_from_rows(rows, config, total, steps):
 def recover_episode(result, config, client, text_model, directory):
     expected = "mock_test" if getattr(client,"is_mock",False) else "real_cage4"
     if result.get("kind") != expected: raise ValueError("Cannot mix mock and real training records")
+    check_pool_interface(result, config)
     rows=[json.loads(line) for line in Path(result["trace"]).open()]
     if result.get('trace_sha256') and hashlib.sha256(Path(result['trace']).read_bytes()).hexdigest()!=result['trace_sha256']:
         raise ValueError('Completed training trace hash changed')
@@ -69,7 +72,7 @@ def run_episode(config, seed, episode_id, client, pool, text_model, directory):
     episode_task=None
     if journal:
         role=getattr(client,'base_context',{}).get('env_stage',config.get('evaluation_role','collection'))
-        episode_task='episode:'+progress_digest([str(directory.resolve()),seed,episode_id,
+        episode_task='episode:'+progress_digest([str(directory.resolve()),seed,episode_id,policy_interface(config),
             pool.snapshot() if pool else None,getattr(client,'identity',None)])
         journal.start(episode_task,role,{'seed':seed,'episode_id':episode_id,
             'arm':config.get('comparison_id',config['arm']),'source':'run_episode','directory':str(directory.resolve())},
@@ -85,7 +88,7 @@ def run_episode(config, seed, episode_id, client, pool, text_model, directory):
     role_map = policy_roles(config["composition"])
     old_config = {**config, "team": "mixed" if config["composition"] == "hybrid" else
         ("all_rl" if config["composition"] == "all_rl" else "all_llm"),
-        "communication": "keep", "deterministic_rl": False}
+        "communication": "keep", "communication_encoder": LEGACY_ENCODER, "deterministic_rl": False}
     rl_agents, weights = load_agents(old_config, 192)
     policies = {a: DefensePolicy(a, client, text_model, config, pool if config["arm"] != "E0" else None)
                 for a, role in role_map.items() if role == "llm"}
@@ -140,7 +143,7 @@ def run_episode(config, seed, episode_id, client, pool, text_model, directory):
             for agent, role in role_map.items():
                 action = env.action_translator(agent, actions[agent])
                 chosen = str(action) if actions[agent] is not None else None
-                actual = executed_actions(env, agent)
+                actual = executed_actions(env, agent, config['action_contract']==ZONE_PAIR_CONTRACT)
                 if chosen is not None: requested[type(action).__name__] += 1
                 for item in actual: executed[item["name"]] += 1
                 automatic["Monitor"] += 1
@@ -155,6 +158,10 @@ def run_episode(config, seed, episode_id, client, pool, text_model, directory):
                     "joint_reward": joint, "score_included": included, "terminal": terminal,
                     "skill_terminated": False, "automatic_monitor": True,
                     "evidence_hash": hashlib.sha256(json.dumps(evidence, sort_keys=True).encode()).hexdigest(), **details[agent]}
+                if config['action_contract']==ZONE_PAIR_CONTRACT:
+                    row['traffic_zone_interface']={'fixed_from_subnet':CAGE4_SUBNETS[int(agent[-1])],
+                        'destination_parameter':'subnet:', 'scope':'single_directed_pair'}
+                    row['requested_traffic_zone_pair']=traffic_zone_pair(action)
                 if role=="llm":policies[agent].observe_transition(row)
                 rows.append(row); previous_rows[agent].append(row)
                 if role == "llm" and policies[agent].controller:
@@ -184,6 +191,7 @@ def run_episode(config, seed, episode_id, client, pool, text_model, directory):
     progress.unlink()
     experiences = experiences_from_rows(rows,config,ledger.total,len(step_rewards))
     result = {"status": "completed", "episode_id": episode_id, "seed": seed,
+        "communication_encoder":config['communication_encoder'], "policy_interface":policy_interface(config),
         "steps_requested": config["steps"], "joint_transitions": len(step_rewards), "scored_transitions": len(ledger.rewards),
         "joint_return": ledger.total, "raw_joint_return": sum(ledger.raw_rewards), "execution_time_s": time.perf_counter()-started,
         "raw_joint_rewards": ledger.raw_rewards, "scored_step_rewards": step_rewards,
@@ -252,7 +260,8 @@ def prepare_batch(config,pending_results,pending_experiences,pool,baselines):
 
 
 def run(config, stage="eval", output=None, resume=False, limit=None, client=None):
-    if stage not in ("train","eval"): raise ValueError("Stage must be train or eval")
+    config = execution_config(config, stage)
+    interface = policy_interface(config)
     if stage=='eval' and config.get('evaluation_disabled'):raise ValueError('No evaluation seeds registered for this probe-only plan')
     if stage == "train" and (config["arm"] not in ("E2","E3") or config["composition"] not in ("hybrid","all_llm")):
         raise ValueError("Skill learning requires E2/E3 with hybrid/all_llm defenders")
@@ -268,6 +277,7 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
         if identity_path.exists():
             previous = json.loads(identity_path.read_text())
             if not resume: raise FileExistsError(f"Existing experiment {output}; use --resume")
+            if previous['stage']!=stage:raise ValueError('Cannot resume with a different execution stage')
             if previous["config_digest"] != fingerprint and compatible_digest(previous["config"]) != compatible_digest(config):
                 raise ValueError("Resume config does not match this experiment")
             recorded = previous.get("implementation_sha256", {})
@@ -276,6 +286,7 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
                 raise ValueError("Implementation changed; use a new experiment directory: " + ", ".join(changed))
         else:
             atomic_json(identity_path, {"config": config, "config_digest": fingerprint, "stage": stage,
+                "policy_interface":interface,
                 "training_run_id":hashlib.sha256((str(output.resolve())+':'+str(time.time_ns())).encode()).hexdigest() if stage=='train' else None,
                 "comparison_run_id":config.get('comparison_run_id',config.get('experiment_id',str(output.parent.resolve()))),
                 "sources": json.loads((ROOT/"research_sources.lock.json").read_text()),
@@ -298,8 +309,8 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
         if client is not None: configure_encoder(client.embed)
         text_model = TextModel(client)
         pool = SecuritySkillPool(config["pool_size"],seed_set=config["skill_seed_set"]) if config["arm"] != "E0" and needs_llm else None
-        evolution = Evolution(text_model, config["evolution"]) if pool and config["arm"] in ("E2", "E3") else None
-        if evolution and stage=="train" and config["evolution"].get("rollout_verification",False):
+        evolution = Evolution(text_model, config["evolution"]) if pool and stage=='train' else None
+        if evolution and config["evolution"].get("rollout_verification",False):
             from .rollout_execution import EnvironmentVerifier
             evolution.rollout_validator=EnvironmentVerifier(config,output,client.identity)
         checkpoint_path = output/"checkpoint.json"
@@ -312,37 +323,47 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
         if stage == "train" and config.get("pool") and checkpoint is None:
             initial_path = Path(config["pool"])
             inherited = json.loads(initial_path.read_text())
-            if inherited.get("stage") != "train" or inherited.get("pending_experiences"):
+            if inherited.get("stage") != "train" or inherited.get("pending_experiences") or inherited.get('validation_only'):
                 raise ValueError("Warm-start requires a committed training snapshot")
-            if any(inherited["model_identity"].get(k) != client.identity.get(k) for k in ("model","revision")):
+            static_initial=check_pool_interface(inherited,config,static_initial=True)
+            if not static_initial and any(inherited["model_identity"].get(k) != client.identity.get(k) for k in ("model","revision")):
                 raise ValueError("Warm-start policy model differs")
             inherited_seeds = inherited.get("training_seeds", [])
             if set(inherited_seeds) & set(split_seeds(config,'final_test')):
                 raise ValueError("Warm-start training/evaluation seeds overlap")
-            if set(inherited_seeds) & set(split_seeds(config,'validation')):
+            reserved_validation = set(split_seeds(config,'validation')) | set(config.get('rollout_validation',{}).get('seeds',[]))
+            if set(inherited_seeds) & reserved_validation:
                 raise ValueError("Warm-start training/validation seeds overlap")
             inherited_episodes = inherited.get("total_training_episodes",inherited["episodes_completed"])
-            lineage_id=inherited.get('training_lineage_id') or inherited.get('training_run_id') or 'historical:'+hashlib.sha256(initial_path.read_bytes()).hexdigest()
+            if not static_initial:
+                lineage_id=inherited.get('training_lineage_id') or inherited.get('training_run_id') or 'historical:'+hashlib.sha256(initial_path.read_bytes()).hexdigest()
             pool.restore(inherited["pool"])
             if evolution: evolution.restore(inherited.get("experience",{}))
             training_provenance = {"path":str(initial_path.resolve()),
                 "sha256":hashlib.sha256(initial_path.read_bytes()).hexdigest(),"total_training_episodes":inherited_episodes,
+                'communication_encoder':inherited.get('communication_encoder',LEGACY_ENCODER) if not static_initial else None,
                 'initial_pool_sha256':inherited.get('initial_pool_sha256'),
                 'segment_initial_pool_sha256':hashlib.sha256(json.dumps(inherited['pool'],sort_keys=True).encode()).hexdigest()}
             atomic_json(output/"initial_pool.json",{"pool":pool.snapshot(),"training_provenance":training_provenance})
         if checkpoint and checkpoint.get("pool") is not None:
+            check_pool_interface(checkpoint, config)
             pool.restore(checkpoint["pool"])
             if evolution: evolution.restore(checkpoint.get("experience", {}))
         elif stage == "eval" and (output/"frozen_pool.json").is_file() and pool:
-            pool.restore(json.loads((output/"frozen_pool.json").read_text())["pool"])
+            frozen=json.loads((output/"frozen_pool.json").read_text())
+            check_pool_interface(frozen,config)
+            pool.restore(frozen["pool"])
         elif stage == "eval" and (config["arm"] in ("E2", "E3") or config["arm"] == "E1" and config.get("pool")):
             pool_path = Path(config.get("pool") or output.parent/"train/checkpoint.json")
             if not pool_path.is_file(): raise FileNotFoundError(f"Train this arm first or specify --pool: {pool_path}")
             trained = json.loads(pool_path.read_text())
             if trained.get("stage") != "train": raise ValueError("Evaluation requires a training snapshot")
+            if trained.get('validation_only') and config.get('evaluation_role')!='rollout':
+                raise ValueError('Candidate validation snapshots are restricted to rollout evaluation')
             if trained.get("pending_experiences"):
                 raise ValueError("Training has an uncommitted evolution batch; resume training before frozen evaluation")
-            if any(trained["model_identity"].get(k) != client.identity.get(k) for k in ("model","revision")):
+            static_initial=check_pool_interface(trained,config,static_initial=True)
+            if not static_initial and any(trained["model_identity"].get(k) != client.identity.get(k) for k in ("model","revision")):
                 raise ValueError("Skill pool was trained with another policy model")
             if set(trained.get("training_seeds", [])) & set(split_seeds(config,'final_test')):
                 raise ValueError("Training/evaluation seeds overlap with the loaded pool")
@@ -353,6 +374,8 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
                 "total_training_episodes": trained.get("total_training_episodes",trained["episodes_completed"]),
                 "training_seeds": trained.get("training_seeds", []), "algorithm": trained.get("algorithm"),
                 "optimizer_status":trained.get('optimizer_status','unknown'),
+                'communication_encoder':trained.get('communication_encoder',LEGACY_ENCODER) if not static_initial else None,
+                'policy_interface':trained.get('policy_interface'),
                 "pool_changed":trained.get('pool_changed'),
                 'training_run_id':trained.get('training_run_id'),
                 'training_lineage_id':trained.get('training_lineage_id'),
@@ -367,6 +390,7 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
             raise ValueError("Stored skill seed set differs from the declared experiment")
         if stage == "eval" and pool and not (output/"frozen_pool.json").exists():
             atomic_json(output/"frozen_pool.json", {"pool": pool.snapshot(), "model_identity": client.identity,
+                "communication_encoder":config['communication_encoder'], "policy_interface":interface,
                 "training_provenance": training_provenance})
         if stage == "eval" and pool:
             training_provenance = json.loads((output/"frozen_pool.json").read_text()).get("training_provenance")
@@ -391,6 +415,7 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
             if result_path.is_file() and (stage == "eval" or episode < committed):
                 result = json.loads(result_path.read_text())
                 if result.get("status") == "completed":
+                    check_pool_interface(result, config)
                     completed.append(result)
                     continue
             if limit is not None and counter >= limit: break
@@ -492,6 +517,7 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
                     "model_identity": client.identity if client else None, "baselines": baselines,
                     "experience": evolution.snapshot() if evolution else {}, "history": history,
                     "config_digest": fingerprint, "algorithm": config["evolution"],
+                    "communication_encoder":config['communication_encoder'], "policy_interface":interface,
                     'controller_contract':config.get('selector',{}).get('contract','upstream'),
                     'optimizer_status':ev.get('optimizer_status','completed_unchanged'),
                     'initial_pool_sha256':initial_pool_hash,
@@ -520,6 +546,7 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
                     "experience":evolution.snapshot() if evolution else {}, "history":history,
                     "pending_experiences":[e.__dict__ for e in pending_experiences],
                     "pending_results":pending_results, "algorithm":config["evolution"],
+                    "communication_encoder":config['communication_encoder'], "policy_interface":interface,
                     'controller_contract':config.get('selector',{}).get('contract','upstream'),
                     "initial_pool_sha256":initial_pool_hash})
             atomic_json(output/"summary.json", {"status": "partial", "stage": stage, "config": config,

@@ -244,3 +244,119 @@ def response_timeline(rows,families=None,allowed_actions=None):
         'CONTINUE_count':termination.get('CONTINUE',0) if termination_logged else None,
         'selector':dict(selector),'guidance_diagnostics':dict(guidance),
         'guidance_is_not_an_action_mask':True,'causal_effect_estimated':False}
+
+
+def response_opportunity_audit(rows, families=None):
+    """Use the recorded actor interface to count addressable defensive opportunities."""
+    from bisect import bisect_left
+    from statistics import median
+    import json
+    import re
+    from .behavior import case_response_options, chosen_action
+
+    families=families or {}
+    groups=defaultdict(list)
+    for row in rows:
+        if row.get('policy')=='llm':
+            groups[(row.get('seed'),row.get('episode_id'),row['agent'])].append(row)
+    counts=Counter()
+    cases=[]
+    for (seed,episode,agent),trace in groups.items():
+        trace.sort(key=lambda row:row['step'])
+        completed={}
+        for row in trace:
+            op=(row.get('behavior_outcome') or {}).get('completed_action')
+            if op and op.get('status') in ('TRUE','FALSE') and op.get('completed_at') is not None:
+                completed[(op['started_at'],op['name'],op['target'])]=op
+        free_steps=[row['step'] for row in trace if row.get('policy_invoked') and row.get('request_applied')]
+        opportunities={}
+        for row in trace:
+            if not row.get('policy_invoked') or not row.get('request_applied'):
+                counts['busy_or_not_invoked_ticks']+=1
+                continue
+            counts['free_decisions']+=1
+            context=row.get('behavior_context')
+            if not isinstance(context,dict) or 'open_cases' not in context:
+                counts['case_context_missing']+=1
+                continue
+            if not context['open_cases']:
+                continue
+            counts['open_case_free_decisions']+=1
+            if not row.get('parse_error') and chosen_action(row)[0]=='Sleep':
+                counts['open_case_free_sleep']+=1
+            hosts=row.get('assigned_hosts')
+            if hosts is None:
+                recorded=re.search(r'^Assigned host IDs: (\[[^\n]*\])$',row.get('user_prompt') or '',re.M)
+                if recorded:
+                    try:hosts=json.loads(recorded[1])
+                    except json.JSONDecodeError:pass
+            if not isinstance(hosts,list):
+                counts['open_case_host_interface_unrecorded']+=1
+                continue
+            options=case_response_options(context,hosts)
+            if not options:
+                continue
+            counts['addressable_case_free_opportunities']+=1
+            top=max(option['priority'] for option in options)
+            preferred=[option for option in options if option['priority']==top]
+            urgent=top>=2
+            counts['urgent_free_opportunities']+=urgent
+            counts['admin_evidence_free_opportunities']+=top==3
+            name=row.get('skill_id')
+            family=families.get(name,re.sub(r'_v\d+$','',name or 'NONE'))
+            aligned=[option for option in preferred if option['family']==family]
+            counts['aligned_skill_free_opportunities']+=bool(aligned)
+            counts['urgent_aligned_skill_free_opportunities']+=urgent and bool(aligned)
+            controller=row.get('skill_controller')
+            if urgent and name and not aligned:
+                if isinstance(controller,dict) and 'selection_audit' in controller:
+                    counts['urgent_different_family_held']+=controller['selection_audit'] is None
+                else:
+                    counts['urgent_selection_history_missing']+=1
+            action,target=chosen_action(row) if not row.get('parse_error') else (None,None)
+            counts['urgent_free_sleep']+=urgent and action=='Sleep'
+            if aligned:
+                matched=any((o['action'],o['host'])==(action,target) for o in aligned)
+                counts['aligned_primitive_target_requests']+=matched
+                counts['urgent_aligned_primitive_target_requests']+=urgent and matched
+            for option in options:
+                key=(option['host'],option['restore_epoch'],option['evidence_version'],option['action'])
+                step=row['step']
+                age=option['evidence_age']
+                visible_at=step-age if type(age) is int and 0<=age<=step else None
+                captured=opportunities.setdefault(key,{**option,'seed':seed,'episode_id':episode,'agent':agent,
+                    'first_cue_step':visible_at,'first_addressable_step':step,'requests':[]})
+                if (option['action'],option['host'])!=(action,target):
+                    continue
+                counts['addressable_case_requests']+=1
+                if urgent and option in preferred:counts['urgent_priority_requests']+=1
+                op=completed.get((step,action,target))
+                counts['linked_completed_calls']+=op is not None
+                if op:counts['completed_'+op['status']]+=1
+                captured['requests'].append({'step':step,'active_skill':name,'selected_family':family,
+                    'selection_audit_recorded':isinstance(controller,dict) and controller.get('selection_audit') is not None,
+                    'termination_events':(controller or {}).get('events',[]),
+                    'execution_observed_at_request':any(a.get('name')==action and a.get('target')==target for a in row.get('executed_actions',[])),
+                    'completion':op})
+        for case in opportunities.values():
+            first=case['requests'][0]['step'] if case['requests'] else None
+            cue=case['first_cue_step']
+            case['right_censored_at_episode_end']=first is None
+            case['first_request_delay_ticks']=first-cue if first is not None and cue is not None else None
+            case['first_request_delay_free_decisions']=bisect_left(free_steps,first)-bisect_left(free_steps,cue) if first is not None and cue is not None else None
+            cases.append(case)
+    delays=[case['first_request_delay_free_decisions'] for case in cases if case['first_request_delay_free_decisions'] is not None]
+    required=('open_case_free_decisions','addressable_case_free_opportunities','urgent_free_opportunities',
+              'admin_evidence_free_opportunities','urgent_aligned_skill_free_opportunities','urgent_different_family_held',
+              'aligned_skill_free_opportunities','aligned_primitive_target_requests','urgent_priority_requests',
+              'urgent_aligned_primitive_target_requests',
+              'addressable_case_requests','linked_completed_calls','completed_TRUE','completed_FALSE','urgent_free_sleep')
+    for key in required:counts.setdefault(key,0)
+    return {'scope':'Free decision ticks with a recorded case and parser-addressable host. Simulator execution is counted separately.',
+        'counts':dict(counts),'cases':cases,'matched_case_delay_count':len(delays),
+        'median_first_request_delay_free_decisions':median(delays) if delays else None,
+        'censored_case_versions':sum(case['right_censored_at_episode_end'] for case in cases),
+        'missing_completion_records':counts['addressable_case_requests']-counts['linked_completed_calls'],
+        'observable_resolution_rate':None,
+        'resolution_limitation':'Partial observations and call status do not establish disappearance or resolution of the original threat.',
+        'opportunities_are_independent_samples':False}

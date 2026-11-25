@@ -2,8 +2,9 @@ import argparse
 from pathlib import Path
 import json
 import sys
+from acd.config import COMMUNICATION_ENCODERS
 from . import ROOT
-from .config import load, validate, ARMS, REDS, VERIFICATION_VARIANTS, CONTROLLER_VARIANTS, variant_config
+from .config import load, validate, execution_config, ARMS, REDS, VERIFICATION_VARIANTS, CONTROLLER_VARIANTS, variant_config
 
 
 def resource_args(config,args):
@@ -33,6 +34,7 @@ def main():
         s.add_argument("--iterations", type=int)
         s.add_argument("--steps", type=int)
         s.add_argument("--pool")
+        s.add_argument("--communication-encoder", choices=COMMUNICATION_ENCODERS)
         s.add_argument("--endpoint", help="Explicit local policy server; model identity must still match")
         s.add_argument('--scoring-endpoints',nargs='+')
         s.add_argument('--generation-endpoints',nargs='+')
@@ -53,10 +55,10 @@ def main():
     args = p.parse_args()
     if args.command in ("train", "evaluate", "compare", "official"):
         c = variant_config(args.variant) if args.variant else load(args.config)
-        for key in ("arm", "red", "composition", "episodes", "train_episodes", "iterations", "steps", "pool"):
+        for key in ("arm", "red", "composition", "episodes", "train_episodes", "iterations", "steps", "pool", "communication_encoder"):
             if getattr(args, key, None) is not None: c[key] = getattr(args, key)
         resource_args(c,args)
-        c = validate(c)
+        c = validate(c) if args.command=='compare' else execution_config(c,'train' if args.command=='train' else 'eval')
         if args.command=='compare' and args.output:
             c['output']=str(Path(args.output).resolve())
         if args.command == "official":
@@ -70,7 +72,7 @@ def main():
                 for red in args.reds:
                     for variant in args.variants:
                         case=variant_config(variant)
-                        for key in ('composition','episodes','train_episodes','iterations','steps','pool'):
+                        for key in ('composition','episodes','train_episodes','iterations','steps','pool','communication_encoder'):
                             if getattr(args,key,None) is not None:case[key]=getattr(args,key)
                         resource_args(case,args)
                         case.update(red=red,output=str(base));case=validate(case)

@@ -26,7 +26,7 @@ def semantic_chunks(experience,config):
               "response", "parse_error", "policy_invoked", "request_applied")
     records = [{k: t.get(k) for k in fields} for t in experience.transitions]
     for transition,record in zip(experience.transitions,records):
-        for key in ("behavior_context","behavior_outcome"):
+        for key in ("behavior_context","behavior_outcome","traffic_zone_interface","requested_traffic_zone_pair"):
             if key in transition:record[key]=deepcopy(transition[key])
     budget = config.get("semantic_chunk_chars", 48000 if reuse else None)
     chunks, pending, chars = [], [], 0

@@ -10,6 +10,7 @@ import time
 
 import numpy as np
 import torch
+from .config import LEGACY_ENCODER
 from CybORG.Simulator.Actions import Sleep
 from CybORG.Agents.CybermonicAgents.cage4 import load
 
@@ -54,6 +55,8 @@ def load_agents(config, feature_dimension, training=False):
     manifest = json.loads(manifest_path.read_text()) if manifest_path.is_file() else None
     if manifest and manifest.get("communication") != config["communication"]:
         raise ValueError("Checkpoint communication protocol does not match the experiment")
+    if manifest and manifest.get("communication_encoder", LEGACY_ENCODER) != config.get("communication_encoder", LEGACY_ENCODER):
+        raise ValueError("Checkpoint communication encoder does not match the experiment")
     for name, role in roles(config["team"]).items():
         if role != "rl":
             continue
@@ -87,7 +90,8 @@ def evaluate(config, output=None):
             episode_seed = config["seed"] + episode
             seed_everything(episode_seed, config["threads"])
             env = make_env(seed=episode_seed, steps=config["steps"], red=config["red"],
-                           communication=config["communication"], horizon=config["horizon"])
+                           communication=config["communication"], horizon=config["horizon"],
+                           communication_encoder=config.get("communication_encoder", LEGACY_ENCODER))
             observations, _ = env.reset(seed=episode_seed)
             rl, weights_metadata = load_agents(config, env.feature_dimension)
             llm = {a: LLMDefender(a, backend, config.get("prompt"))
