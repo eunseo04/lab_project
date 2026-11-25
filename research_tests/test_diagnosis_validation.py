@@ -364,3 +364,95 @@ def test_native_cage4_observation_cases_have_positive_and_negative_paths():
     assert any(r['case']=='Remove_completed_failure' for r in result)
     assert rows and any(r['expected_safe_canonical_path'] for r in result) and any(not r['expected_safe_canonical_path'] for r in result)
     assert all(r['expected_safe_canonical_path']==r['actual_safe_canonical_path'] and r['raw_prose_quarantined'] for r in result)
+
+
+@pytest.mark.parametrize('action,status,body,finding,extra',[
+    ('Sleep','UNKNOWN',{'Processes':[{'PID':77}]},'observed_pid',{'pid':77}),
+    ('Analyse h2','TRUE',{'Files':[{'File Name':'escalate.sh'}]},'observed_admin_indicator',{'indicator':'escalate.sh'}),
+    ('Sleep','IN_PROGRESS',{'Services':{'ssh':False}},'observed_service_state',{'service':'ssh','value':False}),
+])
+def test_observation_host_is_independent_of_own_action(action,status,body,finding,extra):
+    row={'step':5,'agent':'blue_agent_4','requested_action':action,'policy_invoked':status!='IN_PROGRESS',
+        'request_applied':status!='IN_PROGRESS','action_status':status,'observation_before':{},'observation_after':{'h1':body},
+        'behavior_context':{'recent_completed_actions':[{'name':'Restore','target':'h1','status':'TRUE','completed_at':4}]}}
+    data={'diagnosis_status':'supported','semantic_gradient':{'policy':'Review visible evidence'},
+        'evidence':[{'component':'policy','evidence_id':'E0','field':'observation_after'}],
+        'claims':[{'component':'policy','evidence_id':'E0','finding':finding,'observation_target':'h1',
+            'phase':'after','as_of_step':6,'restore_epoch':4,'causal_attribution':'unknown',**extra}]}
+    assert audit(data,[row])['passed']
+    data['claims'][0]['observation_target']='h3'
+    assert not audit(data,[row])['passed']
+    data['claims'][0]['observation_target']='h1';data['claims'][0]['restore_epoch']=-1
+    assert 'restore_epoch_mismatch' in audit(data,[row])['errors']
+
+
+def fact_intervention_fixture():
+    from research.diagnosis import canonical_fact_catalog
+    rows=[{'step':2,'agent':'blue_agent_4','requested_action':'Sleep','policy_invoked':True,
+        'request_applied':True,'action_status':'UNKNOWN','observation_after':{'h1':{'Processes':[{'PID':77}]}}}]
+    fact=next(f for f in canonical_fact_catalog(rows) if f['finding']=='observed_pid')
+    hypothesis={'supported_fact_ids':[fact['fact_id']],'component_to_change':'policy',
+        'observed_problem':'A flagged process may need a response rather than repeated analysis.',
+        'preconditions':'A flagged user process is visible and the defender is free.',
+        'proposed_procedure':'Remove on the runtime bound host and inspect the completed call.',
+        'success_observation':'Inspect the next observation for the previously flagged process.',
+        'termination':'Stop after the outcome is reviewed or new evidence requires reassessment.',
+        'failure_or_retry_rule':'If the call fails, investigate new evidence before one justified retry.',
+        'target_binding':'observed_host','causal_status':'untested_hypothesis'}
+    return rows,{'is_related':True,'reward_attribution':'unknown','interventions':[hypothesis]}
+
+
+def test_fact_id_intervention_retains_procedure_as_hypothesis_and_rejects_wrong_ids():
+    rows,data=fact_intervention_fixture();captured=[]
+    def model(prompt):captured.append(prompt);return json.dumps(data)
+    boundary=EvidenceModel(model,rows,True,schema='fact_interventions_v1');result=json.loads(boundary('original chunk'))
+    check=boundary.audits[-1]['structured_proposals']
+    assert result['is_related'] and check['facts_verified'] and not check['efficacy_verified']
+    assert check['proposals'][0]['proposed_procedure']==data['interventions'][0]['proposed_procedure']
+    assert check['facts'][0]['observation_target']=='h1' and 'Exact fact catalogue' in captured[0]
+    for mutation in ({'supported_fact_ids':['Fdoes_not_exist']},{'target':'invented'},{'causal_status':'proven'},
+                     {'proposed_procedure':'Remove h1'},{'supported_fact_ids':[]}):
+        broken=deepcopy(data);broken['interventions'][0].update(mutation)
+        b=EvidenceModel(lambda _:json.dumps(broken),rows,True,schema='fact_interventions_v1')
+        assert not json.loads(b('original chunk'))['is_related']
+
+
+def test_stale_pid_cannot_be_claimed_fresh_and_completion_stays_host_bound():
+    data,rows=evidence('Analyse','TRUE');rows[0]['observation_before']={'h1':{'Processes':[{'PID':77}]}}
+    rows[0]['observation_after']={'h1':{'Processes':[{'PID':77}]}}
+    data['evidence'][0]['field']='observation_after'
+    data['claims'][0].update(finding='observed_pid',pid=77,fresh=True)
+    assert 'pid_not_fresh' in audit(data,rows)['errors']
+    data['claims'][0].update(finding='completed_success',target='h2');data['claims'][0].pop('pid')
+    assert 'target_mismatch' in audit(data,rows)['errors']
+
+
+def test_observation_only_proposal_passes_the_whole_legacy_boundary_without_an_action():
+    row={'step':5,'agent':'blue_agent_4','requested_action':'Sleep','policy_invoked':True,
+        'request_applied':True,'action_status':'UNKNOWN','observation_after':{'h1':{'Processes':[{'PID':77}]}}}
+    data={'is_related':True,'diagnosis_status':'supported','semantic_gradient':{'policy':'Review the visible clue.'},
+        'evidence':[{'component':'policy','evidence_id':'E0','field':'observation_after'}],
+        'claims':[{'component':'policy','evidence_id':'E0','finding':'observed_pid','observation_target':'h1','pid':77,
+            'phase':'after','as_of_step':6,'restore_epoch':-1,'causal_attribution':'unknown'}],
+        'proposals':[{'component':'policy','evidence_ids':['E0'],'observed_action':None,'operation':'review_observed_pid',
+            'scope':'same_observed_host_and_epoch','causal_status':'untested_hypothesis'}]}
+    boundary=EvidenceModel(lambda _:json.dumps(data),[row],True);result=json.loads(boundary('original SG'))
+    assert result['is_related'] and boundary.audits[-1]['passed']
+    assert result['verified_facts'][0]['target']=='h1' and result['verified_facts'][0]['action'] is None
+    assert result['proposals'][0]['observed_actions']==[]
+
+
+def test_busy_placeholder_does_not_invent_a_pending_sleep_operation():
+    from research.diagnosis import canonical_fact_catalog
+    row={'step':5,'agent':'blue_agent_4','requested_action':'Sleep','policy_invoked':False,
+        'request_applied':False,'action_status':'IN_PROGRESS','observation_after':{'h1':{'Processes':[{'PID':77}]}}}
+    assert not any(f['finding']=='pending' for f in canonical_fact_catalog([row]))
+    data={'diagnosis_status':'supported','semantic_gradient':{'policy':'Wait for the recorded operation'},
+        'evidence':[{'component':'policy','evidence_id':'E0','field':'action_status'}],
+        'claims':[{'component':'policy','evidence_id':'E0','action':'Sleep','target':None,'finding':'pending',
+            'phase':'after','as_of_step':6,'restore_epoch':-1,'causal_attribution':'unknown'}]}
+    assert 'own_operation_not_recorded' in audit(data,[row])['errors']
+    row['behavior_context']={'pending_action':{'name':'Analyse','target':'h2','started_at':3}}
+    data['claims'][0].update(action='Analyse',target='h2')
+    assert audit(data,[row])['passed']
+    assert any(f['finding']=='pending' and f['target']=='h2' for f in canonical_fact_catalog([row]))

@@ -114,7 +114,8 @@ class Evolution(OriginalEvolution):
             audits=[]
             if self.config.get('evidence_verification',False):
                 from .semantic_evidence import EvidenceModel
-                callback=EvidenceModel(callback,visible,diagnosis_verification=self.config.get('diagnosis_verification',False))
+                callback=EvidenceModel(callback,visible,diagnosis_verification=self.config.get('diagnosis_verification',False),
+                    schema=self.config.get('evidence_schema','typed_claims_v8'))
                 audits=callback.audits
             local_evolver=OriginalEvolution(callback,threshold=self.threshold,epsilon=self.epsilon)
             with self._scope(stage='sg_chunk',chunk=index,logical_counter=reservation['counter'] if reservation else None):
@@ -429,7 +430,10 @@ class Evolution(OriginalEvolution):
                         selected = [best] if best[0] > self.config.get("acceptance_margin", 0.0) else []
                     for value, candidate, item in selected:
                         candidate.maturity = 0
-                        if (item.get('semantic_support') or {}).get('requires_rollout') and not rollout_mode:
+                        admission=self.config.get('admission_mode','legacy_rollout_veto')
+                        item['admission_mode']=admission
+                        item['efficacy_verified']=False
+                        if (item.get('semantic_support') or {}).get('requires_rollout') and not rollout_mode and admission!='factual_ppo':
                             item['ppo_accepted']=True;item['deferred']='candidate_semantics_require_real_rollout'
                             continue
                         if any(self.config.get(k,False) for k in ('action_support_verification','selection_shift_verification')):
@@ -446,6 +450,8 @@ class Evolution(OriginalEvolution):
                             item["rollout_validation"]=validation
                             if not validation.get("accepted",False):continue
                             pool.restore(validation["verified_pool"])
+                            item['efficacy_verified']=True
+                            item['efficacy_scope']='Registered paired validation only, not independent-test generalization.'
                             item["accepted"]=record["accepted"]=True
                             continue
                         parent.last_evolved_iter = iteration

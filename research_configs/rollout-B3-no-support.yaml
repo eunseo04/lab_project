@@ -49,6 +49,9 @@ evolution:
   ema_alpha: 0.1
   acceptance_margin: 0.0
   evidence_verification: true
+  evidence_schema: fact_interventions_v1
+  admission_mode: factual_ppo
+  method_version: cage4-fact-intervention-v1
   rollout_verification: false
   maximum_rollout_candidates_per_iteration: 1
   diagnosis_verification: true
@@ -62,4 +65,4 @@ diagnostics:
   reward_events: true
   skill_attribution: true
 comparison_id: B3-no-support
-experiment_version: cage4-skillpro-durable-full
+experiment_version: cage4-fact-intervention-v1

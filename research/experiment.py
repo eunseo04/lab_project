@@ -492,6 +492,7 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
                     "model_identity": client.identity if client else None, "baselines": baselines,
                     "experience": evolution.snapshot() if evolution else {}, "history": history,
                     "config_digest": fingerprint, "algorithm": config["evolution"],
+                    'controller_contract':config.get('selector',{}).get('contract','upstream'),
                     'optimizer_status':ev.get('optimizer_status','completed_unchanged'),
                     'initial_pool_sha256':initial_pool_hash,
                     'pool_changed':ev.get('pool_changed',False),
@@ -519,6 +520,7 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
                     "experience":evolution.snapshot() if evolution else {}, "history":history,
                     "pending_experiences":[e.__dict__ for e in pending_experiences],
                     "pending_results":pending_results, "algorithm":config["evolution"],
+                    'controller_contract':config.get('selector',{}).get('contract','upstream'),
                     "initial_pool_sha256":initial_pool_hash})
             atomic_json(output/"summary.json", {"status": "partial", "stage": stage, "config": config,
                 "episodes": completed, "metrics": aggregate_episodes(completed),

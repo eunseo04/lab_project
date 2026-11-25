@@ -403,3 +403,79 @@ def test_reward_diagnostics_handle_inactive_red_and_green_without_observations(t
     assert calc.calculate_reward(None,actions,obs,False,state)==0 and called[0][1] is actions
     audit.capture(0,0,True);audit.finish(0)
     assert all(r['status']=='NOT_OBSERVED' and not r['active_session'] and not r['policy_input'] for r in audit.environment_actions)
+
+
+def test_factual_ppo_change_can_commit_reload_and_reach_the_next_actor(offline,monkeypatch,tmp_path):
+    from research.adapter import DefensePolicy
+    from research.config import variant_config
+    parent,candidate,records,links=supported_candidate_fixture()
+    pool=SecuritySkillPool(24);snapshot=pool.snapshot();snapshot['skills']=[parent.__dict__];pool.restore(snapshot)
+    exp=experience();exp.skill=parent.name
+    ev=Evolution(offline,{'schedule':'paper_batch','gate_mode':'paper_rtg','maintenance_mode':'paper_algorithm1',
+        'best_of_n':1,'evidence_verification':True,'admission_mode':'factual_ppo'})
+    def evolve(*args):
+        ev.gradients.extend(deepcopy(records));ev._candidate_links=deepcopy(links)
+        return deepcopy(candidate),'REFINE'
+    monkeypatch.setattr(ev,'evolve',evolve);monkeypatch.setattr(ev,'probabilities',lambda s,es:[0.]*sum(len(e.transitions) for e in es))
+    result=ev.update(pool,[exp],{'test':0},1)['evolution'][0]['candidates'][0]
+    assert result['accepted'] and not result['efficacy_verified'] and result['admission_mode']=='factual_ppo'
+    path=tmp_path/'frozen.json';path.write_text(json.dumps(pool.snapshot()))
+    restored=SecuritySkillPool(24);restored.restore(json.loads(path.read_text()))
+    cfg=variant_config('B3');cfg['selector']['epsilon']=0
+    seen=[]
+    def generated(messages,**kw):
+        seen.extend(messages);return {'text':'{"action":"Sleep","reason":"CPU fixture"}','token_ids':[1]}
+    monkeypatch.setattr(offline,'generate',generated)
+    actor=DefensePolicy('blue_agent_4',offline,lambda *a,**k:'<choice>child</choice>',cfg,restored)
+    state={'agent':'blue_agent_4','observation':{'success':'UNKNOWN'},'user_prompt':'visible',
+        'hosts':['h1'],'subnets':[],'allowed_actions':['Sleep'],'behavior_context':{}}
+    _,record=actor.decide(state,episode=1,step=0,seed=1)
+    assert record['skill_id']=='child' and candidate.policy[0] in seen[0]['content']
+
+
+def test_asv_only_is_not_a_blanket_changed_text_veto():
+    from research.semantic_evidence import action_support
+    parent=Skill('p','i',['Remove the affected host'],'t');candidate=Skill('c','i',['Remove the affected host and review the call result'],'t')
+    exp=experience();exp.transitions=[{'seed':1,'step':0,'agent':'blue_agent_4','requested_action':'Remove h1',
+        'policy_invoked':True,'request_applied':True,'action_status':'TRUE','executed_actions':[{'name':'Remove'}],
+        'behavior_context':{'open_cases':[{'response_due':True,'flagged_pids':[77],'observed_level':2}]}}]
+    check=action_support(parent,candidate,[exp],[exp])
+    assert not check['requires_rollout'] and not check['efficacy_verified']
+
+
+def test_new_fact_schema_runs_original_sg_candidate_gate_and_commit_path(offline):
+    import re
+    from research.config import variant_config
+    from research.diagnosis import canonical_fact_catalog
+    from test_diagnosis_validation import fact_intervention_fixture
+    parent=Skill('parent','same initiation',['Check process evidence'],'same termination',version=1)
+    pool=SecuritySkillPool(24);snapshot=pool.snapshot();snapshot['skills']=[parent.__dict__];pool.restore(snapshot)
+    procedure='Remove the runtime bound host, wait for completion, then review the visible process evidence.'
+    class Model:
+        def __init__(self):self.rows=[];self.sg=0;self.candidates=0;self.score_samples=0
+        def capture_evidence_rows(self,rows):self.rows=rows
+        def __call__(self,prompt):
+            if 'Exact fact catalogue' in prompt:
+                self.sg+=1;_,data=fact_intervention_fixture()
+                fact=next(f for f in canonical_fact_catalog(self.rows) if f['finding']=='observed_pid')
+                data['interventions'][0]['supported_fact_ids']=[fact['fact_id']]
+                return json.dumps(data)
+            self.candidates+=1
+            ids=list(dict.fromkeys(re.findall(r'\bP[a-f0-9]{16}\b',prompt)))
+            assert ids
+            return json.dumps({'skill_name':'child','initiation':parent.initiation,'policy':[procedure],
+                'termination':parent.termination,'change_links':[{'component':'execution','element':0,
+                    'candidate_text':procedure,'proposal_ids':ids}]})
+        def score(self,samples,**kw):self.score_samples+=len(samples);return [0.]*len(samples)
+    model=Model();exps=[]
+    for seed in (1,2):
+        exp=experience();exp.skill=parent.name
+        for row in exp.transitions:
+            row.update(seed=seed,episode_id=0,agent='blue_agent_4',requested_action='Sleep',action_status='UNKNOWN',
+                observation_before={},observation_after={'h1':{'Processes':[{'PID':77}]}})
+        exps.append(exp)
+    config=variant_config('B3')['evolution'];ev=Evolution(model,config)
+    result=ev.update(pool,exps,{'test':0},1)
+    assert result['evolution'][0]['accepted']
+    assert model.sg==2 and model.candidates==config['best_of_n'] and model.score_samples>0
+    assert any(s.name=='parent_v2' and s.policy==[procedure] for s in pool.skills)

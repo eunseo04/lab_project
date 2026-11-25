@@ -175,7 +175,7 @@ def profile_diagnosis(directory,protocol,client,pending,preparation,time_availab
             began=time.perf_counter()
             with client.context(stage='diagnosis_boundary_probe',skill=item['skill'],prompt_sha256=item['prompt_sha256']):
                 response=client.generate(messages,seed=stable_seed(protocol.get('experiment_id'),i,item['prompt_sha256']),purpose='evolution',max_tokens=768)
-            boundary=EvidenceModel(lambda _:response['text'],item['evidence_rows'],diagnosis_verification=True)
+            boundary=EvidenceModel(lambda _:response['text'],item['evidence_rows'],diagnosis_verification=True, schema=protocol['configs']['B3']['evolution'].get('evidence_schema','typed_claims_v8'))
             validation_error=None
             try:
                 canonical=json.loads(boundary('Replay only this exact newly generated response for deterministic checks'))
@@ -360,7 +360,7 @@ def profile_optimizer(directory,label,pending,port):
         if cfg['evolution'].get('evidence_verification'):
             from research.semantic_evidence import EvidenceModel
             boundary=EvidenceModel(lambda _:response['text'],r['evidence_rows'],
-                diagnosis_verification=cfg['evolution'].get('diagnosis_verification',False))
+                diagnosis_verification=cfg['evolution'].get('diagnosis_verification',False), schema=cfg['evolution'].get('evidence_schema','typed_claims_v8'))
             parsed=json.loads(boundary('Profile uses the same canonical boundary as the optimizer'))
         gradient=parsed.get('semantic_gradient',{})
         if parsed.get('is_related'):

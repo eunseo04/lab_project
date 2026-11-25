@@ -13,13 +13,14 @@ VERIFICATION_VARIANTS = {name:{'base':'B4' if name.startswith('B4-') else 'B2',
     for name in ('B2-ASV','B2-SSV','B2-ASV-SSV','B2-ASV-SSV-RV',
                  'B2-ASV-SSV-RV-screen','B4-ASV','B4-SSV','B4-ASV-SSV')}
 COMPLETED_OPTIMIZER_STATUSES=frozenset(('completed_changed','completed_unchanged','completed_no_eligible_skill'))
+CONTROLLER_VARIANTS={'B1-selector-contract':'B1','B3-selector-contract':'B3'}
 
 
 def comparison_metadata(config):
     """Shared identity for runtime variants and reports; labels do not prove learning."""
     c={'comparison_id':config} if isinstance(config,str) else config
     name=c.get('comparison_id',c.get('arm','unknown'));variant=VERIFICATION_VARIANTS.get(name,{})
-    base=c.get('base_comparison_id',variant.get('base',name))
+    base=c.get('base_comparison_id',CONTROLLER_VARIANTS.get(name,variant.get('base',name)))
     internal=c.get('arm')
     known=internal in ARMS or base in ('B0','B1','B2','B3-no-support','B3','B4')
     consistent=not (internal in ARMS and base in ('B0','B1','B2','B3-no-support','B3','B4') and
@@ -120,6 +121,11 @@ def apply_seed_plan(config,plan,history=None):
 
 def variant_config(name,seed_plan=None):
     """Named overrides of existing configs; no copied YAML or silent B2/B3/B4 redefinition."""
+    if name in CONTROLLER_VARIANTS:
+        base=CONTROLLER_VARIANTS[name];c=load(ROOT/f'research_configs/rollout-{base}.yaml')
+        c['selector']['contract']='cage4_role_v1'
+        c.update(comparison_id=name,base_comparison_id=base,experiment_version='cage4-selector-contract-v1')
+        return apply_seed_plan(c,seed_plan) if seed_plan is not None else validate(c)
     if name not in VERIFICATION_VARIANTS:
         c=load(ROOT/f'research_configs/rollout-{name}.yaml')
         if seed_plan is not None:return apply_seed_plan(c,seed_plan)
@@ -128,7 +134,9 @@ def variant_config(name,seed_plan=None):
     metadata=VERIFICATION_VARIANTS[name];base=metadata['base']
     c=load(ROOT/f'research_configs/rollout-{base}.yaml')
     c['evolution'].update(action_support_verification=metadata['action_support_verification'],
-                          selection_shift_verification=metadata['selection_shift_verification'])
+                          selection_shift_verification=metadata['selection_shift_verification'],
+                          admission_mode='rollout' if metadata['rollout_verification'] else 'factual_ppo',
+                          method_version='cage4-fact-intervention-v1')
     if '-RV' in name:
         c['evolution']['rollout_verification']=True
         c['rollout_validation']=load(ROOT/'research_configs/rollout-B4.yaml')['rollout_validation']
@@ -136,7 +144,7 @@ def variant_config(name,seed_plan=None):
         c['rollout_validation'].update(reject_screen_pairs=2,reject_screen_only=True,
             procedure_version='necessary-worst-seed-rejection-v1')
     c.setdefault('seed_use','legacy_reproduction')
-    c.update(comparison_id=name,experiment_version='cage4-support-shift-v1',base_comparison_id=base)
+    c.update(comparison_id=name,experiment_version='cage4-fact-intervention-v1',base_comparison_id=base)
     if seed_plan is not None:return apply_seed_plan(c,seed_plan)
     return validate(c)
 
@@ -206,6 +214,15 @@ def validate(config):
     if type(c["validation_episodes"]) is not int or c["validation_episodes"] < 0:
         raise ValueError("validation_episodes must be a nonnegative integer")
     e = c["evolution"]
+    mode=e.get('admission_mode','legacy_rollout_veto')
+    if mode not in ('legacy_rollout_veto','factual_ppo','rollout'):raise ValueError('Invalid admission mode')
+    if mode!='legacy_rollout_veto' and not e.get('method_version'):raise ValueError('Changed admission policy requires method_version')
+    if mode=='rollout' and not e.get('rollout_verification'):raise ValueError('Rollout admission requires registered rollout verification')
+    if mode=='factual_ppo' and e.get('rollout_verification'):raise ValueError('Factual PPO and rollout admission contracts conflict')
+    if e.get('evidence_schema','typed_claims_v8') not in ('typed_claims_v8','fact_interventions_v1'):raise ValueError('Invalid evidence schema')
+    if e.get('evidence_schema')=='fact_interventions_v1' and not (e.get('diagnosis_verification') and e.get('method_version')):raise ValueError('Fact interventions require a versioned diagnosis method')
+    if c['selector'].get('contract','upstream') not in ('upstream','cage4_role_v1'):raise ValueError('Unknown selector contract')
+    if c['selector'].get('contract')=='cage4_role_v1' and c.get('comparison_id') not in CONTROLLER_VARIANTS:raise ValueError('Selector change requires its own controller ablation')
     if e.get('diagnosis_verification',False) and not e.get('evidence_verification',False):
         raise ValueError('CAGE4 diagnosis verification requires trace evidence verification')
     minimum=e.get('minimum_independent_episodes',0)

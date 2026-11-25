@@ -181,3 +181,25 @@ def test_source_or_frozen_pool_mismatch_is_not_merged(tmp_path):
     for run,source in ((first,'source_a'),(second,'source_b')):
         (run/'manifest.json').write_text(json.dumps({'implementation_sha256':{'adapter.py':source}}))
     with pytest.raises(ValueError,match='conditions differ'):reporter.collect(tmp_path)
+
+
+def test_regenerating_automatic_report_preserves_manual_research_findings(tmp_path):
+    write_run(tmp_path,'B0','eval',[-10]);reporter.report_experiment(tmp_path,include_bundle=False)
+    path=tmp_path/'report/performance.md';manual='Research findings: no gain claimed.\n\n'
+    path.write_text(manual+path.read_text())
+    reporter.report_experiment(tmp_path,include_bundle=False)
+    reporter.report_experiment(tmp_path,include_bundle=False)
+    assert path.read_text().startswith(manual)
+    assert path.read_text().count('<!-- generated-comparison:start -->')==1
+    assert path.read_text().count('# Experiment comparison')==1
+
+
+def test_regeneration_after_source_change_preserves_existing_immutable_bundle(tmp_path):
+    write_run(tmp_path,'B0','eval',[-10]);out=tmp_path/'report';out.mkdir()
+    (tmp_path/'protocol.json').write_text(json.dumps({'source_sha256':{'research/gate.py':'historical source differs'}}))
+    archive=out/'reproduction_bundle.tar.gz';archive.write_bytes(b'previous immutable archive fixture')
+    digest=hashlib.sha256(archive.read_bytes()).hexdigest()
+    manifest=out/'reproducibility_manifest.json';manifest.write_text(json.dumps({'sha256':digest}))
+    before=manifest.read_bytes();result=reporter.report_experiment(tmp_path)
+    assert result['bundle_action']=='preserved_registered_source_snapshot'
+    assert hashlib.sha256(archive.read_bytes()).hexdigest()==digest and manifest.read_bytes()==before

@@ -14,7 +14,7 @@
 | B1 | B0 + 고정 초기 Security Skill | E1 |
 | B2 | Skill-Pro 논문식 SG·batch·RTG·PPO Gate | E2 |
 | B3-no-support | B2 + evidence/diagnosis 검증, 최소 episode 제한 없음 | E2 |
-| B3 | B2 + evidence/diagnosis 검증·최소 독립 episode 2개 | E2 |
+| B3 | B2 + fact-ID/intervention 검증·최소 독립 episode 2개·원본 PPO 채택 | E2 |
 | B4 | B3 + 실제 대응 CAGE4 Rollout 검증·rollback | E2 |
 
 B3/B4도 B2와 같은 actor/selector를 사용한다. B4를 내부 E3와 혼용하지 않는다. `artifacts/initial_pool.json`은 B1–B4가 공유하는 정적 초기 절차이며 학습 결과가 아니다.
@@ -100,11 +100,11 @@ loop 상태는 `completed_changed`, `completed_unchanged`, `completed_no_eligibl
 
 기본 scorer는 기존 incremental reference다. full-sequence 경로는 실험용이며 실제 Qwen의 token/sequence/PPO/판정 동등성 인증 없이는 채택할 수 없다. 입력 요약·chunk 축소·Best-of-N 축소·모델/dtype/승인 기준 변경은 하지 않는다. 현재 실제 값은 temperature 1.0, actor 최대 192 token, SG/후보 최대 768 token, chunk 32 step/48,000문자, Best-of-N 2다. 입력 token은 최종 chat template 렌더링 후 확인하며 문자를 token으로 계산하지 않는다.
 
-B3/B4는 typed claim → canonical 관찰 사실 → 연결된 구조화 가설만 후보 입력으로 넘긴다. 원문 diagnosis/free gradient는 감사 기록으로 격리한다. 성분 범위/관찰 관계 검사는 일반 자연어 의미·인과관계·제안 절차의 효과를 보증하지 않는다. 공동 reward를 개별 Skill의 직접 기여로 해석하지 않으며, PPO Gate 양수만으로 방어 성능 개선을 주장하지 않는다.
+새 B3/B4 방법은 fact-interventions-v1이다. 코드가 만든 canonical fact ID를 LLM이 선택하고, preconditions/proposed_procedure/success_observation/termination/failure_or_retry_rule을 미검증 가설로 전달한다. action/host/time/epoch를 모델이 반복 복사하지 않는다. 잘못 선택한 ID를 다른 사실로 고치지 않으며 원문과 해석된 사실을 보관한다. 원래 B2와 chunk·입력 기록은 유지한다. 검증된 관찰 사실과 연결된 구조화 가설만 후보 입력으로 넘긴다. 원문 diagnosis/free gradient는 감사 기록으로 격리한다. 성분 범위/관찰 관계 검사는 일반 자연어 의미·인과관계·제안 절차의 효과를 보증하지 않는다. 공동 reward를 개별 Skill의 직접 기여로 해석하지 않으며, PPO Gate 양수만으로 방어 성능 개선을 주장하지 않는다.
 
-진단 schema v8은 `requested_decision`과 `completed_or_pending_operation`을 분리한다. 현재 Sleep/null과 이전 Restore/h1이 같은 행에 있어도 각 대상의 as_of/Restore epoch를 표시하고 같은 canonical builder로 검사한다. `recorded_decision`은 실제 호출·적용·파싱된 정책 결정만 확인하며 UNKNOWN을 완료/실패/진행 중으로 바꾸지 않는다. 제안·사실 ID는 검증 메타데이터에만 두며 reusable Skill에 복사하지 않는다.
+기존 typed claim의 후속 schema v9은 `requested_decision`과 `completed_or_pending_operation`을 분리한다. 현재 Sleep/null과 이전 Restore/h1이 같은 행에 있어도 각 대상의 as_of/Restore epoch를 표시하고 같은 canonical builder로 검사한다. `recorded_decision`은 실제 호출·적용·파싱된 정책 결정만 확인하며 UNKNOWN을 완료/실패/진행 중으로 바꾸지 않는다. PID/파일/서비스는 별도 observation_target과 해당 호스트의 epoch로 검사하므로 Sleep이나 다른 호스트의 행동 중에도 실제 관측을 사용할 수 있다. 완료·실패·pending은 여전히 실제 작업 대상에 연결한다. 제안·사실 ID는 검증 메타데이터에만 두며 reusable Skill에 복사하지 않는다.
 
-후보 변경은 요소별 정확한 텍스트와 검증된 proposal/fact ID를 연결한다. 같은 component라는 사실만으로 자연어 의미가 검증되지 않는다. Remove TRUE를 privileged persistence 제거의 증거로 확대하는 명확한 모순을 검사하고 나머지 의미는 unknown이다. 미분류 ASV 변경과 미검증 의미는 추가 whole-Pool rollout 또는 보류다. SSV-only는 여러 parent 채택·capacity 정리 후 최종 Pool을 다시 검사한다. 원본 B2의 양수 J 승인 규칙은 유지하고 J_old/Delta J는 진단값으로만 기록한다.
+후보 변경은 요소별 정확한 텍스트와 검증된 proposal/fact ID를 연결한다. 같은 component라는 사실만으로 자연어 의미가 검증되지 않는다. Remove TRUE를 privileged persistence 제거의 증거로 확대하는 명확한 모순을 검사하고 나머지 의미는 unknown이다. 사실/출처, candidate_links_valid, known_contradiction, efficacy_verified와 admission_mode를 구분한다. 새 B3의 factual_ppo는 사실·후보 연결·알려진 모순 검사와 원본 양수 PPO를 통과하면 효과가 미검증인 후보도 채택할 수 있다. B4의 rollout 모드는 같은 검사 뒤 실제 20쌍 승인을 요구한다. ASV-only는 미실행 행동·미관측 조건·미분류 변경에 추가 검증을 요구하지만 텍스트가 바뀌었다는 이유만으로 전부 금지하지 않는다. 과거 legacy_rollout_veto protocol은 보존하며 새 방법으로 소급 해석하지 않는다. SSV-only는 여러 parent 채택·capacity 정리 후 최종 Pool을 다시 검사한다. 원본 B2의 양수 J 승인 규칙은 유지하고 J_old/Delta J는 진단값으로만 기록한다.
 
 201000/201001, 211000/211001, 215000은 이미 결과를 보았고 213000/213001은 validation에 사용했다. 101000–101099·102000 등 제공된 이전 개발 시드도 노출 이력에 포함한다. 보고기는 내부 정책 유형·정확한 optimizer 완료 상태·checkpoint 및 동결 Pool 해시·실제 학습 방법으로 train/test/control을 분류한다. 원래 B2 Pool을 완료된 Proposed 학습으로 다시 이름 붙일 수 없다. 독립 학습 수는 run/lineage provenance로 계산하며 B0/B1은 해당 없음, 누락은 미상이다. 반복 run의 같은 eval seed를 덮어쓰지 않고, 여러 run의 CI는 comparison-run cluster를 보존한다.
 
@@ -119,7 +119,7 @@ FiniteState의 B1−B0는 −29, B2−B0는 −37.5다. SD는 B0 28.28/B1 11.31/
 
 검토 기준 6c1d229 이후의 CPU 수정과 실제 SG probe는 이 동결 보상과 다른 증거다. 이번 작업 전 누적 GPU는 6.717276/8시간, 잔여는 1.282724시간이었다. 추가 사용은 새 output의 실제 ledger로 더하며 새 8시간으로 해석하지 않는다. 40회 validation의 약 11.69 GPU-hour는 예상이며 SG/최종 평가 비용은 별도다. 이 비용을 현재 잔여 예산으로 완료했다고 주장하지 않는다.
 
-이번 경계 수정 후 전체 CPU 검사 314개가 통과했다. 실제 Qwen SG는 원래 전체 chunk에서 사전 선택한 6건씩 두 번 측정했다. canonical-v2는 JSON 6건·선택된 관찰 claim 검사 1건·proposal 연결 0건, 필드 명세를 맞춘 v3는 각각 6·1·1건이었다. 두 실행은 prompt와 생성 seed가 달라 통과 수 차이를 수정의 인과 효과로 해석하지 않는다. 연결된 제안 1건도 후보 생성·PPO·rollout 채택을 뜻하지 않으며 이번 새 loop와 CAGE4 평가는 0이다. 실제 추가 GPU는 0.165175시간, 누적 6.882450/8시간, 잔여 1.117550시간이다. 등록한 서버 2개는 종료됐고 8418–8421 포트가 닫힌 것을 재확인했다.
+9cd80a3까지의 경계 수정에서는 CPU 검사 314개가 통과했다. 실제 Qwen SG는 원래 전체 chunk에서 사전 선택한 6건씩 두 번 측정했다. canonical-v2는 JSON 6건·선택된 관찰 claim 검사 1건·proposal 연결 0건, 필드 명세를 맞춘 v3는 각각 6·1·1건이었다. 두 실행은 prompt와 생성 seed가 달라 통과 수 차이를 수정의 인과 효과로 해석하지 않는다. 연결된 제안 1건도 후보 생성·PPO·rollout 채택을 뜻하지 않으며 해당 SG-only 작업의 새 loop와 CAGE4 평가는 0이다. 실제 추가 GPU는 0.165175시간, 누적 6.882450/8시간, 잔여 1.117550시간이다. 등록한 서버 2개는 종료됐고 8418–8421 포트가 닫힌 것을 재확인했다.
 
 로컬 상세 진행 보고는 `research_outputs/audit-fields-ece94dbe/report/performance.md`에 있다. 이전 모델 원문은 `audit-boundaries-20261125-9e1ec3c0`에 그대로 보존했다. 두 원시 실험 경로는 Git 제외 대상이다. 실제 과거 checkpoint·SQLite backup·두 trace·초기 Pool을 묶음에서 격리 복원했고, 원래 프로젝트 데이터 접근을 막은 상태에서 `historical_batch`를 읽었다. weights와 독립 CAGE4 재실행은 이 복원 검사에 포함하지 않는다.
 
@@ -145,3 +145,17 @@ v2 재현 묶음은 현재 output 밖의 과거 checkpoint/journal/훈련 trace/
 ```
 
 이 모드는 기존 훈련 91000·91001만 검증 입력으로 읽고 평가·validation·transfer는 명시적 seed plan을 따른다. 이미 사용한 211000·211001·213000·213001·215000을 새 독립 holdout으로 재사용할 수 없다. 초기 Pool과 완료한 B2 Pool을 정확히 고정한다. 같은 최종 Pool 결과를 재사용하면 원본 평가와 해시·추론 조건을 명시하고 추가 episode로 세지 않는다. GPU에 기존 compute PID가 있으면 여유 메모리와 관계없이 선택하지 않는다. `report/`의 `action_support.json`, `selector_probe.json`, `historical_forensics.json`, `fixed_update_rollout.json`, `scorer_parity.json`, `sg_boundary_profile.json`에 검증과 수치 정확도·비용을 남긴다. full-sequence scorer는 완전한 인증 전까지 생산 경로에 적용하지 않는다.
+
+## 후속 정합성 수정과 controller 실험
+
+B3의 영구 보류와 cross-host observation 거부를 수정했다. 기존 SG 12건은 같은 원문·관측 행 hash로 재검사했고 새로 해제된 거부는 0건이다. 최종 1/6을 대표 진단 정확도나 방어 성공률로 부르지 않는다. 새 fact-ID schema의 137개 원래 chunk(eligible 124)는 tokenizer 검사에서 최대 19,392 input + 768 output 예약으로 context 24,576 안에 들었다. 실제 새 SG 생성을 측정한 수치는 아니다.
+
+기본 B1/B2/B3/B4의 initiation·allowed_actions는 자연어 지침이며 강제 action mask·eligibility·urgent preemption을 보장하지 않는다. runtime CAGEVerifier는 E3 전용이다. 별도 B1-selector-contract와 B3-selector-contract는 selector 역할 지침 하나만 추가한 정적/최적화 대조군이다. primitive actor·termination prompt·epsilon·행동 공간·maturity/gain 필터는 그대로다. 원본 llm_model의 maturity>=3, avg_gain>-0.015 필터와 min_gain 전달 누락은 감사 로그에 남기며 변경하지 않는다.
+
+새 exploratory frozen pair는 기존 run_campaign.py의 --frozen-policy-pilot로 실행한다. 같은 초기 Pool의 B1과 B1-selector-contract를 사전 등록한 시드 하나에서 각각 500 nominal-step으로 평가한다. 두 episode와 기동·정리를 먼저 예약한다. 자동 Skill 개선·B4 승인·미사용 최종 holdout 성능의 증거는 아니다. 실제 결과는 기존 최종 보고서 research_outputs/audit-fields-ece94dbe/report/performance.md와 새 실험 selector-pilot-23071375의 원시 결과에 구분한다.
+
+현재 B0는 ACD 기반 Qwen 공통조건 대조군이다. 원논문의 모델·통신 재학습 KEEP·관찰 조건을 그대로 재현한 절대 점수가 아니다. 일부 PID/connection severity가 원본 2와 현재 1로 다르고 공개 KEEP용 8→3 projection은 정보 손실이 있다. Block/Allow의 출발 구역은 HQ 담당 Qwen에서 public_access_zone_subnet으로 고정된다. 모두 현재 비교의 공통 조건이며 확인된 보상 하락의 원인이라고 단정하지 않는다. official arithmetic parity는 보상 산술 검사로, 전체 actor hook·궤적 동일성은 아니다. paper online score와 공개 코드 모드는 별도이며 두 번 정규화하는 오류라는 이유로 원래 식을 바꾸지 않았다.
+
+후속 실제 정적 paired pilot(seed 788380683, development)은 B1 -121 / B1-selector-contract -122, 차이 -1이었다. N=1의 SD/CI는 N/A이며 개선이나 자동 Skill 최적화 효과를 입증하지 못했다. LWF/ASF/RIA 합계는 같고 공동 action cost만 -1이었다. 모델 호출은 698→733회였고 전체 평가 시간은 각각 906.69/899.15초다. 이 차이를 처리속도 개선이나 특정 Qwen 행동의 인과 효과로 해석하지 않는다. 다음 최종 holdout에는 이 seed를 쓰지 않는다.
+
+최종 CPU 회귀 329개가 통과했다. 실측 종료 후 관측-only action=null, 기록 없는 busy placeholder의 pending 추론 거부, 선택/종료/요청/완료 연결, 보고서 수동 설명과 이전 source bundle 보존을 추가 검사했다. 실제 정적 정책의 actor/selector/model/reward source는 그 후 변경하지 않았다. 실측 source와 최종 CPU 감사 source를 기존 최종 보고서에 분리했다. 이번 추가 GPU는 0.506023시간, 기존 승인 누적 7.388473/8시간, 잔여 0.611527시간이며 등록 Qwen/worker 종료와 GPU·8418–8421 포트 해제를 실제 확인했다. 새 실제 SG·후보·PPO·optimizer loop는 0이고 B3/B4 학습 후 성능은 N/A다.

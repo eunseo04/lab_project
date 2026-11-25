@@ -154,6 +154,7 @@ class SkillController:
     def choose(self, state, step):
         events = []
         selection_audit=None
+        termination_audit=None
         if self.active is not None:
             if step - self.started >= self.config.get("max_skill_age", 8):
                 events.append({"terminated": self.active.name, "reason": "maximum_age"})
@@ -177,6 +178,7 @@ Decide whether the skill should STOP now because termination is achieved or init
 Output EXACTLY <status>DONE</status> or <status>CONTINUE</status>."""
                 response = self.model(prompt, purpose="termination")
                 match = re.search(r"<status>\s*(DONE|CONTINUE)\s*</status>", response, re.I)
+                termination_audit={'prompt':prompt,'response':response,'status':match[1].upper() if match else 'malformed'}
                 if match and match[1].upper() == "DONE":
                     events.append({"terminated": self.active.name, "reason": "model_termination"})
                     self.active = None
@@ -186,20 +188,27 @@ Output EXACTLY <status>DONE</status> or <status>CONTINUE</status>."""
             candidates = list(self.pool.skills)
             calls=[];before_rng=random.getstate()
             def observed_selector(prompt):
+                if self.config.get('contract')=='cage4_role_v1':prompt=SELECTOR_CONTRACT+'\n'+prompt
                 response=self.model(prompt)
                 calls.append({'prompt':prompt,'response':response})
                 return response
             try:
                 if self.proposed:
                     self.pool.skills = [s for s in candidates if self.verifier.check(s, state, self.history)[0]]
-                offered=[{'name':s.name,'initiation':s.initiation} for s in self.pool.skills]
+                offered=[{'name':s.name,'initiation':s.initiation,'avg_gain':s.avg_gain,'maturity':s.maturity} for s in self.pool.skills]
                 self.active = self.pool.select_skill(state["user_prompt"], llm_agent=observed_selector,
                     select_type="llm_model", epsilon=self.config.get("epsilon", 0.1))
                 selection_audit={'source':'llm' if calls else 'epsilon_exploration',
                     'state_prompt':state['user_prompt'],'offered_skills':offered,
                     'model_calls':calls,'selected':self.active.name if self.active else None,
                     'python_rng_before':before_rng,'python_rng_after':random.getstate(),
-                    'input_unchanged':True}
+                    'input_unchanged':self.config.get('contract','upstream')=='upstream',
+                    'controller_contract':self.config.get('contract','upstream'),
+                    'upstream_gain_filter':{'llm_model_min_gain':-.015,'warmup_maturity':3,
+                        'select_skill_min_gain_forwarded':False,'override_applied':False}}
+                match=re.search(r'<choice>\s*(.*?)\s*</choice>',calls[-1]['response'],re.I|re.S) if calls else None
+                nominated=next((s for s in self.pool.skills if match and s.name.lower()==match[1].strip().lower()),None)
+                selection_audit['gain_filter_veto']=bool(nominated and self.active is None and nominated.maturity>=3 and nominated.avg_gain<=-.015)
             finally:
                 self.pool.skills = candidates
             if self.active is not None:
@@ -207,8 +216,27 @@ Output EXACTLY <status>DONE</status> or <status>CONTINUE</status>."""
                 events.append({"activated": self.active.name, "version": self.active.version})
         self.last_event = {"events": events, "active": self.active.name if self.active else None,
                            "started": self.started, "age": step-self.started if self.active else 0,
-                           "selection_audit":selection_audit}
+                           "selection_audit":selection_audit,'termination_audit':termination_audit}
         return self.active
+
+
+SELECTOR_CONTRACT='''# CAGE4 defender selector contract v1; selector-only ablation
+You select one procedural Skill for this Blue's visible evidence, not a primitive action.
+Use the original <choice>SkillName</choice> or <choice>NONE</choice> format only.
+Prioritize unresolved observed escalate.sh/escalate.exe with PrivilegedRecovery:
+Remove cannot remove privileged persistence. A newly flagged user PID calls for
+RapidProcessResponse; do not replace a due response with repeated investigation.
+EscalationDiagnosis inspects unresolved results; RiskBasedInvestigation investigates
+uncertain leads. Decoys are discretionary when local response is outstanding.
+NetworkContainment needs a visible threat justification, not just another defender's
+busy bit. TrafficRecovery requires this defender's own observed block history.
+Block/Allow operate FROM public_access_zone_subnet to the chosen destination only.
+IN_PROGRESS is waiting, not failed remediation. A successful call is not proof
+of cleanup; inspect subsequent visible evidence. Joint reward does not identify
+an individual Skill cause. If no Skill is useful choose NONE for the common ACD actor.
+This is guidance only: no action mask, eligibility filter, preemption or gain-filter
+override is added. Never infer hidden Red sessions or unseen service health.
+'''
 
 
 def probe_selection(previous, proposed, records, client, rule=None, data_role='training'):

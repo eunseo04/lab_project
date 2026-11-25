@@ -52,6 +52,10 @@ def canonical_operations(row, rows):
         result[key]={**op,'as_of_before':row['step'],'as_of_after':row['step']+1,
             'restore_epoch_before':restore_boundary(rows,row['agent'],target,row['step']),
             'restore_epoch_after':restore_boundary(rows,row['agent'],target,row['step']+1)}
+        if key=='completed_or_pending_operation':
+            result[key]['recorded_operation']=bool((row.get('behavior_outcome') or {}).get('completed_action') or
+                (row.get('behavior_context') or {}).get('pending_action') or
+                (decision['policy_invoked'] and decision['request_applied'] and not decision['parse_error'] and decision['recorded_request']))
     return result
 
 
@@ -79,14 +83,21 @@ def validate_diagnosis(data, rows, provenance):
             errors.append('unproven_causal_or_unknown_claim'); continue
         operations=canonical_operations(row,rows)
         op=operations['requested_decision' if finding=='recorded_decision' else 'completed_or_pending_operation']
+        observation_finding=finding.startswith('observed_')
         if finding == 'recorded_decision':
             # A decision fact is distinct from completion of an earlier action.
             if not row.get('policy_invoked') or not row.get('request_applied') or row.get('parse_error') or not row.get('requested_action'):
                 errors.append('not_an_applied_policy_decision'); continue
-        if claim.get('action') != op.get('name'):
+        context_actions={op.get('name'),operations['requested_decision'].get('name'),'Monitor',None}
+        if (not observation_finding and claim.get('action') != op.get('name') or
+                observation_finding and claim.get('action') not in context_actions):
             errors.append('action_mismatch'); continue
-        host = claim.get('target')
-        if ('target' not in claim or host != op.get('target') or
+        host = claim.get('observation_target',claim.get('target')) if observation_finding else claim.get('target')
+        if observation_finding:
+            if not isinstance(host,str) or not host or ('observation_target' in claim and
+                    'target' in claim and claim['target']!=host):
+                errors.append('target_mismatch'); continue
+        elif ('target' not in claim or host != op.get('target') or
                 (not host and not (host is None and op.get('name') in {'Sleep', 'Monitor'}))):
             errors.append('target_mismatch'); continue
         phase = claim.get('phase', 'after')
@@ -97,6 +108,8 @@ def validate_diagnosis(data, rows, provenance):
         if type(as_of) is not int or as_of != recorded_at:
             errors.append('observation_time_mismatch'); continue
         end, start = op.get('completed_at'), op.get('started_at')
+        if finding in ('completed_success','completed_failure','pending') and not op['recorded_operation']:
+            errors.append('own_operation_not_recorded');continue
         if finding == 'recorded_decision':
             if phase != 'after':
                 errors.append('decision_not_recorded_before_action'); continue
@@ -115,6 +128,10 @@ def validate_diagnosis(data, rows, provenance):
                 pids = {str(p['PID']) for p in body.get('Processes', []) if isinstance(p, dict) and 'PID' in p and 'username' not in p}
                 if str(claim.get('pid')) not in pids:
                     errors.append('pid_not_observed_at_claimed_time'); continue
+                before=(row.get('observation_before') or {}).get(host,{})
+                if claim.get('fresh') and (phase!='after' or any(str(p.get('PID'))==str(claim.get('pid'))
+                        for p in before.get('Processes',[]) if isinstance(p,dict))):
+                    errors.append('pid_not_fresh'); continue
             if finding == 'observed_admin_indicator':
                 names = {f.get('File Name') for f in body.get('Files', []) if isinstance(f, dict)}
                 if claim.get('indicator') not in names & {'escalate.sh', 'escalate.exe'}:
@@ -123,13 +140,14 @@ def validate_diagnosis(data, rows, provenance):
                 services = body.get('Services', {})
                 if not isinstance(services, dict) or claim.get('service') not in services or services[claim['service']] != claim.get('value'):
                     errors.append('service_state_not_observed'); continue
-        boundary = op['restore_epoch_'+phase]
+        boundary = restore_boundary(rows,row['agent'],host,as_of) if observation_finding else op['restore_epoch_'+phase]
         if 'restore_epoch' not in claim or claim['restore_epoch'] != boundary:
             errors.append('restore_epoch_mismatch'); continue
         # A newly observed PID is not evidence that an older Remove failed.
         if finding == 'completed_failure' and claim.get('pid') is not None:
             errors.append('call_status_is_not_pid_cleanup_evidence'); continue
         valid.append({**claim, 'component': component, 'status': 'observation_consistent',
+            **({'observation_target':host,'target':host,'action':claim.get('action')} if observation_finding else {}),
             'source_seed':row.get('seed'),'source_agent':row['agent'],'source_step':row['step'],
             'source_trace_sha256':provenance.get('trace_sha256')})
     supported = {c['component'] for c in valid}
@@ -145,7 +163,7 @@ def validate_diagnosis(data, rows, provenance):
 
 
 PROMPT = '''
-### CAGE4 diagnosis consistency schema (Proposed v8, separate from Skill-Pro)
+### CAGE4 diagnosis consistency schema (Proposed v9, separate from Skill-Pro)
 Keep the original initiation/policy/termination semantic gradients. In addition,
 return diagnosis_status="supported|unknown|insufficient_evidence", reward_attribution="unknown",
 and claims=[{"component":"policy", "evidence_id":"E0", "action":"Remove",
@@ -155,8 +173,13 @@ Allowed findings: recorded_decision, completed_success, completed_failure, pendi
 observed_admin_indicator (include indicator), observed_service_state (include service and value).
 Use one matching evidence citation and observation-consistent claim for EVERY changed component.
 Use requested_decision for recorded_decision, and completed_or_pending_operation
-for all other findings. Copy that object's name, target, as_of and target-specific
+for completion/pending findings. Copy that object's name, target, as_of and target-specific
 restore_epoch fields. They may describe different targets in the same row.
+For observed_pid/admin/service use observation_target: the exact host in that Blue's
+before/after observation, independently of the action target. Use that observation
+host's Restore boundary. An optional action is context only, never evidence that
+the action caused the observation. Never claim an observed PID is fresh if already
+present before. Only actual operation claims establish completion/pending.
 For recorded_decision only, use the actual requested action/target of an invoked,
 applied, parsed policy decision, even if completed_or_pending_operation describes an
 earlier completion. Sleep/Monitor have target JSON null, never the string "null"
@@ -191,7 +214,7 @@ def canonical_proposals(data, validation):
     """
     from .progress import digest
     facts=[]
-    fields=('component','evidence_id','action','target','finding','phase','as_of_step','restore_epoch','pid','indicator','service','value',
+    fields=('component','evidence_id','action','target','observation_target','finding','phase','as_of_step','restore_epoch','pid','indicator','service','value',
         'source_seed','source_agent','source_step','source_trace_sha256')
     for claim in validation.get('valid_claims',[]):
         fact={k:claim[k] for k in fields if k in claim}
@@ -218,7 +241,7 @@ def canonical_proposals(data, validation):
             'component':component,'operation':kind,
             'scope':scope,'causal_status':'untested_hypothesis',
             'fact_ids':[f['fact_id'] for f in support],
-            'observed_actions':sorted({f['action'] for f in support})})
+            'observed_actions':sorted({f['action'] for f in support if f.get('action')})})
     gradients={key:'' for key in COMPONENTS}
     for proposal in proposals:
         selected=[f for f in facts if f['fact_id'] in proposal['fact_ids']]
@@ -245,6 +268,115 @@ wait_for_completion -> pending; review_observed_pid -> observed_pid;
 review_privilege_indicator -> observed_admin_indicator;
 review_service_observation -> observed_service_state.
 Use the actually cited own action, matching component and validated evidence.
+Observation-only proposals may use observed_action=null when no own action is
+claimed. The observation_target remains the visible host, not an action effect.
 A proposal is an untested procedure hypothesis, never proof of causation or reward gain.
 Do not add unrelated remediation. Unchanged components need no proposal.
+'''
+
+
+def canonical_fact_catalog(rows):
+    """Agent-visible facts with stable IDs; observation hosts are independent of actions."""
+    from .progress import digest
+    facts=[]
+    for i,row in enumerate(rows):
+        ops=canonical_operations(row,rows)
+        def add(finding,phase,target,action=None,**details):
+            at=row['step']+int(phase=='after')
+            fact={'evidence_id':f'E{i}','agent':row['agent'],'step':row['step'],
+                'finding':finding,'phase':phase,'as_of_step':at,'target':target,'action':action,
+                'restore_epoch':restore_boundary(rows,row['agent'],target,at),
+                'source_record_sha256':digest(row),**details}
+            fact['fact_id']='F'+digest(fact)[:16];facts.append(fact)
+        decision=ops['requested_decision'];op=ops['completed_or_pending_operation']
+        if decision['policy_invoked'] and decision['request_applied'] and not decision['parse_error'] and decision['recorded_request']:
+            add('recorded_decision','after',decision['target'],decision['name'])
+        if op['recorded_operation'] and op.get('status') in ('TRUE','FALSE') and op.get('completed_at') is not None and op.get('started_at') is not None and op['started_at']<=op['completed_at']<=row['step']+1:
+            add('completed_success' if op['status']=='TRUE' else 'completed_failure','after',op.get('target'),op.get('name'))
+        if op['recorded_operation'] and op.get('status')=='IN_PROGRESS' and op.get('completed_at') is None:
+            add('pending','after',op.get('target'),op.get('name'))
+        for phase in ('before','after'):
+            for host,body in (row.get('observation_'+phase) or {}).items():
+                if not isinstance(body,dict):continue
+                for process in body.get('Processes',[]):
+                    if isinstance(process,dict) and 'PID' in process and 'username' not in process:
+                        add('observed_pid',phase,host,pid=process['PID'],observation_target=host)
+                for file in body.get('Files',[]):
+                    if isinstance(file,dict) and file.get('File Name') in ('escalate.sh','escalate.exe'):
+                        add('observed_admin_indicator',phase,host,indicator=file['File Name'],observation_target=host)
+                services=body.get('Services',{})
+                if isinstance(services,dict):
+                    for service,value in services.items():
+                        add('observed_service_state',phase,host,service=service,value=value,observation_target=host)
+    return facts
+
+
+def validate_interventions(data,rows):
+    """Resolve selected IDs exactly, validate bounded hypotheses, never repair a claim."""
+    import json,re
+    from .progress import digest
+    catalog={f['fact_id']:f for f in canonical_fact_catalog(rows)}
+    hypotheses=data.get('interventions',[]);errors=[];facts={};proposals=[]
+    required=('observed_problem','preconditions','proposed_procedure','success_observation','termination','failure_or_retry_rule')
+    allowed=set(required)|{'supported_fact_ids','component_to_change','causal_status','target_binding'}
+    if not isinstance(hypotheses,list):hypotheses=[];errors.append('invalid_interventions')
+    if hypotheses and data.get('is_related') is not True:errors.append('inconsistent_related_status')
+    if len(hypotheses)>32:errors.append('too_many_interventions');hypotheses=[]
+    hosts={f['target'] for f in catalog.values() if isinstance(f.get('target'),str)}
+    for hypothesis in hypotheses:
+        if not isinstance(hypothesis,dict) or set(hypothesis)-allowed:
+            errors.append('invalid_intervention_fields');continue
+        component='execution' if hypothesis.get('component_to_change')=='policy' else hypothesis.get('component_to_change')
+        ids=hypothesis.get('supported_fact_ids')
+        if component not in COMPONENTS or not isinstance(ids,list) or not ids or any(not isinstance(i,str) or i not in catalog for i in ids) or len(ids)!=len(set(ids)):
+            errors.append('intervention_without_catalog_fact');continue
+        if hypothesis.get('causal_status')!='untested_hypothesis' or any(not isinstance(hypothesis.get(k),str) or not hypothesis[k].strip() or len(hypothesis[k])>2048 for k in required):
+            errors.append('invalid_or_causal_intervention');continue
+        selected=[catalog[i] for i in ids]
+        binding=hypothesis.get('target_binding')
+        if binding not in ('observed_host','none') or (binding=='observed_host' and any(f.get('target') is None for f in selected)):
+            errors.append('unsupported_runtime_binding');continue
+        text=' '.join(hypothesis[k] for k in required)
+        if re.search(r'\b(?:\d{1,3}\.){3}\d{1,3}\b|\b[FP][a-f0-9]{16}\b|\bE\d+\b',text) or any(re.search(r'(?<!\w)'+re.escape(host)+r'(?!\w)',text) for host in hosts):
+            errors.append('instance_identifier_in_intervention');continue
+        # A selected fact proves only its exact visible content, not the stated problem/efficacy.
+        for f in selected:facts[(component,f['fact_id'])]={**f,'component':component}
+        proposal={**hypothesis,'component':component,'fact_ids':ids,'operation':'structured_intervention',
+            'scope':'runtime_observation_binding','observed_actions':sorted({f['action'] for f in selected if f.get('action')})}
+        proposal['proposal_id']='P'+digest(proposal)[:16];proposals.append(proposal)
+    if data.get('reward_attribution','unknown')!='unknown':errors.append('individual_joint_reward_attribution_unidentified')
+    gradients={key:'' for key in COMPONENTS}
+    for p in proposals:
+        gradients[p['component']]+=json.dumps({'verified_observations':[facts[(p['component'],i)] for i in p['fact_ids']],
+            'untested_modification_hypothesis':p,'constraint':'Facts alone are verified. Problem, proposed procedure and efficacy remain untested. Bind targets from current observations; never copy instance IDs.'},ensure_ascii=False,sort_keys=True)+'\n'
+    return {'passed':bool(proposals) and not errors,'schema':'fact-interventions-v1','facts':list(facts.values()),'proposals':proposals,
+        'gradients':gradients,'errors':errors,'facts_verified':bool(facts) and not errors,'candidate_links_valid':None,
+        'known_contradiction':False,'efficacy_verified':False,'raw_prose_forwarded':False,
+        'limitation':'Selected catalog facts are exact; natural-language problem/procedure/efficacy are hypotheses, not verified semantics.'}
+
+
+INTERVENTION_PROMPT = '''
+### Proposed fact-interventions-v1 (separate from original B2)
+The following catalogue contains ONLY this Blue's exact recorded observation facts.
+Select supported_fact_ids exactly. Do not copy action/host/time/epoch fields: the code
+resolves the chosen IDs without correcting a wrong selection. A fact about a visible
+PID/file/service may concern a different host from your current action. No hidden
+Red state or reward answer is provided. Treat a selected fact as observation only.
+Return JSON with is_related, reward_attribution="unknown", and interventions:
+[{"supported_fact_ids":["an actual catalogue ID"],"component_to_change":"policy",
+"observed_problem":"hypothesized decision problem, not an established cause",
+"preconditions":"visible evidence and free/busy prerequisites",
+"proposed_procedure":"concrete procedure using the runtime bound target",
+"success_observation":"observable follow-up to check",
+"termination":"when to stop or reassess",
+"failure_or_retry_rule":"bounded response to failure or insufficient evidence",
+"target_binding":"observed_host","causal_status":"untested_hypothesis"}].
+Use initiation/policy/termination components. target_binding is observed_host or none.
+Use no hostname/IP/seed/fact IDs inside procedural text. No facts means is_related=false
+and interventions=[]. Free diagnosis/semantic_gradient prose is audit-only. Facts are
+verified separately from hypotheses, candidate links, PPO admission and real efficacy.
+Block/Allow control traffic FROM public_access_zone_subnet to the selected destination;
+they cannot isolate an arbitrary source zone. Monitor is automatic; IN_PROGRESS is
+waiting, Remove TRUE does not establish privileged cleanup; Restore has availability cost.
+# Exact fact catalogue:
 '''

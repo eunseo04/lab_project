@@ -204,6 +204,30 @@ def historical_reference(args):
 
 
 def make_protocol(args,out):
+    if getattr(args,'frozen_policy_pilot',False):
+        plan,history=campaign_seed_plan(args);prior,ledger=campaign_budget(args)
+        if len(plan['final_test'])!=1 or args.max_gpus!=1:raise ValueError('Frozen exploratory pair requires one registered seed and one GPU')
+        labels=['B1','B1-selector-contract'];configs={}
+        for label in labels:
+            c=variant_config(label)
+            c.update(iterations=1,experiment_id=str(out),comparison_run_id=str(out),
+                experiment_version='cage4-static-selector-pilot-v1',output=str(out),journal_path=str(out/'journal.sqlite3'))
+            configs[label]=apply_seed_plan(c,plan,history)
+        reservation=core_cost_reservation(plan['final_test'])
+        reservation.update(episodes=2,gpu_seconds_estimate=2*reservation['episode_upper_seconds']+390)
+        return {'schema':'durable-campaign-v1','registered_unix':time.time(),'experiment_id':str(out),
+            'protocol_kind':'exploratory-frozen-policy-pair-v1','source_sha256':source_identity(),'configs':configs,
+            'seed_plan':plan,'seed_exposure_history':history,'pilot_test_seeds':plan['final_test'],
+            'budget_gpu_hours':args.gpu_hours,'maximum_wall_seconds':args.wall_hours*3600,
+            'previous_campaign_gpu_hours':prior,'prior_physical_usage':ledger,'combined_authorization_gpu_hours':8.,
+            'maximum_servers':1,'minimum_free_mib':args.minimum_free_mib,'profile_full_sequence':False,
+            'core_evaluation_reservation':reservation,'required_evaluation_labels':labels,
+            'initial_pool_file_sha256':sha(ROOT/'artifacts/initial_pool.json'),
+            'training_plan':{'episodes':0,'iterations':0},
+            'scope':'Exploratory static controller factor only. Same initial Pool; no optimization or B4 admission. Both complete episodes required.',
+            'changed_factor':'Selector-only CAGE4 role/action-semantics guidance; no filtering, preemption, actor change or gain threshold override.',
+            'allocation':'Reserve both full 500-nominal episodes plus startup/shutdown before GPU launch.',
+            'historical_performance_reference':historical_reference(args)}
     if getattr(args,'fixed_update_from',None):return make_fixed_protocol(args,out)
     plan,history=campaign_seed_plan(args);prior,ledger=campaign_budget(args)
     requested=list(dict.fromkeys(['B2',*args.arms]));labels=['B0','B1',*requested];configs={}
@@ -536,18 +560,20 @@ def main():
     parser.add_argument('--reference-report',type=Path,help='Immutable historical metrics JSON for separate context, not new evidence')
     parser.add_argument('--usage-ledger',type=Path,nargs='+',help='Prior cumulative completion ledgers; sessions are deduplicated')
     parser.add_argument('--diagnosis-probes-only',action='store_true',help='Historical training SG probes only; no training or final evaluation')
+    parser.add_argument('--frozen-policy-pilot',action='store_true',help='One preregistered static B1/selector-contract pair; no training or B4 admission')
     parser.add_argument('--diagnosis-probe-count',type=int,default=6,choices=range(1,13))
     parser.add_argument('--train-episodes',type=int,help='Must equal the explicit training seed count')
     parser.add_argument('--iterations',type=int,default=1,help='Actual training optimizer iterations; full six/three requires explicit plan')
     parser.add_argument('--require-all-arms',action='store_true',help='Treat all registered arms as required rather than optional extensions')
     parser.add_argument('--prior-gpu-hours',type=float,default=None,help='Carry-in from the existing eight GPU-hour authorization; required for --fixed-update-from')
     parser.add_argument('--test-episodes',type=int,default=None,choices=range(1,101))
-    parser.add_argument('--arms',nargs='+',choices=['B2','B3-no-support','B3','B4',*VERIFICATION_VARIANTS],default=['B2'])
+    parser.add_argument('--arms',nargs='+',choices=['B2','B3-no-support','B3','B4',*VERIFICATION_VARIANTS,'B3-selector-contract'],default=['B2'])
     parser.add_argument('--generalization',action='store_true')
     parser.add_argument('--resume',action='store_true')
     parser.add_argument('--plan-only',action='store_true')
     parser.add_argument('--cleanup-only',action='store_true')
     args=parser.parse_args()
+    if args.frozen_policy_pilot and (args.fixed_update_from or args.diagnosis_probes_only):raise ValueError('Frozen pilot and historical diagnosis are separate protocols')
     if args.diagnosis_probes_only and not args.fixed_update_from:raise ValueError('Diagnosis probes require the exact historical training source')
     if not 0<args.gpu_hours<=8 or args.wall_hours<=0:raise ValueError('New authorized cap is at most eight GPU-hours; wall cap is independent')
     if args.minimum_free_mib<18000:raise ValueError('Do not lower the pinned BF16 model memory requirement to use a busy GPU')
@@ -656,7 +682,7 @@ def main():
             scoring_endpoints=[f"http://127.0.0.1:{s['port']}" for s in servers],sg_workers=len(servers))
         if stage=='evaluate':
             cfg.update(episodes=1,eval_seed=seed,eval_seeds=[seed],evaluation_disabled=False,
-                red=red,pool=str(pool) if pool else None,evaluation_role='frozen_test' if red=='finite' else 'transfer_test')
+                red=red,pool=str(pool) if pool else None,evaluation_role='exploratory_frozen_pilot' if protocol['protocol_kind']=='exploratory-frozen-policy-pair-v1' else 'frozen_test' if red=='finite' else 'transfer_test')
             cfg['evolution']['rollout_verification']=False;cfg.pop('rollout_validation',None)
         elif cfg['evolution'].get('rollout_verification'):cfg['rollout_validation'].update(ports=[s['port'] for s in servers])
         config_path=dest/'config.json'
@@ -714,11 +740,18 @@ def main():
                 remaining_seconds();heartbeat()
                 try:
                     with urllib.request.urlopen(f"http://127.0.0.1:{server['port']}/health",timeout=1) as stream:identity=json.load(stream)
-                    model=protocol['configs']['B0']['model']
+                    model=next(iter(protocol['configs'].values()))['model']
                     if identity.get('model')!=model['model'] or identity.get('revision')!=model['revision'] or identity.get('dtype')!='bfloat16' or not identity.get('weights_frozen'):raise ValueError('Model identity mismatch')
                     write(out/f"identity-{server['port']}.json",identity);ready=True;break
                 except OSError:time.sleep(.5)
             if not ready:raise RuntimeError('Pinned Qwen startup failed')
+        if protocol['protocol_kind']=='exploratory-frozen-policy-pair-v1':
+            switch_phase('exploratory_frozen_pilot')
+            for label in protocol['required_evaluation_labels']:
+                for seed in protocol['pilot_test_seeds']:
+                    _,job=worker(label,'evaluate',servers[0]['port'],seed,pool=ROOT/'artifacts/initial_pool.json')
+                    if job.get('summary_status')!='completed':raise IncompleteOptimization('Required exploratory episode incomplete; no paired claim')
+            return
         if protocol['protocol_kind'] in ('fixed-committed-update-verification-v1','historical-diagnosis-probes-v1'):
             run_fixed_study(protocol,out,journal,servers,worker,remaining_seconds,switch_phase)
             return

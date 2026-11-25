@@ -170,3 +170,77 @@ def verify_counterfactual_snapshot(before_state, after_state, before_rng, after_
     return {'state_equal': before_state == after_state, 'rng_equal': before_rng == after_rng,
             'eligible': before_state == after_state and before_rng == after_rng,
             'causal_effect_estimated': False}
+
+
+def response_timeline(rows,families=None,allowed_actions=None):
+    """Visible cue-to-response links; delays are censored, never hidden-attack failures."""
+    import json,re
+    from .behavior import chosen_action
+    from .diagnosis import operation,restore_boundary
+    from .behavior_skills import initiation_matches
+    families=families or {};allowed_actions=allowed_actions or {};groups=defaultdict(list)
+    for row in rows:
+        if row.get('policy')=='llm':groups[(row.get('seed'),row.get('episode_id'),row['agent'])].append(row)
+    events=[];termination=Counter();selector=Counter();guidance=Counter();open_sleep=0;termination_logged=0;free_total=0
+    for group,trace in groups.items():
+        trace.sort(key=lambda r:r['step']);seen=set();free=[r for r in trace if r.get('policy_invoked')]
+        def selection_at(record):
+            audit=(record.get('skill_controller') or {}).get('selection_audit')
+            return {'step':record['step'],**{k:audit.get(k) for k in ('source','selected','controller_contract','gain_filter_veto')}} if audit else None
+        def termination_at(record):
+            controller=record.get('skill_controller') or {};audit=controller.get('termination_audit')
+            events=[e for e in controller.get('events',[]) if e.get('terminated') or e.get('error')]
+            if audit:return {'step':record['step'],'status':audit.get('status'),'response':audit.get('response'),'events':events}
+            return {'step':record['step'],'status':None,'events':events,'raw_status_not_recorded':True} if events else None
+        for row in trace:
+            controller=row.get('skill_controller') or {};ta=controller.get('termination_audit')
+            if ta:termination[ta['status']]+=1;termination_logged+=1
+            for e in controller.get('events',[]):
+                if e.get('reason'):termination[e['reason']]+=1
+                if e.get('error'):termination[e['error']]+=1
+            sa=controller.get('selection_audit')
+            if sa:
+                selector['calls']+=1;selector['gain_filter_veto']+=bool(sa.get('gain_filter_veto'))
+                selector['NONE']+=sa.get('selected') is None
+                selector['llm_gain_audit_recorded']+='gain_filter_veto' in sa
+            if row.get('policy_invoked'):
+                free_total+=1;action,_=chosen_action(row);ctx=row.get('behavior_context') or {}
+                open_sleep+=action=='Sleep' and bool(ctx.get('open_cases'))
+                name=row.get('skill_id');family=families.get(name,re.sub(r'_v\d+$','',name or 'NONE'))
+                if name and ctx and not initiation_matches(family,ctx,revision='v5'):guidance['observable_eligibility_mismatch']+=1
+                permitted=allowed_actions.get(name)
+                if permitted is not None and action not in permitted:guidance['outside_declared_guidance_actions']+=1
+            for phase in ('before','after'):
+                for host,body in (row.get('observation_'+phase) or {}).items():
+                    if not isinstance(body,dict):continue
+                    at=row['step']+int(phase=='after');epoch=restore_boundary(trace,row['agent'],host,at)
+                    cues=[('pid',p['PID']) for p in body.get('Processes',[]) if isinstance(p,dict) and 'PID' in p and 'username' not in p]
+                    cues += [('admin',f['File Name']) for f in body.get('Files',[]) if isinstance(f,dict) and f.get('File Name') in ('escalate.sh','escalate.exe')]
+                    if isinstance(body.get('Services'),dict):cues += [('service',json.dumps([k,v],sort_keys=True)) for k,v in body['Services'].items()]
+                    for kind,value in cues:
+                        key=(host,epoch,kind,str(value))
+                        if key in seen:continue
+                        seen.add(key);later=[r for r in free if r['step']>=at];responses={}
+                        for action in ('Analyse','Remove','Restore'):
+                            request=next((r for r in later if chosen_action(r)==(action,host) and r.get('request_applied') and not r.get('parse_error')),None)
+                            if request:
+                                completion=next((operation(r) for r in trace if operation(r).get('name')==action and operation(r).get('target')==host and operation(r).get('started_at')==request['step'] and operation(r).get('completed_at') is not None),None)
+                                responses[action]={'requested_step':request['step'],'elapsed_ticks':request['step']-at,
+                                    'free_decisions_before_request':sum(r['step']<request['step'] for r in later),
+                                    'busy_ticks_before_request':sum(at<=r['step']<request['step'] and not r.get('policy_invoked') for r in trace),
+                                    'skill':request.get('skill_id'),
+                                    'selection':next((selection_at(r) for r in reversed(trace) if r['step']<=request['step'] and selection_at(r)),None),
+                                    'termination':termination_at(request),
+                                    'completion':completion,'completion_linked':completion is not None}
+                            else:responses[action]={'censored':True,'not_an_unobserved_attack_failure':True}
+                        events.append({'seed':group[0],'episode_id':group[1],'agent':group[2],'observation_target':host,
+                            'kind':kind,'value':value,'first_visible_at':at,'restore_epoch':epoch,'responses':responses,
+                            'last_selection_before_cue':next((selection_at(r) for r in reversed(trace) if r['step']<at and selection_at(r)),None),
+                            'first_selection_after_cue':next((selection_at(r) for r in trace if r['step']>=at and selection_at(r)),None),
+                            'first_termination_after_cue':next((termination_at(r) for r in trace if r['step']>=at and termination_at(r)),None)})
+    return {'scope':'First visible clue per host/epoch/value; correlation only. No hidden-state or causal failure labels.',
+        'new_visible_cues':len(events),'events':events,'free_decisions':free_total,'unresolved_case_free_sleep':open_sleep,
+        'termination_counts':dict(termination),'explicit_termination_audits':termination_logged,
+        'CONTINUE_count':termination.get('CONTINUE',0) if termination_logged else None,
+        'selector':dict(selector),'guidance_diagnostics':dict(guidance),
+        'guidance_is_not_an_action_mask':True,'causal_effect_estimated':False}

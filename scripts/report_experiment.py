@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from scripts.recompute_public_metrics import recompute,paired_episodes
 from research.progress import Journal,atomic_json
-from research.config import comparison_metadata,VERIFICATION_VARIANTS,COMPLETED_OPTIMIZER_STATUSES
+from research.config import comparison_metadata,VERIFICATION_VARIANTS,CONTROLLER_VARIANTS,COMPLETED_OPTIMIZER_STATUSES
 
 
 def load(path):
@@ -64,6 +64,10 @@ def training_evidence(config,summary,run,cache):
     expected['rollout_verification']=base=='B4' or metadata.get('rollout_verification',False)
     for k in ('gate_mode','schedule','maintenance_mode'):
         if k in e:expected[k]=e[k]
+    for k in ('method_version','admission_mode','evidence_schema'):
+        if k in e:expected[k]=e[k]
+    if trained.get('controller_contract','upstream')!=config.get('selector',{}).get('contract','upstream'):
+        result['state']='training_controller_mismatch';return result
     if any(algorithm.get(k,False if isinstance(value,bool) else 0)!=value for k,value in expected.items()):
         result['state']='training_method_mismatch';return result
     history=trained.get('history',[]);status=trained.get('optimizer_status')
@@ -214,7 +218,8 @@ def collect(directory, include_trace=False):
 
 COMPARISONS=(('B1','B0'),('B2','B1'),('B2','B0'),('B4','B2'),('B4','B0'),
              ('B3-no-support','B2'),('B3','B3-no-support'),('B3','B2'),('B4','B3'),
-             *[(name,metadata['base']) for name,metadata in VERIFICATION_VARIANTS.items()])
+             *[(name,metadata['base']) for name,metadata in VERIFICATION_VARIANTS.items()],
+             ('B1-selector-contract','B1'),('B3-selector-contract','B1-selector-contract'))
 
 
 def paired_comparisons(episodes):
@@ -259,7 +264,7 @@ def paired_comparisons(episodes):
 
 
 def optimizer_report(directory,output,statuses):
-    states=[];changes=[];diagnoses=[];tasks=[];usage=None
+    states=[];changes=[];diagnoses=[];tasks=[];usage=None;candidate_stages=[]
     db=directory/'journal.sqlite3'
     if db.exists():
         journal=Journal(db);tasks=journal.tasks();usage=journal.budget_usage()
@@ -273,6 +278,19 @@ def optimizer_report(directory,output,statuses):
                 for sg in record.get('semantic_gradients',[]):
                     for item in sg.get('evidence_audits',[]):diagnoses.append(item)
                 for candidate in record.get('candidates',[]):
+                    validation=candidate.get('rollout_validation')
+                    candidate_stages.append({'loop_id':key,'arm':state.get('context',{}).get('arm'),
+                        'name':(candidate.get('skill') or {}).get('name'),
+                        'planned':True,'collected':True,'grounded':(candidate.get('semantic_support') or {}).get('passed'),
+                        'candidates_generated':bool(candidate.get('skill')),'scored':candidate.get('score') is not None,
+                        'ppo_passed':candidate.get('score',0)>0 if candidate.get('score') is not None else None,
+                        'rollout_pending':validation is None if candidate.get('ppo_accepted') else None,
+                        'rollout_completed':bool(validation.get('validation_complete') or validation.get('seeds')) if validation else None,
+                        'committed_changed':bool(candidate.get('accepted')) and state['status'] in COMPLETED_OPTIMIZER_STATUSES,
+                        'used_next_batch':None,'frozen_evaluated':None,
+                        'admission_mode':candidate.get('admission_mode'),'efficacy_verified':candidate.get('efficacy_verified'),
+                        'surrogate_diagnostics':candidate.get('surrogate_diagnostics'),
+                        'unknown_is_not_zero':True})
                     if candidate.get('accepted'):
                         changes.append({'loop_id':key,'arm':state.get('context',{}).get('arm'),'iteration':state.get('iteration'),
                             'parent':record['old_skill'],'after':candidate['skill'],
@@ -295,7 +313,10 @@ def optimizer_report(directory,output,statuses):
         used=any(r.get('policy')=='llm' and r.get('skill_id')==change['after']['name'] for r in observed)
         change['next_loop_used']=True if used else False if matching and complete else None
         change['next_loop_note']='Based on completed next-batch raw traces; missing/unfinished future experience remains unknown.'
+        for item in candidate_stages:
+            if item['loop_id']==change['loop_id'] and item['name']==change['after']['name']:item['used_next_batch']=change['next_loop_used']
     atomic_json(output/'optimizer_progress.json',{'loops':states,'environment_runs':statuses,'tasks':tasks,
+        'candidate_stages':candidate_stages,
         'resource_phases':journal.restore('resource_phases') if db.exists() else None,
         'budget':usage,'unknown_is_not_zero':True,
         'completed_optimizer_loops':sum(s['status'].startswith('completed_') for s in states),
@@ -489,12 +510,27 @@ def report_experiment(directory, output=None, include_trace=False, include_bundl
             if (output/filename).exists():lines.append(f'- [{filename}]({filename})')
         screen=load(output/'fixed_update_rollout.json') if (output/'fixed_update_rollout.json').exists() else {}
         if screen:lines+=['',f"Reject-only validation: {screen.get('reason')}; paired seeds={screen.get('paired_seeds')}; differences={screen.get('differences')}. Partial validation never approves."]
-    (output/'performance.md').write_text('\n'.join(lines))
+    path=output/'performance.md';marker='<!-- generated-comparison:start -->'
+    previous=path.read_text() if path.exists() else ''
+    if marker in previous:preface=previous.split(marker,1)[0]
+    elif '# Experiment comparison\n' in previous:preface=previous.split('# Experiment comparison\n',1)[0]
+    else:preface=previous+'\n\n' if previous else ''
+    path.write_text(preface+marker+'\n'+'\n'.join(lines))
     optimizer_report(directory,output,statuses)
     from scripts.audit_training_cost import audit
     audit(directory)
-    if include_bundle:reproduction_bundle(directory,output)
-    return {'episodes': len(episodes), 'runs': len(statuses), 'rollout_decisions': len(decisions), 'output': str(output)}
+    bundle_action='not_requested'
+    if include_bundle:
+        mismatch=any(not (ROOT/name).is_file() or hashlib.sha256((ROOT/name).read_bytes()).hexdigest()!=expected
+            for name,expected in protocol.get('source_sha256',{}).items())
+        if mismatch:
+            archive=output/'reproduction_bundle.tar.gz';manifest=output/'reproducibility_manifest.json'
+            if not archive.is_file() or not manifest.is_file() or hashlib.sha256(archive.read_bytes()).hexdigest()!=load(manifest).get('sha256'):
+                raise ValueError('Registered source differs; an exact immutable source bundle is required, never snapshot the current source as historical evidence')
+            bundle_action='preserved_registered_source_snapshot'
+        else:
+            reproduction_bundle(directory,output);bundle_action='created_from_registered_source'
+    return {'episodes': len(episodes), 'runs': len(statuses), 'rollout_decisions': len(decisions), 'output': str(output),'bundle_action':bundle_action}
 
 
 if __name__ == '__main__':

@@ -305,3 +305,58 @@ def test_scorer_profile_fills_missing_per_token_generation_cache_with_reference(
     assert result['historical_exact_reference_samples']==0 and result['fresh_missing_per_token_reference_samples']==6
     assert result['reference_gate_reproduced'] and not result['backend_adopted']
     assert all(row['ppo_decisions_match'] for row in result['microbatches'].values())
+
+
+def test_selector_contract_is_one_factor_and_upstream_maturity_filter_is_preserved(offline):
+    from research.config import variant_config
+    from research.skills import SkillController
+    pool=SecuritySkillPool(24,seed_set='response_v1');state={'user_prompt':'visible','observation':{},'allowed_actions':[]}
+    skill=pool.skills[0];calls=[]
+    def model(prompt,*a,**k):calls.append(prompt);return '<choice>'+skill.name+'</choice>'
+    for maturity,expected in ((2,skill.name),(3,None)):
+        skill.maturity=maturity;skill.avg_gain=-.02
+        controller=SkillController(pool,model,{'epsilon':0,'contract':'cage4_role_v1'})
+        selected=controller.choose(state,0)
+        assert (selected.name if selected else None)==expected
+        assert 'CAGE4 defender selector contract' in calls[-1] and 'Return one JSON object' not in calls[-1]
+        assert controller.last_event['selection_audit']['gain_filter_veto']==(maturity==3)
+    assert variant_config('B1-selector-contract')['arm']=='E1'
+    assert variant_config('B3-selector-contract')['arm']=='E2'
+    assert variant_config('B2')['selector'].get('contract','upstream')=='upstream'
+
+
+def test_static_selector_pilot_reserves_both_complete_episodes_before_launch(tmp_path,monkeypatch):
+    from argparse import Namespace
+    from scripts import run_campaign as campaign
+    plan={'purpose':'development','train':[91000,91001],'validation':[],'final_test':[1234567],'transfer':[]}
+    monkeypatch.setattr(campaign,'campaign_seed_plan',lambda args:(plan,{'exposed_seeds':[]}))
+    monkeypatch.setattr(campaign,'campaign_budget',lambda args:(6.882450215,{'gpu_hours':6.882450215}))
+    monkeypatch.setattr(campaign,'source_identity',lambda:{})
+    monkeypatch.setattr(campaign,'core_cost_reservation',lambda seeds:{'episode_upper_seconds':1000})
+    p=campaign.make_protocol(Namespace(frozen_policy_pilot=True,max_gpus=1,gpu_hours=1,wall_hours=1,minimum_free_mib=24000),tmp_path)
+    assert p['core_evaluation_reservation']['episodes']==2
+    assert p['core_evaluation_reservation']['gpu_seconds_estimate']==2390
+    assert p['training_plan']=={'episodes':0,'iterations':0}
+    left,right=(p['configs'][n] for n in p['required_evaluation_labels'])
+    assert left['arm']==right['arm']=='E1' and left['pool']==right['pool']
+    assert left['selector'].get('contract','upstream')=='upstream' and right['selector']['contract']=='cage4_role_v1'
+    for key in ('model','steps','communication','action_contract','behavior_context'):assert left[key]==right[key]
+
+
+def test_visible_cue_chain_keeps_selection_termination_busy_wait_and_completion_separate():
+    from research.attribution import response_timeline
+    common={'seed':1,'episode_id':0,'agent':'blue_agent_4','policy':'llm','observation_before':{},'observation_after':{}}
+    rows=[{**common,'step':0,'policy_invoked':True,'request_applied':True,'requested_action':'Sleep','action_status':'UNKNOWN',
+        'observation_after':{'h1':{'Processes':[{'PID':77}]}},'skill_id':'RiskBasedInvestigation',
+        'skill_controller':{'selection_audit':{'selected':'RiskBasedInvestigation','source':'llm'}}},
+      {**common,'step':1,'policy_invoked':False,'requested_action':'Sleep','action_status':'IN_PROGRESS'},
+      {**common,'step':2,'policy_invoked':True,'request_applied':True,'requested_action':'Remove h1','action_status':'IN_PROGRESS','skill_id':'RapidProcessResponse',
+        'skill_controller':{'selection_audit':{'selected':'RapidProcessResponse','source':'llm'},
+            'events':[{'terminated':'RiskBasedInvestigation','reason':'model_termination'}]}},
+      {**common,'step':3,'policy_invoked':False,'requested_action':'Sleep','action_status':'TRUE',
+        'behavior_outcome':{'completed_action':{'name':'Remove','target':'h1','started_at':2,'completed_at':4,'status':'TRUE'}}}]
+    event=response_timeline(rows)['events'][0];response=event['responses']['Remove']
+    assert event['last_selection_before_cue']['selected']=='RiskBasedInvestigation'
+    assert event['first_selection_after_cue']['step']==2 and event['first_termination_after_cue']['raw_status_not_recorded']
+    assert response['busy_ticks_before_request']==1 and response['free_decisions_before_request']==0
+    assert response['selection']['selected']=='RapidProcessResponse' and response['completion']['completed_at']==4

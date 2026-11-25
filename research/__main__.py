@@ -3,7 +3,7 @@ from pathlib import Path
 import json
 import sys
 from . import ROOT
-from .config import load, validate, ARMS, REDS, VERIFICATION_VARIANTS, variant_config
+from .config import load, validate, ARMS, REDS, VERIFICATION_VARIANTS, CONTROLLER_VARIANTS, variant_config
 
 
 def resource_args(config,args):
@@ -24,7 +24,7 @@ def main():
     for command in ("evaluate", "train", "compare", "official"):
         s = sub.add_parser(command)
         s.add_argument("--config", default=str(ROOT/"research_configs/rollout-B0.yaml"))
-        s.add_argument('--variant',choices=VERIFICATION_VARIANTS,help='Named verification ablation built from the existing configs')
+        s.add_argument('--variant',choices=[*VERIFICATION_VARIANTS,*CONTROLLER_VARIANTS],help='Named verification ablation built from the existing configs')
         s.add_argument("--arm", choices=ARMS)
         s.add_argument("--red", choices=REDS)
         s.add_argument("--composition", choices=("hybrid", "all_llm", "no_blue", "all_rl"))
@@ -43,7 +43,7 @@ def main():
         s.add_argument("--limit", type=int, help="Maximum new episodes in this invocation; plan and resume remain intact")
         if command == "compare":
             s.add_argument("--arms", choices=ARMS, nargs="+", default=list(ARMS))
-            s.add_argument('--variants',choices=['B0','B1','B2','B3-no-support','B3','B4',*VERIFICATION_VARIANTS],nargs='+',
+            s.add_argument('--variants',choices=['B0','B1','B2','B3-no-support','B3','B4',*VERIFICATION_VARIANTS,*CONTROLLER_VARIANTS],nargs='+',
                 help='Use the registered public configs and distinct ablation IDs, rather than changing internal E arms')
             s.add_argument("--reds", choices=REDS, nargs="+", default=list(REDS))
             s.add_argument("--train", action="store_true")

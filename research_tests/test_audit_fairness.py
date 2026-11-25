@@ -23,8 +23,16 @@ def test_public_labels_isolate_semantic_and_rollout_verification():
     assert len({c[label]['pool'] for label in ['B1','B2','B3','B4']})==1
 
 
-def test_reward_gate_and_token_probability_implementation_are_unchanged():
+def test_reward_gate_token_backend_and_default_skill_components_are_protected():
     reference=json.loads((ROOT/'tests/fixtures/reference_integrity.json').read_text())
+    import ast
+    source=ast.parse((ROOT/'research/skills.py').read_text());parts={}
+    for node in source.body:
+        name=getattr(node,'name',None)
+        if isinstance(node,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='SEEDS' for t in node.targets):name='SEEDS'
+        if name in reference['skills_protected_ast_sha256']:
+            parts[name]=hashlib.sha256(ast.dump(node,include_attributes=False).encode()).hexdigest()
+    assert parts==reference['skills_protected_ast_sha256']
     for name in ['gate.py','metrics.py','paper_algorithm.py','adapter.py','skills.py']:
         assert hashlib.sha256((ROOT/'research'/name).read_bytes()).hexdigest()==reference['core_sha256'][name],name
 

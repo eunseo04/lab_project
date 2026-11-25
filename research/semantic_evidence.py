@@ -80,7 +80,8 @@ def action_support(parent, candidate, experiences, gate_experiences):
         'actions_outside_empirical_execution_support':uncovered,
         'unclassified_changes':unclassified,'unverified_condition_procedure_termination':changed,
         'semantic_status':'unknown' if changed else 'unchanged',
-        'requires_rollout':bool(changed or uncovered or unobserved_conditions),'forbidden_actions':[],
+        'requires_rollout':bool(uncovered or unobserved_conditions or unclassified),'forbidden_actions':[],
+        'efficacy_verified':False,'unverified_semantics_require_efficacy_evaluation':bool(changed),
         'effect_verification':'Observed call outcomes and PPO likelihood do not establish defensive benefit; only a separate registered real-pool rollout can test it.',
         'intent_limit':'Explicit primitive mentions with simple direct negation handling; indirect natural-language intent is not fully classified.'}
 
@@ -142,6 +143,8 @@ def candidate_supported(parent,candidate,gradient_records,links=None):
         'instance_specific_identifier':instance,'change_links':list(linked.values()),'linkage_errors':errors,
         'known_rule_contradictions':contradictions,'semantic_status':'contradiction' if contradictions else 'unknown',
         'known_rule_source':{'path':str(rule_path),'sha256':hashlib.sha256(rule_path.read_bytes()).hexdigest() if rule_path.is_file() else None},
+        'facts_verified':bool(facts) and passed,'candidate_links_valid':not errors and bool(linked),
+        'known_contradiction':bool(contradictions),'efficacy_verified':False,
         'semantics_verified':False,'requires_rollout':bool(changed),
         'limitation':'A matching explicit link does not prove arbitrary prose agrees with the proposal or improves reward.'}
 
@@ -190,10 +193,31 @@ def audit_references(data,rows):
 
 
 class EvidenceModel:
-    def __init__(self,model,rows,diagnosis_verification=False):
+    def __init__(self,model,rows,diagnosis_verification=False,schema='typed_claims_v8'):
         self.model,self.rows,self.audits=model,rows,[]
         self.diagnosis_verification=diagnosis_verification
+        self.schema=schema
     def __call__(self,prompt):
+        if self.schema=='fact_interventions_v1':
+            from .diagnosis import canonical_fact_catalog,validate_interventions,INTERVENTION_PROMPT
+            prompt+=INTERVENTION_PROMPT+json.dumps(canonical_fact_catalog(self.rows),ensure_ascii=False)
+            if hasattr(self.model,'capture_evidence_rows'):self.model.capture_evidence_rows(self.rows)
+            raw=self.model(prompt)
+            from .upstream import OriginalEvolution
+            parsed=OriginalEvolution._parse_json_safely(self,raw)
+            data=parsed if isinstance(parsed,dict) else {}
+            checked=validate_interventions(data,self.rows)
+            audit={'passed':checked['passed'],'schema':self.schema,'raw_response':raw,
+                'selected_fact_ids':[i for p in checked['proposals'] for i in p['fact_ids']],
+                'interpreted_facts':checked['facts'],'structured_proposals':checked,
+                'diagnosis_validation':{'passed':checked['facts_verified'],'valid_claims':checked['facts'],'errors':checked['errors']},
+                'errors':checked['errors'],'valid_references':[{'component':f['component'],'evidence_id':f['evidence_id'],
+                    'fact_id':f['fact_id']} for f in checked['facts']]}
+            self.audits.append(audit)
+            return json.dumps({'is_related':checked['passed'],
+                'diagnosis':'Exact catalog facts; intervention and efficacy are untested.',
+                'semantic_gradient':{('policy' if k=='execution' else k):v if checked['passed'] else '' for k,v in checked['gradients'].items()},
+                'verified_facts':checked['facts'],'proposals':checked['proposals']},ensure_ascii=False)
         from .diagnosis import canonical_operations
         catalog=[{'evidence_id':f'E{i}',**{key:r.get(key) for key in
             ('step','agent','requested_action','action_status','policy_invoked','skill_terminated')},
