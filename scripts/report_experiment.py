@@ -411,6 +411,13 @@ COMPARISONS=(('B1','B0'),('B2','B1'),('B2','B0'),('B4','B2'),('B4','B0'),
              *[(name,'B1' if base=='B1' else 'B1'+name[2:]) for name,base in CONTROLLER_VARIANTS.items()])
 
 
+def checkpoint_comparisons(labels):
+    comparisons = [('B1', 'B0')]
+    for index, label in enumerate(labels):
+        comparisons.extend((label, previous) for previous in ('B0', 'B1', *labels[:index]))
+    return comparisons
+
+
 def paired_comparisons(episodes, checkpoint_labels=()):
     groups=defaultdict(lambda:defaultdict(list))
     for e in episodes:groups[episode_group(e)][e['label']].append(e)
@@ -419,9 +426,7 @@ def paired_comparisons(episodes, checkpoint_labels=()):
         curve=group[GROUP_FIELDS.index('evaluation_scope')]=='completed_update_curve'
         if curve:
             labels=checkpoint_labels or sorted((name for name in arms if name.startswith('B2@')),key=lambda x:int(x[3:]))
-            comparisons=[('B1','B0')]
-            for index,label in enumerate(labels):
-                comparisons.extend((label,previous) for previous in ('B0','B1',*labels[:index]))
+            comparisons=checkpoint_comparisons(labels)
         else:
             comparisons=list(dict.fromkeys([*COMPARISONS,*[(name,'B0') for name in arms if name!='B0']]))
         for new,old in comparisons:
@@ -457,8 +462,9 @@ def paired_comparisons(episodes, checkpoint_labels=()):
                 row['reward_component_mean_differences']={k:statistics.mean(b['reward_components'].get(k,0)-a['reward_components'].get(k,0) for a,b in zip(before,after)) for k in component_keys}
             output.append(row)
     if not groups:
+        comparisons=checkpoint_comparisons(checkpoint_labels) if checkpoint_labels else COMPARISONS
         output=[{'comparison':new+'-'+old,'paired_n':0,'mean_difference':None,'median_difference':None,
-                 'win_tie_loss':None,'paired_bootstrap_95ci':None,'reason':'No completed paired real test episodes'} for new,old in COMPARISONS]
+                 'win_tie_loss':None,'paired_bootstrap_95ci':None,'reason':'No completed paired real test episodes'} for new,old in comparisons]
     return output
 
 

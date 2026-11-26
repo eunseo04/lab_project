@@ -69,6 +69,23 @@ def test_uncommitted_completed_training_is_not_a_trained_test(tmp_path):
     assert train['completed_environment_episodes']==2 and train['committed_iterations']==0
 
 
+def test_empty_curve_reports_only_registered_checkpoint_comparisons():
+    rows = reporter.paired_comparisons([], ['B2@1', 'B2@2', 'B2@3'])
+
+    assert [row['comparison'] for row in rows] == [
+        'B1-B0',
+        'B2@1-B0', 'B2@1-B1',
+        'B2@2-B0', 'B2@2-B1', 'B2@2-B2@1',
+        'B2@3-B0', 'B2@3-B1', 'B2@3-B2@1', 'B2@3-B2@2',
+    ]
+    for row in rows:
+        assert row['paired_n'] == 0
+        assert row['mean_difference'] is None
+        assert row['median_difference'] is None
+        assert row['win_tie_loss'] is None
+        assert row['paired_bootstrap_95ci'] is None
+
+
 @pytest.mark.parametrize('inherited',[0,1])
 def test_registered_intermediate_checkpoints_keep_identical_eval_seeds_separate(tmp_path,inherited):
     from research.config import digest,validate
