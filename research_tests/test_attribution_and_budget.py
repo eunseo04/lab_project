@@ -284,6 +284,69 @@ def test_each_required_update_is_profiled_and_frozen_after_its_own_batch(tmp_pat
     assert json.loads((tmp_path/'extension_status.json').read_text())['B3']['status']=='completed'
 
 
+def test_curve_profiles_global_updates_and_reserves_only_segment_work(tmp_path,monkeypatch):
+    import json,threading
+    from research.progress import Journal,optimizer_batch_identity
+    from scripts.run_campaign import run_training_study
+    from scripts.audit_training_cost import campaign_reservation
+
+    journal=Journal(tmp_path/'journal.sqlite3')
+    protocol={'configs':{'B2':{'train_episodes':4,'iterations':2,'continuation':{'iteration':1}}},
+        'checkpoint_evaluations':{f'B2@{k}':{} for k in (1,2,3)},
+        'requested_training_arms':['B2'],'all_arms_required':True,'pilot_test_seeds':[81,82],
+        'core_evaluation_labels':['B0','B1','B2'],'budget_gpu_hours':8.,'maximum_wall_seconds':28800.,
+        'core_evaluation_reservation':{'episode_upper_seconds':10.}}
+    first=campaign_reservation(protocol,1)
+    assert first['counts']['optimizer_updates']==2 and first['counts']['training_episodes']==4
+    assert first['counts']['frozen_test_episodes']==10
+    committed=1;profiled=[];evaluated=[]
+
+    def worker(label,stage,port,seed=None,red='finite',pool=None,*,checkpoint=None):
+        nonlocal committed
+        dest=tmp_path/'runs'/f'{label}-{stage}-{seed}';dest.mkdir(parents=True,exist_ok=True)
+        if stage=='evaluate':
+            if checkpoint:assert checkpoint['iteration']==int(label[3:])
+            (dest/'summary.json').write_text(json.dumps({'status':'completed'}))
+            evaluated.append((label,seed))
+            return dest,{'status':'completed','summary_status':'completed','task_id':dest.name}
+        for iteration in range(committed+1,4):
+            pending={'trace_hash':str(iteration),'resume_identity':{'iteration':iteration},
+                     'environment_episodes_completed':2*(iteration-1),'segment_completed_iterations':iteration-2}
+            journal.checkpoint(f'pending_batch:{iteration}:B2',pending)
+            reservation=journal.restore(f'preflight:B2:{iteration}')
+            if not reservation:
+                return dest,{'status':'incomplete','failure_status':'waiting_for_cost_preflight'}
+            assert reservation['batch_identity']==optimizer_batch_identity(pending)
+            committed=iteration
+            (dest/'checkpoint.json').write_text(json.dumps({'history':[{}]*iteration,
+                'segment_completed_iterations':iteration-1,'episodes_completed':2*(iteration-1),
+                'optimizer_status':'completed_unchanged','training_completed':iteration==3}))
+        return dest,{'status':'completed'}
+
+    def profile(out,label,pending,port,*,iteration,deadline):
+        profiled.append(iteration)
+        return {'status':'measured','episode_upper_seconds':12.,'planned_parents':0,'planned_sg_chunks':0}
+
+    bindings={f'B2@{k}':{'path':str(tmp_path/f'pool-{k}.json'),'iteration':k,
+                          'checkpoint_sha256':str(k)*64,'pool_sha256':str(k)*64} for k in (1,2,3)}
+    monkeypatch.setattr('scripts.run_campaign.bind_checkpoints',lambda *a:bindings)
+    monkeypatch.setattr('scripts.audit_training_cost.profile_optimizer',profile)
+    monkeypatch.setattr('scripts.audit_training_cost.audit',lambda _:None)
+    run_training_study(protocol,tmp_path,journal,[{'port':8418}],worker,lambda:28000,lambda _:None,threading.Event())
+    assert committed==3 and profiled==[2,3]
+    assert evaluated==[(label,seed) for seed in (81,82) for label in ('B0','B1','B2@1','B2@2','B2@3')]
+    assert journal.restore('campaign_cost_progress')['updates']=={'B2':2}
+    assert journal.restore('preflight:B2:2')['counts']['optimizer_profiles']==1
+    assert journal.restore('preflight:B2:3')['counts']['optimizer_profiles']==0
+    receipts=journal.restore('campaign_cost_progress')['evaluation_receipts']['core']
+    assert len(receipts)==10
+    assert {value.get('checkpoint_iteration') for value in receipts.values()}=={None,1,2,3}
+    progress=journal.restore('campaign_cost_progress')
+    progress['evaluated_blocks']=[]
+    progress['curve_evaluation_receipts'].pop('B2@3:finite:82')
+    assert campaign_reservation(protocol,1,progress=progress)['counts']['frozen_test_episodes']==1
+
+
 def test_campaign_cleanup_checks_process_identity_before_signaling(tmp_path):
     import subprocess,sys
     from scripts.run_campaign import process_identity,stop_owned

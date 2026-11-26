@@ -15,23 +15,22 @@ import sys
 import threading
 import time
 import urllib.request
+import zlib
 from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 from research.progress import (Journal,atomic_json,BudgetExceeded,IncompleteOptimization,digest,
-    implementation_identity,LEGACY_GPU_AUTHORIZATION,validate_budget_limits,optimizer_batch_identity)
+    implementation_identity,LEGACY_GPU_AUTHORIZATION,validate_budget_limits,optimizer_batch_identity,file_sha256 as sha)
 from research.config import (load,validate,variant_config,apply_seed_plan,validate_seed_plan,
     seed_exposure_history,split_seeds,VERIFICATION_VARIANTS,CONTROLLER_VARIANTS,COMPLETED_OPTIMIZER_STATUSES,REDS,
-    execution_config,policy_interface,check_pool_interface,read_policy_manifest,read_training_manifest)
+    execution_config,policy_interface,check_pool_interface,read_policy_manifest,read_training_manifest,
+    checkpoint_method_digest,core_evaluation_labels,training_boundary,verify_completed_update,digest as config_digest)
 from scripts.audit_training_cost import campaign_reservation, STARTUP_SHUTDOWN_SECONDS
 
 PORTS=[8418,8419,8420,8421]
 write=atomic_json
-
-
-def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def source_identity():
@@ -278,6 +277,120 @@ def historical_reference(args):
         'role':'Historical context only; never merged into this study or counted as new loops/episodes.'}
 
 
+def continuation_source(path, protocol, initial_pool_sha256):
+    path = Path(path).resolve()
+    if path.parent.name == 'frozen' and path.name == 'B2.json':
+        original = path.parent.parent / 'runs/B2-finite-train/checkpoint.json'
+        if sha(path) != sha(original):
+            raise ValueError('Frozen B2 does not match its original training checkpoint')
+        path = original
+    manifest_path = path.parent / 'manifest.json'
+    manifest_ref = {'path': str(manifest_path), 'sha256': sha(manifest_path)}
+    checkpoint = json.loads(path.read_text())
+    manifest = read_training_manifest(path, checkpoint, manifest_ref=manifest_ref)
+    if checkpoint.get('training_completed') is not True:
+        raise ValueError('Continuation requires a completed previous training segment')
+    original_out = Path(manifest['config']['experiment_id'])
+    original_protocol = original_out / 'protocol.json'
+    original = json.loads(original_protocol.read_text())
+    registered_digest = original['comparison_protocol_digest']
+    protocol_input = deepcopy(original)
+    protocol_input.pop('comparison_protocol_digest')
+    for cfg in protocol_input['configs'].values():
+        cfg.pop('protocol_digest')
+    old_sources = original['source_sha256']
+    orchestration = {'research/config.py', 'research/experiment.py', 'research/progress.py', 'research/reporting.py',
+                     'scripts/run_campaign.py', 'scripts/audit_training_cost.py',
+                     'scripts/report_experiment.py', 'scripts/recompute_public_metrics.py'}
+    current_sources = protocol['source_sha256']
+    if (registered_digest != digest(protocol_input) or registered_digest != manifest['config'].get('protocol_digest')
+            or original['locks'] != protocol['locks']
+            or original['keep_weights_sha256'] != protocol['keep_weights_sha256']
+            or original['initial_pool_file_sha256'] != protocol['initial_pool_file_sha256']
+            or not manifest.get('implementation_sha256')
+            or any(old_sources.get(name) != value for name, value in manifest['implementation_sha256'].items())
+            or any(old_sources.get(name) != current_sources.get(name)
+                   for name in (old_sources.keys() | current_sources.keys()) - orchestration)):
+        raise ValueError('Continuation source, policy implementation or asset locks differ')
+    iteration = len(checkpoint.get('history', []))
+    expected = {'iteration': iteration, 'total_training_episodes': checkpoint['total_training_episodes'],
+                'training_seeds': checkpoint['training_seeds'], 'initial_pool_sha256': initial_pool_sha256}
+    verified = verify_completed_update(checkpoint, expected, protocol['configs']['B2'], manifest)
+    identity = checkpoint.get('model_identity') or {}
+    configured = protocol['configs']['B2']['model']
+    if (any(identity.get(key) != configured[key] for key in ('model', 'revision'))
+            or identity.get('dtype') != 'bfloat16' or not identity.get('weights_frozen')):
+        raise ValueError('Continuation requires the pinned frozen BF16 Qwen model')
+    checkpoint_hash = sha(path)
+    with sqlite3.connect((original_out / 'journal.sqlite3').as_uri() + '?mode=ro', uri=True) as db:
+        row = db.execute('SELECT value FROM checkpoints WHERE key=?', (f'loop_commit:{iteration}:B2',)).fetchone()
+    receipt = json.loads(zlib.decompress(row[0])) if row else {}
+    if (receipt.get('checkpoint_sha256') != checkpoint_hash
+            or receipt.get('optimizer_status') != checkpoint['optimizer_status']):
+        raise ValueError('Continuation checkpoint does not match its durable commit receipt')
+    files = {str(path): checkpoint_hash, str(manifest_path): manifest_ref['sha256'],
+             str(original_protocol): sha(original_protocol)}
+    for local_episode, seed in enumerate(split_seeds(manifest['config'], 'train')):
+        record_path = path.parent / f'episode-{local_episode:04d}.json'
+        result = json.loads(record_path.read_text())
+        trace = record_path.with_suffix('.jsonl')
+        if (result.get('kind') != 'real_cage4' or result.get('status') != 'completed'
+                or result.get('seed') != seed or sha(trace) != result.get('trace_sha256')):
+            raise ValueError('Continuation training trace does not match its completed episode')
+        files.update({str(record_path): sha(record_path), str(trace): result['trace_sha256']})
+    return {**expected, **verified, 'path': str(path), 'checkpoint_sha256': checkpoint_hash,
+            'training_manifest': manifest_ref, 'model_identity': identity,
+            'source_protocol': str(original_protocol), 'source_identity_sha256': digest(old_sources),
+            'files_sha256': files}
+
+
+def register_checkpoint_evaluations(args, out, protocol):
+    iterations = getattr(args, 'checkpoint_iterations', None)
+    previous = getattr(args, 'continue_from', None)
+    if iterations is None and previous is None:
+        return
+    if protocol['requested_training_arms'] != ['B2'] or protocol['generalization_requested']:
+        raise ValueError('Checkpoint evaluation covers the registered B0/B1/B2 FiniteState curve')
+    cfg = protocol['configs']['B2']
+    initial_hash = config_digest(json.loads((ROOT / 'artifacts/initial_pool.json').read_text())['pool'])
+    inherited = continuation_source(previous, protocol, initial_hash) if previous else {}
+    offset = inherited.get('iteration', 0)
+    inherited_seeds = inherited.get('training_seeds', [])
+    new_seeds = protocol['seed_plan']['train']
+    if (set(inherited_seeds) & (set(new_seeds) | set(protocol['pilot_test_seeds']))
+            or set(new_seeds) & set(protocol['seed_exposure_history']['exposed_seeds'])):
+        raise ValueError('Checkpoint curve requires new training experience and a separate holdout')
+    if inherited:
+        protocol['continuation_source'] = inherited
+        cfg.update(pool=inherited['path'], pool_manifest=inherited['training_manifest'],
+                   continuation={key: inherited[key] for key in ('iteration', 'training_seeds',
+                       'total_training_episodes', 'training_lineage_id', 'initial_pool_sha256', 'checkpoint_sha256')})
+    total = offset + cfg['iterations']
+    iterations = iterations if iterations is not None else list(range(max(offset, 1), total + 1))
+    if iterations != sorted(set(iterations)) or any(not max(offset, 1) <= k <= total for k in iterations):
+        raise ValueError('Checkpoint iterations must be ordered and available in the declared lineage')
+    checkpoints = {}
+    for iteration in iterations:
+        local = training_boundary(len(new_seeds), cfg['iterations'], iteration - offset)
+        seeds = sorted([*inherited_seeds, *new_seeds[:local]])
+        checkpoints[f'B2@{iteration}'] = {'iteration': iteration, 'training_seeds': seeds,
+            'total_training_episodes': len(seeds), 'initial_pool_sha256': initial_hash,
+            'path': inherited['path'] if iteration == offset else
+                str(out / 'runs' / 'B2-finite-train' / f'pool-iteration-{iteration:04d}.json')}
+        if inherited:
+            checkpoints[f'B2@{iteration}']['training_lineage_id'] = inherited['training_lineage_id']
+    protocol['checkpoint_evaluations'] = checkpoints
+    protocol['all_arms_required'] = True
+    protocol['training_plan'].update(inherited_optimizer_iterations=offset,
+        segment_optimizer_iterations=cfg['iterations'], total_optimizer_iterations=total,
+        inherited_training_episodes=len(inherited_seeds), segment_training_episodes=len(new_seeds),
+        total_training_episodes=len(inherited_seeds) + len(new_seeds))
+    reservation = protocol['core_evaluation_reservation']
+    count = len(core_evaluation_labels(protocol)) * len(protocol['pilot_test_seeds'])
+    upper = reservation['episode_upper_seconds']
+    reservation.update(episodes=count, gpu_seconds_estimate=count * upper if upper is not None else None)
+
+
 def make_protocol(args,out):
     if getattr(args,'frozen_policy_pilot',False):
         plan,history=campaign_seed_plan(args);prior,ledger=campaign_budget(args)
@@ -349,6 +462,7 @@ def make_protocol(args,out):
         'allocation':'Reserve mandatory collection, profiling, updates, paired validation, final/required transfer and shutdown before launch. Refresh with each pending batch.',
         'scorer':'incremental_reference; experimental full-sequence cannot be adopted without a real-Qwen parity certificate',
         'selection':'Freeze completed_changed/completed_unchanged/completed_no_eligible_skill only. An interrupted pool is untrained_control, never a trained policy.'}
+    register_checkpoint_evaluations(args, out, protocol)
     protocol['required_work_reservations']=[campaign_reservation(protocol,count) for count in range(1,args.max_gpus+1)]
     return protocol
 
@@ -604,16 +718,51 @@ def run_fixed_study(protocol,out,journal,servers,worker,remaining_seconds,switch
 
 def read_cost_progress(journal):
     progress=journal.restore('campaign_cost_progress') or {}
-    for receipt in progress.get('evaluation_receipts',{}).values():
-        if any(not Path(path).is_file() or sha(Path(path))!=value for path,value in receipt.items()):
-            raise ValueError('A completed evaluation record changed after it was reserved as complete')
+    curve_receipts=progress.get('curve_evaluation_receipts',{})
+    completed_curve={value['summary_path']:value for value in curve_receipts.values()}
+    for receipt in [*progress.get('evaluation_receipts',{}).values(),completed_curve]:
+        for path, value in receipt.items():
+            summary_hash = value['summary_sha256'] if isinstance(value, dict) else value
+            if not Path(path).is_file() or sha(path) != summary_hash:
+                raise ValueError('A completed evaluation record changed after it was reserved as complete')
     return progress
+
+
+def bind_checkpoints(protocol, out, journal):
+    """Bind each predeclared update to its unique committed checkpoint and Pool."""
+    bindings = journal.restore('checkpoint_evaluation_bindings') or {}
+    original = protocol.get('continuation_source') or {}
+    cfg = protocol['configs']['B2']
+    for label, expected in protocol.get('checkpoint_evaluations', {}).items():
+        path = Path(expected['path'])
+        inherited = path == Path(original.get('path', ''))
+        manifest_path = path.parent / 'manifest.json'
+        manifest_ref = original['training_manifest'] if inherited else {
+            'path': str(manifest_path), 'sha256': sha(manifest_path)}
+        checkpoint = json.loads(path.read_text())
+        manifest = read_training_manifest(path, checkpoint, manifest_ref=manifest_ref)
+        if not inherited and manifest['config'].get('protocol_digest') != protocol['comparison_protocol_digest']:
+            raise ValueError('Checkpoint training did not use the registered campaign')
+        proof = verify_completed_update(checkpoint, expected, cfg, manifest)
+        checkpoint_hash = sha(path)
+        receipt = original if inherited else journal.restore(f"loop_commit:{expected['iteration']}:B2")
+        if not receipt or receipt['checkpoint_sha256'] != checkpoint_hash:
+            raise ValueError('Checkpoint differs from the committed optimizer receipt')
+        binding = {**expected, **proof, 'checkpoint_sha256': checkpoint_hash,
+                   'training_manifest': manifest_ref, 'training_run_id': checkpoint['training_run_id']}
+        if label in bindings and bindings[label] != binding:
+            raise ValueError('Registered iteration has a different checkpoint hash or identity')
+        bindings[label] = binding
+    if bindings:
+        journal.checkpoint('checkpoint_evaluation_bindings', bindings)
+        write(out / 'frozen' / 'checkpoints.json', bindings)
+    return bindings
 
 
 def run_training_study(protocol,out,journal,servers,worker,remaining_seconds,switch_phase,abort):
     """Refresh the complete outstanding reservation before every pending update."""
     from scripts.audit_training_cost import audit,profile_optimizer,optimizer_forecast,SHUTDOWN_SECONDS
-    core=protocol['core_evaluation_labels'];extensions={};trained_labels=[]
+    core=core_evaluation_labels(protocol);extensions={};trained_labels=[]
     progress=read_cost_progress(journal)
     for key in ('updates','collected','profiles','evaluation_receipts'):
         progress.setdefault(key,{})
@@ -643,16 +792,19 @@ def run_training_study(protocol,out,journal,servers,worker,remaining_seconds,swi
         switch_phase('training_'+label)
         reserve(label,'collection')
         cfg=protocol['configs'][label]
+        offset=(cfg.get('continuation') or {}).get('iteration',0)
         while True:
             dest,job=worker(label,'train',servers[0]['port'])
             checkpoint=dest/'checkpoint.json'
             trained=json.loads(checkpoint.read_text()) if checkpoint.is_file() else {}
-            completed=len(trained.get('history',[]))
+            completed=len(trained.get('history',[]))-offset if trained else 0
+            if not 0<=completed<=cfg['iterations'] or trained.get('segment_completed_iterations',completed)!=completed:
+                raise IncompleteOptimization('Committed updates disagree with this training segment: '+label)
             progress['updates'][label]=completed
             if job['status']=='completed':
                 break
-            iteration=completed+1
-            if job.get('failure_status')!='waiting_for_cost_preflight' or iteration>cfg['iterations']:
+            iteration=offset+completed+1
+            if job.get('failure_status')!='waiting_for_cost_preflight' or completed>=cfg['iterations']:
                 raise IncompleteOptimization('Optimizer did not finish: '+label)
             pending=journal.restore(f'pending_batch:{iteration}:{label}')
             if not pending:
@@ -663,6 +815,8 @@ def run_training_study(protocol,out,journal,servers,worker,remaining_seconds,swi
             if previous and previous.get('status')=='passed':
                 raise IncompleteOptimization('Worker is waiting on a previously approved optimizer batch: '+label)
             progress['collected'][label]=pending['environment_episodes_completed']
+            if pending.get('segment_completed_iterations',completed)!=completed:
+                raise IncompleteOptimization('Pending batch update count differs from the committed segment')
             save_progress()
             reserve(label,'before_cost_profile')
             deadline=time.time()+remaining_seconds()-SHUTDOWN_SECONDS
@@ -685,16 +839,18 @@ def run_training_study(protocol,out,journal,servers,worker,remaining_seconds,swi
             approval={'batch_identity':batch,'profile':forecast,**estimate}
             journal.checkpoint(key,approval)
             write(out/f'preflight-{label}-{iteration:04d}.json',approval)
-        if (trained.get('pending_experiences') or trained.get('optimizer_status') not in COMPLETED_OPTIMIZER_STATUSES or
+        if (trained.get('pending_experiences') or trained.get('pending_results') or trained.get('optimizer_status') not in COMPLETED_OPTIMIZER_STATUSES or
                 trained.get('training_completed') is False or trained.get('episodes_completed',0)<cfg['train_episodes'] or
-                len(trained.get('history',[]))<cfg['iterations']):
+                completed!=cfg['iterations']):
             raise IncompleteOptimization('No completed registered training plan: '+label)
         progress['collected'][label]=trained['episodes_completed']
         save_progress()
+        if label=='B2' and protocol.get('checkpoint_evaluations'):
+            return
         frozen=out/'frozen'/f'{label}.json'
         if frozen.exists() and sha(frozen)!=sha(checkpoint):raise ValueError('Frozen policy changed')
         if not frozen.exists():write(frozen,trained)
-    def evaluate(block,labels,seeds,reds=('finite',)):
+    def evaluate(block,labels,seeds,reds=('finite',),*,checkpoints=None):
         if block in progress['evaluated_blocks']:
             return
         if block!='transfer' or all_required:
@@ -702,23 +858,42 @@ def run_training_study(protocol,out,journal,servers,worker,remaining_seconds,swi
         estimate=max((protocol['core_evaluation_reservation']['episode_upper_seconds'] or 0),
                      (progress.get('episode_upper_seconds') or 0))
         required=len(labels)*len(seeds)*len(reds)
-        if not estimate or math.ceil(required/len(servers))*estimate+60>remaining_seconds():
-            raise BudgetExceeded('Complete predeclared evaluation block does not fit')
         pending=queue.Queue();records={};records_lock=threading.Lock()
+        curve_receipts=progress.setdefault('curve_evaluation_receipts',{}) if checkpoints else {}
         for red in reds:
             for seed in seeds:
-                for label in labels:pending.put((label,seed,red))
+                for label in labels:
+                    receipt=curve_receipts.get(f'{label}:{red}:{seed}')
+                    if receipt:records[receipt['summary_path']]=receipt
+                    else:pending.put((label,seed,red))
+        if not estimate or math.ceil(pending.qsize()/len(servers))*estimate+60>remaining_seconds():
+            raise BudgetExceeded('Complete predeclared evaluation block does not fit')
         def queue_worker(port):
             while not abort.is_set():
                 try:label,seed,red=pending.get_nowait()
                 except queue.Empty:return
                 try:
-                    static=label=='B1' or CONTROLLER_VARIANTS.get(label)=='B1'
-                    pool=None if label=='B0' else ROOT/'artifacts/initial_pool.json' if static else out/'frozen'/f'{label}.json'
-                    dest,job=worker(label,'evaluate',port,seed,red,pool)
+                    binding = (checkpoints or {}).get(label)
+                    if binding:
+                        dest,job=worker(label,'evaluate',port,seed,red,Path(binding['path']),checkpoint=binding)
+                    else:
+                        static=label=='B1' or CONTROLLER_VARIANTS.get(label)=='B1'
+                        pool=None if label=='B0' else ROOT/'artifacts/initial_pool.json' if static else out/'frozen'/f'{label}.json'
+                        dest,job=worker(label,'evaluate',port,seed,red,pool)
                     if job['status']!='completed' or job.get('summary_status')!='completed':raise IncompleteOptimization('Required evaluation incomplete')
                     summary=dest/'summary.json'
-                    with records_lock:records[str(summary)]=sha(summary)
+                    receipt=sha(summary)
+                    if binding:
+                        receipt={'summary_sha256':receipt,'checkpoint_iteration':binding['iteration'],
+                                 'checkpoint_sha256':binding['checkpoint_sha256'],'pool_sha256':binding['pool_sha256'],
+                                 'seed':seed,'task_id':job['task_id']}
+                    with records_lock:
+                        if checkpoints:
+                            if not binding:receipt={'summary_sha256':receipt,'seed':seed,'task_id':job['task_id']}
+                            receipt['summary_path']=str(summary)
+                            curve_receipts[f'{label}:{red}:{seed}']=receipt
+                            save_progress()
+                        records[str(summary)]=receipt
                 except BaseException:abort.set();raise
                 finally:pending.task_done()
         with ThreadPoolExecutor(max_workers=len(servers)) as executor:
@@ -728,7 +903,10 @@ def run_training_study(protocol,out,journal,servers,worker,remaining_seconds,swi
         progress['evaluation_receipts'][block]=records
         progress['evaluated_blocks']=list(progress['evaluation_receipts'])
         save_progress()
-    train('B2');switch_phase('core_frozen_test');evaluate('core',core,protocol['pilot_test_seeds'])
+    train('B2')
+    checkpoints=bind_checkpoints(protocol,out,journal) if protocol.get('checkpoint_evaluations') else None
+    switch_phase('core_frozen_test')
+    evaluate('core',core,protocol['pilot_test_seeds'],checkpoints=checkpoints)
     write(out/'core_comparison.json',{'status':'completed','labels':core,'seeds':protocol['pilot_test_seeds'],
         'actual_episodes':len(core)*len(protocol['pilot_test_seeds']),'optional_arms_not_selected_by_reward':True})
     for label in protocol['requested_training_arms']:
@@ -760,6 +938,8 @@ def main():
     parser.add_argument('--minimum-free-mib',type=int,default=21000)
     parser.add_argument('--profile-full-sequence',action='store_true',help='Opt in to the memory-intensive experimental scorer probe; reference scoring is unchanged')
     parser.add_argument('--fixed-update-from',type=Path,help='Verify an exact committed historical B2 update; no new training claim')
+    parser.add_argument('--continue-from',type=Path,help='Start a new B2 training segment from a committed campaign checkpoint')
+    parser.add_argument('--checkpoint-iterations',nargs='+',type=int,help='Cumulative B2 updates to evaluate on the shared registered holdout')
     parser.add_argument('--seed-plan',type=Path,help='Explicit train/validation/final_test/transfer seed lists and purpose')
     parser.add_argument('--reference-report',type=Path,help='Immutable historical metrics JSON for separate context, not new evidence')
     parser.add_argument('--usage-ledger',type=Path,nargs='+',help='Prior cumulative completion ledgers; sessions are deduplicated')
@@ -782,6 +962,8 @@ def main():
     args=parser.parse_args()
     if args.frozen_policy_pilot and (args.fixed_update_from or args.diagnosis_probes_only):raise ValueError('Frozen pilot and historical diagnosis are separate protocols')
     if args.diagnosis_probes_only and not args.fixed_update_from:raise ValueError('Diagnosis probes require the exact historical training source')
+    if (args.continue_from or args.checkpoint_iterations) and (args.fixed_update_from or args.frozen_policy_pilot):
+        raise ValueError('Checkpoint curves require a B2 training campaign')
     if not math.isfinite(args.gpu_hours) or args.gpu_hours<=0 or not math.isfinite(args.wall_hours) or args.wall_hours<=0:
         raise ValueError('Positive finite GPU-hour and wall-hour caps are required')
     if args.minimum_free_mib<18000:raise ValueError('Do not lower the pinned BF16 model memory requirement to use a busy GPU')
@@ -876,6 +1058,9 @@ def main():
     if not replica_count:
         defer_launch('Complete required work cannot be reserved within both caps',estimates)
         return
+    for path, expected in protocol.get('continuation_source', {}).get('files_sha256', {}).items():
+        if sha(path) != expected:
+            raise ValueError('Registered continuation input changed: '+path)
     available,all_gpus=available_gpus(protocol['minimum_free_mib'])
     write(out/'resource_check.json',{'checked_unix':time.time(),'gpus':all_gpus,'eligible':available})
     if not available:
@@ -928,20 +1113,33 @@ def main():
         return process,entry
     def heartbeat():
         for server in servers:journal.budget_heartbeat(server['budget_session'])
-    def worker(label,stage,port,seed=None,red='finite',pool=None):
+    def worker(label,stage,port,seed=None,red='finite',pool=None,*,checkpoint=None):
         if source_identity()!=protocol['source_sha256']:raise RuntimeError('Registered source changed')
-        tag=f'{label}-{red}-{stage}'+(f'-{seed}' if seed is not None else '')
+        policy_tag=label
+        if checkpoint:
+            if stage!='evaluate' or checkpoint!=json.loads((out/'frozen/checkpoints.json').read_text()).get(label):
+                raise ValueError('Worker checkpoint is absent from the locked evaluation list')
+            policy_tag=f"{label}-{checkpoint['checkpoint_sha256'][:16]}"
+        tag=f'{policy_tag}-{red}-{stage}'+(f'-{seed}' if seed is not None else '')
         dest=out/'runs'/tag;dest.mkdir(parents=True,exist_ok=True)
-        cfg=deepcopy(protocol['configs'][label]);cfg['model'].update(endpoint=f'http://127.0.0.1:{port}',
+        cfg=deepcopy(protocol['configs']['B2' if checkpoint else label]);cfg['model'].update(endpoint=f'http://127.0.0.1:{port}',
             generation_endpoints=[f"http://127.0.0.1:{s['port']}" for s in servers],
             scoring_endpoints=[f"http://127.0.0.1:{s['port']}" for s in servers],sg_workers=len(servers))
         if stage=='evaluate':
             cfg.update(episodes=1,eval_seed=seed,eval_seeds=[seed],evaluation_disabled=False,
                 red=red,pool=str(pool) if pool else None,evaluation_role='exploratory_frozen_pilot' if protocol['protocol_kind']=='exploratory-frozen-policy-pair-v1' else 'frozen_test' if red=='finite' else 'transfer_test')
+            if checkpoint:
+                cfg.update(comparison_id=label,base_comparison_id='B2',checkpoint_evaluation=checkpoint,
+                           pool_manifest=checkpoint['training_manifest'])
         elif cfg['evolution'].get('rollout_verification'):cfg['rollout_validation'].update(ports=[s['port'] for s in servers])
         cfg=execution_config(cfg,'eval' if stage=='evaluate' else 'train')
         config_path=dest/'config.json'
-        if config_path.exists():cfg=json.loads(config_path.read_text())
+        if config_path.exists():
+            saved=json.loads(config_path.read_text())
+            if checkpoint and any(saved.get(key)!=cfg[key] for key in (
+                    'checkpoint_evaluation','pool','protocol_digest','eval_seeds','comparison_id')):
+                raise ValueError('Existing evaluation config differs from the registered checkpoint')
+            cfg=saved
         else:write(config_path,cfg)
         command=[str(ROOT/'.venv/bin/python'),'-m','research',stage,'--config',str(config_path),'--output',str(dest)]
         endpoints=[f"http://127.0.0.1:{s['port']}" for s in servers]
@@ -949,8 +1147,10 @@ def main():
             '--generation-endpoints',*endpoints,'--sg-workers',str(len(servers))]
         if stage=='train' and cfg['evolution'].get('rollout_verification'):command+=['--rollout-ports',*[str(s['port']) for s in servers]]
         if (dest/'manifest.json').exists():command.append('--resume')
-        task_id=digest([protocol['experiment_id'],label,stage,seed,red,sha(pool) if pool else None])
+        pool_hash=checkpoint['checkpoint_sha256'] if checkpoint else sha(pool) if pool else None
+        task_id=digest([protocol['experiment_id'],label,stage,seed,red,pool_hash])
         job={'task_id':task_id,'label':label,'stage':stage,'seed':seed,'red':red,'directory':str(dest),'started_unix':time.time()}
+        if checkpoint:job.update(checkpoint_iteration=checkpoint['iteration'],checkpoint_sha256=pool_hash)
         job['status']='started';jobs.append(job);write(out/'jobs.json',jobs)
         process,entry=launch(command,dest/'worker.log',env={**os.environ,'PYTHONHASHSEED':'0','OMP_NUM_THREADS':'1','MKL_NUM_THREADS':'1'})
         try:
@@ -973,6 +1173,10 @@ def main():
                 episodes=summary.get('episodes',[])
                 if (summary.get('result_kind')!='real_cage4' or len(episodes)!=1 or episodes[0].get('seed')!=seed
                         or episodes[0].get('status')!='completed' or episodes[0].get('kind')!='real_cage4'):
+                    job['status']='incomplete'
+                if checkpoint and ((summary.get('training_provenance') or {}).get('checkpoint_evaluation')!=checkpoint
+                        or summary.get('pool_sha256')!=checkpoint['pool_sha256']
+                        or not episodes or episodes[0].get('input_pool_sha256')!=checkpoint['pool_sha256']):
                     job['status']='incomplete'
         write(out/'jobs.json',jobs)
         return dest,job

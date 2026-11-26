@@ -69,6 +69,79 @@ def test_uncommitted_completed_training_is_not_a_trained_test(tmp_path):
     assert train['completed_environment_episodes']==2 and train['committed_iterations']==0
 
 
+@pytest.mark.parametrize('inherited',[0,1])
+def test_registered_intermediate_checkpoints_keep_identical_eval_seeds_separate(tmp_path,inherited):
+    from research.config import digest,validate
+    from scripts.run_campaign import bind_checkpoints
+
+    train=tmp_path/'runs/B2-finite-train';train.mkdir(parents=True)
+    initial='0'*64;lineage='fixture-lineage';model={'model':'fixture'}
+    training_episodes=6-2*inherited;iterations=3-inherited
+    cfg=validate({'arm':'E2','comparison_id':'B2','train_episodes':training_episodes,'iterations':iterations,
+                  'validation_episodes':0,'eval_seed':701,'episodes':1,
+                  'seed_use':'final_evaluation',
+                  'protocol_digest':'fixture-curve','execution_stage':'train'})
+    if inherited:cfg['continuation']={'iteration':inherited,'total_training_episodes':2*inherited}
+    identity=reporter.policy_interface(cfg)
+    manifest={'stage':'train','config':cfg,'config_digest':digest(cfg),'training_run_id':'fixture-train',
+              'policy_interface':identity}
+    reporter.atomic_json(train/'manifest.json',manifest)
+    journal=reporter.Journal(tmp_path/'journal.sqlite3');spec={}
+    labels=(f'B2@{inherited+1}',f'B2@{inherited+2}')
+    for k in (inherited+1,inherited+2):
+        segment=2*(k-inherited)
+        seeds=list(range(90,90+2*inherited))+list(range(cfg['train_seed'],cfg['train_seed']+segment))
+        path=train/f'pool-iteration-{k:04d}.json'
+        snapshot={'stage':'train','pool':{'max_size':1,'skills':[{'fixture_version':k}]},
+                  'algorithm':cfg['evolution'],'model_identity':model,'config_digest':digest(cfg),
+                  'training_run_id':'fixture-train','training_lineage_id':lineage,
+                  'training_completed':segment==training_episodes,'planned_training_episodes':training_episodes,
+                  'planned_optimizer_iterations':iterations,
+                  'episodes_completed':segment,'training_seeds':seeds,'initial_pool_sha256':initial,
+                  'optimizer_status':'completed_changed','policy_interface':identity,
+                  'history':[{'iteration':j,'optimizer_status':'completed_changed'} for j in range(1,k+1)]}
+        reporter.atomic_json(path,snapshot)
+        journal.checkpoint(f'loop_commit:{k}:B2',{'checkpoint_sha256':reporter.file_sha256(path)})
+        spec[f'B2@{k}']={'path':str(path),'iteration':k,'training_seeds':seeds,
+                        'total_training_episodes':2*k,'initial_pool_sha256':initial}
+    protocol={'configs':{'B2':cfg},'comparison_protocol_digest':'fixture-curve',
+              'checkpoint_evaluations':spec,'pilot_test_seeds':[701]}
+    reporter.atomic_json(tmp_path/'protocol.json',protocol)
+    bindings=bind_checkpoints(protocol,tmp_path,journal)
+    assert len({b['checkpoint_sha256'] for b in bindings.values()})==2
+    for label,binding in bindings.items():
+        run=tmp_path/'runs'/f"{label}-{binding['checkpoint_sha256'][:16]}-finite-evaluate-701"
+        run.mkdir()
+        evaluation={**cfg,'execution_stage':'eval','comparison_id':label,'base_comparison_id':'B2',
+                    'evaluation_role':'frozen_test','checkpoint_evaluation':binding,'eval_seeds':[701]}
+        reporter.atomic_json(run/'manifest.json',{'stage':'eval','config':evaluation,
+                             'config_digest':digest(evaluation),'policy_interface':identity})
+        record={'status':'completed','kind':'real_cage4','seed':701,'joint_return':float(binding['iteration']),
+                'episode_id':0,'execution_time_s':1.,'joint_transitions':499,'scored_transitions':498,
+                'input_pool_sha256':binding['pool_sha256'],'communication_encoder':identity['communication_encoder']}
+        proof={'path':binding['path'],'sha256':binding['checkpoint_sha256'],'checkpoint_evaluation':binding,
+               'training_manifest':binding['training_manifest'],'episodes_completed':binding['segment_training_episodes'],
+               'training_seeds':binding['training_seeds'],'initial_pool_sha256':initial,
+               'algorithm':cfg['evolution'],'optimizer_status':'completed_changed'}
+        reporter.atomic_json(run/'summary.json',{'status':'completed','stage':'eval','config':evaluation,
+            'model_identity':model,'result_kind':'real_cage4','pool_sha256':binding['pool_sha256'],
+            'comparison_run_id':'fixture-curve','training_provenance':proof,'episodes':[record]})
+    episodes,statuses=reporter.collect(tmp_path)
+    assert {(r['label'],r['seed'],r['split']) for r in episodes}=={(label,701,'test') for label in labels}
+    assert {r['training_provenance_state'] for r in episodes}=={'verified_completed_update'}
+    assert reporter.training_summary(episodes)['count']==1
+    pair=next(r for r in reporter.paired_comparisons(episodes) if r['comparison']==f'{labels[1]}-{labels[0]}')
+    assert pair['paired_n']==1 and pair['mean_difference']==1.
+    path=Path(spec[labels[1]]['path']);original=reporter.load(path)
+    reporter.atomic_json(path,{**original,'pool':{'fixture_replacement':True}})
+    journal.checkpoint(f'loop_commit:{inherited+2}:B2',{'checkpoint_sha256':reporter.file_sha256(path)})
+    with pytest.raises(ValueError,match='different checkpoint hash'):
+        bind_checkpoints(protocol,tmp_path,journal)
+    reporter.atomic_json(path,{**original,'pending_results':[{'uncommitted':True}]})
+    with pytest.raises(ValueError,match='complete optimizer commit prefix'):
+        bind_checkpoints(protocol,tmp_path,journal)
+
+
 def test_paired_test_ignores_candidate_validation_and_mock_samples(tmp_path):
     write_run(tmp_path,'B0','eval',[-10,-30])
     write_run(tmp_path,'B1','eval',[-5,-25])

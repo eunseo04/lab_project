@@ -64,6 +64,14 @@ def digest(value):
     return hashlib.sha256(canonical(value).encode()).hexdigest()
 
 
+def file_sha256(path):
+    sha = hashlib.sha256()
+    with Path(path).open('rb') as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b''):
+            sha.update(chunk)
+    return sha.hexdigest()
+
+
 def optimizer_batch_identity(pending):
     return digest([pending['trace_hash'],pending['resume_identity']])
 

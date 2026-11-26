@@ -18,7 +18,8 @@ from .adapter import (BLUE_AGENTS, CAGE4_SUBNETS, DefensePolicy, make_state, mak
 from .client import ModelClient, TextModel
 from .config import (digest, compatible_digest, split_seeds, execution_config,
                      policy_interface, check_pool_interface, read_policy_manifest,
-                     read_training_manifest, ZONE_PAIR_CONTRACT)
+                     read_training_manifest, ZONE_PAIR_CONTRACT, training_boundary,
+                     training_counts, verify_completed_update)
 from .metrics import JointRewardLedger, aggregate_episodes
 from .skills import SecuritySkillPool
 from .upstream import configure_encoder, Experience
@@ -26,7 +27,7 @@ from .evolution import Evolution
 from .gate import returns_to_go
 from . import ROOT
 from .progress import (atomic_json, digest as progress_digest, rng_snapshot, rng_restore,
-                       BudgetExceeded, OptimizerPreflightRequired, implementation_identity)
+                       BudgetExceeded, OptimizerPreflightRequired, implementation_identity, file_sha256)
 
 
 def policy_roles(composition):
@@ -71,6 +72,7 @@ def recover_episode(result, config, client, text_model, directory, *, manifest=N
 
 def run_episode(config, seed, episode_id, client, pool, text_model, directory):
     started = time.perf_counter()
+    input_pool_sha256 = digest(pool.snapshot()) if pool else None
     journal=getattr(client,'journal',None)
     episode_task=None
     if journal:
@@ -194,6 +196,7 @@ def run_episode(config, seed, episode_id, client, pool, text_model, directory):
     progress.unlink()
     experiences = experiences_from_rows(rows,config,ledger.total,len(step_rewards))
     result = {"status": "completed", "episode_id": episode_id, "seed": seed,
+        'input_pool_sha256':input_pool_sha256,
         "communication_encoder":config['communication_encoder'], "policy_interface":policy_interface(config),
         "steps_requested": config["steps"], "joint_transitions": len(step_rewards), "scored_transitions": len(ledger.rewards),
         "joint_return": ledger.total, "raw_joint_return": sum(ledger.raw_rewards), "execution_time_s": time.perf_counter()-started,
@@ -265,6 +268,11 @@ def prepare_batch(config,pending_results,pending_experiences,pool,baselines):
 def run(config, stage="eval", output=None, resume=False, limit=None, client=None):
     config = execution_config(config, stage)
     interface = policy_interface(config)
+    registered_update = config.get('checkpoint_evaluation')
+    continuation = config.get('continuation') or {}
+    if registered_update is not None:
+        if stage != 'eval' or file_sha256(config['pool']) != registered_update['checkpoint_sha256']:
+            raise ValueError('Registered evaluation checkpoint hash differs')
     if stage=='eval' and config.get('evaluation_disabled'):raise ValueError('No evaluation seeds registered for this probe-only plan')
     if stage == "train" and (config["arm"] not in ("E2","E3") or config["composition"] not in ("hybrid","all_llm")):
         raise ValueError("Skill learning requires E2/E3 with hybrid/all_llm defenders")
@@ -326,6 +334,7 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
         lineage_id=(checkpoint or {}).get('training_lineage_id') or training_run_id
         inherited_seeds = list((checkpoint or {}).get("inherited_training_seeds", []))
         inherited_episodes = (checkpoint or {}).get("inherited_training_episodes", 0)
+        inherited_iterations = (checkpoint or {}).get('inherited_optimizer_iterations', 0)
         if stage == "train" and config.get("pool") and checkpoint is None:
             initial_path = Path(config["pool"])
             inherited = json.loads(initial_path.read_text())
@@ -335,6 +344,12 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
             static_initial=check_pool_interface(inherited,config,static_initial=True,manifest=source_manifest)
             if not static_initial and inherited.get("model_identity")!=client.identity:
                 raise ValueError("Warm-start policy model identity differs")
+            if continuation:
+                if file_sha256(initial_path) != continuation['checkpoint_sha256']:
+                    raise ValueError('Registered continuation checkpoint hash differs')
+                verify_completed_update(inherited, continuation, config, source_manifest)
+                if inherited.get('training_completed') is not True:
+                    raise ValueError('Continuation requires a completed previous segment')
             inherited_seeds = inherited.get("training_seeds", [])
             if set(inherited_seeds) & set(split_seeds(config,'final_test')):
                 raise ValueError("Warm-start training/evaluation seeds overlap")
@@ -342,13 +357,21 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
             if set(inherited_seeds) & reserved_validation:
                 raise ValueError("Warm-start training/validation seeds overlap")
             inherited_episodes = inherited.get("total_training_episodes",inherited["episodes_completed"])
+            inherited_iterations = len(inherited.get('history', []))
+            if continuation and set(inherited_seeds) & set(split_seeds(config, 'train')):
+                raise ValueError('Continuation requires new training seeds')
             original_interface=policy_interface(source_manifest['config']) if source_manifest else inherited.get('policy_interface')
             if not static_initial:
                 lineage_id=inherited.get('training_lineage_id') or inherited.get('training_run_id') or 'historical:'+hashlib.sha256(initial_path.read_bytes()).hexdigest()
             pool.restore(inherited["pool"])
             if evolution: evolution.restore(inherited.get("experience",{}))
+            if inherited.get('text_model_state'):text_model.restore(inherited['text_model_state'])
+            if inherited.get('rng_state'):rng_restore(inherited['rng_state'])
             training_provenance = {"path":str(initial_path.resolve()),
-                "sha256":hashlib.sha256(initial_path.read_bytes()).hexdigest(),"total_training_episodes":inherited_episodes,
+                "sha256":file_sha256(initial_path),"total_training_episodes":inherited_episodes,
+                'inherited_optimizer_iterations':inherited_iterations,'training_lineage_id':lineage_id,
+                'restored_text_model_state':bool(inherited.get('text_model_state')),
+                'restored_rng_state':bool(inherited.get('rng_state')),
                 'communication_encoder':original_interface['communication_encoder'] if not static_initial else None,
                 'initial_pool_sha256':inherited.get('initial_pool_sha256'),
                 'segment_initial_pool_sha256':hashlib.sha256(json.dumps(inherited['pool'],sort_keys=True).encode()).hexdigest()}
@@ -360,6 +383,10 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
             if client is not None and checkpoint.get('model_identity')!=client.identity:
                 raise ValueError('Resume checkpoint model identity differs')
             check_pool_interface(checkpoint,config,manifest=manifest)
+            if continuation and (inherited_iterations != continuation['iteration']
+                    or inherited_episodes != continuation['total_training_episodes']
+                    or lineage_id != continuation['training_lineage_id']):
+                raise ValueError('Resume checkpoint differs from the registered continuation lineage')
             pool.restore(checkpoint["pool"])
             if evolution: evolution.restore(checkpoint.get("experience", {}))
         elif stage == "eval" and (output/"frozen_pool.json").is_file() and pool:
@@ -367,6 +394,9 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
             if frozen.get('model_identity')!=client.identity:
                 raise ValueError('Frozen Pool model identity differs on evaluation resume')
             check_pool_interface(frozen,config,manifest=manifest)
+            if registered_update and (frozen.get('training_provenance', {}).get('checkpoint_evaluation') != registered_update
+                    or digest(frozen['pool']) != registered_update['pool_sha256']):
+                raise ValueError('Frozen Pool differs from the registered update on resume')
             pool.restore(frozen["pool"])
         elif stage == "eval" and (config["arm"] in ("E2", "E3") or config["arm"] == "E1" and config.get("pool")):
             pool_path = Path(config.get("pool") or output.parent/"train/checkpoint.json")
@@ -380,6 +410,11 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
             manifest_ref=config.get('pool_manifest')
             source_manifest=read_training_manifest(pool_path,trained,manifest_ref=manifest_ref)
             static_initial=check_pool_interface(trained,config,static_initial=True,manifest=source_manifest)
+            if registered_update:
+                evidence = verify_completed_update(trained, registered_update, config, source_manifest)
+                if (any(registered_update.get(key) != value for key, value in evidence.items())
+                        or registered_update['training_run_id'] != trained['training_run_id']):
+                    raise ValueError('Registered update Pool or training identity differs')
             if not static_initial and trained.get("model_identity")!=client.identity:
                 raise ValueError("Skill pool was trained with another policy model identity")
             if set(trained.get("training_seeds", [])) & set(split_seeds(config,'final_test')):
@@ -387,7 +422,7 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
             original_interface=policy_interface(source_manifest['config']) if source_manifest else trained.get('policy_interface')
             pool.restore(trained["pool"])
             training_provenance = {"path": str(pool_path.resolve()),
-                "sha256": hashlib.sha256(pool_path.read_bytes()).hexdigest(),
+                "sha256": file_sha256(pool_path),
                 "episodes_completed": trained["episodes_completed"],
                 "total_training_episodes": trained.get("total_training_episodes",trained["episodes_completed"]),
                 "training_seeds": trained.get("training_seeds", []), "algorithm": trained.get("algorithm"),
@@ -406,6 +441,8 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
                 'initial_pool_sha256':trained.get('initial_pool_sha256')}
             if manifest_ref is not None:
                 training_provenance['training_manifest']=manifest_ref
+            if registered_update:
+                training_provenance.update(evidence, checkpoint_evaluation=registered_update)
         if pool and pool.seed_set!=config["skill_seed_set"]:
             raise ValueError("Stored skill seed set differs from the declared experiment")
         if stage == "eval" and pool and not (output/"frozen_pool.json").exists():
@@ -423,11 +460,11 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
         completed, counter = [], 0
         planned = config["train_episodes"] if stage == "train" else config["episodes"]
         planned_seeds=split_seeds(config,'train' if stage=='train' else 'final_test')
-        boundaries = {(i*planned+config["iterations"]-1)//config["iterations"]
+        boundaries = {training_boundary(planned, config['iterations'], i)
                       for i in range(1,config["iterations"]+1)} if stage == "train" else {planned}
         pending_experiences = [Experience(**e) for e in checkpoint.get("pending_experiences", [])] if checkpoint else []
         pending_results = checkpoint.get("pending_results", []) if checkpoint else []
-        history = deepcopy((checkpoint or inherited or {}).get("history", []))
+        history = list((checkpoint or inherited or {}).get("history", []))
         baselines = deepcopy((checkpoint or inherited or {}).get("baselines", {}))
         committed = checkpoint.get("episodes_completed", 0) if checkpoint else 0
         for episode in range(planned):
@@ -436,6 +473,8 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
                 result = json.loads(result_path.read_text())
                 if result.get("status") == "completed":
                     check_pool_interface(result, config, manifest=manifest)
+                    if result.get('seed') != planned_seeds[episode]:
+                        raise ValueError('Recovered episode seed differs from the registered plan')
                     completed.append(result)
                     continue
             if limit is not None and counter >= limit: break
@@ -444,6 +483,10 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
             if recovered:
                 result=json.loads(result_path.read_text())
                 if result.get("status") != "completed": raise ValueError("Cannot recover an incomplete episode result")
+                if result.get('seed') != planned_seeds[episode]:
+                    raise ValueError('Recovered training seed differs from the registered plan')
+                if continuation and result.get('input_pool_sha256') != digest(pool.snapshot()):
+                    raise ValueError('Recovered training episode did not use the current input Pool')
                 experiences=recover_episode(result,config,client,text_model,output,manifest=manifest)
             else:
                 result, experiences = run_episode(config, planned_seeds[episode], episode, client, pool, text_model, output)
@@ -467,6 +510,7 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
                         'trace_hash':pending_hash,'episodes':pending_results,
                         'experiences':[e.__dict__ for e in pending_experiences],
                         'resume_identity':batch_identity,
+                        **training_counts(history, len(completed), inherited_iterations, inherited_episodes),
                         'environment_episodes_completed':len(completed),'committed_optimizer_loops':len(history)})
                 if prepared is None and journal:
                     prepared={'pending_hash':pending_hash,'resume_identity':batch_identity,'status':'before_preparation','before':{
@@ -530,6 +574,7 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
                     ev["validation_reward_mean"]=aggregate_episodes(validation)["mean_joint_reward"]
                     ev["validation_episodes"]=validation
                 history.append({"iteration": len(history)+1, "episodes": episode+1,
+                    'total_training_episodes':inherited_episodes+episode+1,
                     "reward_mean": average, "baseline": baselines[task], **ev, "pool_snapshot": pool.snapshot() if pool else None})
                 snapshot = {"stage": "train", "pool": pool.snapshot() if pool else None,
                     'training_run_id':training_run_id,
@@ -537,8 +582,8 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
                     'planned_training_episodes':planned,'planned_optimizer_iterations':config['iterations'],
                     'training_completed':episode+1==planned,
                     "episodes_completed": episode+1,
-                    "total_training_episodes": inherited_episodes+episode+1,
-                    "inherited_training_seeds": inherited_seeds, "inherited_training_episodes": inherited_episodes,
+                    **training_counts(history, episode+1, inherited_iterations, inherited_episodes),
+                    "inherited_training_seeds": inherited_seeds,
                     "training_seeds": sorted(set(inherited_seeds)|set(planned_seeds[:episode+1])),
                     "model_identity": client.identity if client else None, "baselines": baselines,
                     "experience": evolution.snapshot() if evolution else {}, "history": history,
@@ -554,7 +599,7 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
                 if journal:
                     journal.checkpoint('loop_commit:'+str(len(history))+':'+config.get('comparison_id',config['arm']),{
                         'optimizer_status':snapshot['optimizer_status'],'pool_changed':snapshot['pool_changed'],
-                        'checkpoint_sha256':hashlib.sha256(checkpoint_path.read_bytes()).hexdigest()})
+                        'checkpoint_sha256':file_sha256(checkpoint_path)})
                 pending_experiences, pending_results = [], []
             elif stage == "train":
                 # Persist the pending batch too, so a one-episode batch invocation
@@ -565,8 +610,8 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
                     'planned_training_episodes':planned,'planned_optimizer_iterations':config['iterations'],
                     'training_completed':False,
                     "episodes_completed":episode+1,
-                    "total_training_episodes":inherited_episodes+episode+1,
-                    "inherited_training_seeds":inherited_seeds,"inherited_training_episodes":inherited_episodes,
+                    **training_counts(history, episode+1, inherited_iterations, inherited_episodes),
+                    "inherited_training_seeds":inherited_seeds,
                     "training_seeds":sorted(set(inherited_seeds)|set(planned_seeds[:episode+1])),
                     "model_identity":client.identity if client else None, "baselines":baselines,
                     "experience":evolution.snapshot() if evolution else {}, "history":history,
@@ -591,6 +636,8 @@ def run(config, stage="eval", output=None, resume=False, limit=None, client=None
             'comparison_initial_pool_sha256':initial_pool_hash,
             "pool_sha256": hashlib.sha256(json.dumps(pool.snapshot() if pool else None, sort_keys=True).encode()).hexdigest(),
             "initial_pool_sha256": hashlib.sha256(json.dumps(pool_before, sort_keys=True).encode()).hexdigest()}
+        if stage == 'train':
+            summary.update(training_counts(history, len(completed), inherited_iterations, inherited_episodes))
         atomic_json(output/"summary.json", summary)
         print(json.dumps({"output": str(output), "status": summary["status"], "metrics": summary["metrics"]}), flush=True)
         return summary

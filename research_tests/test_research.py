@@ -294,16 +294,29 @@ def test_reports_exclude_mock_rewards_and_preserve_unexecuted_cells(tmp_path):
 
 
 def test_training_continuation_keeps_pool_experience_and_seed_provenance(offline,tmp_path):
+    from research.config import digest
     c=validate({"arm":"E2","composition":"all_llm","steps":6,"episodes":2,
         "train_episodes":1,"iterations":1,"validation_episodes":0,"evolution":{"threshold":99}})
     run(c,stage="train",output=tmp_path/"first",client=offline)
     previous=json.loads((tmp_path/"first/checkpoint.json").read_text())
-    next_config=validate({**c,"train_seed":101,"pool":str(tmp_path/"first/checkpoint.json")})
-    run(next_config,stage="train",output=tmp_path/"continued",client=TestModel())
+    next_config=validate({**c,"train_seed":101,"train_episodes":4,"iterations":2,
+                          "pool":str(tmp_path/"first/checkpoint.json")})
+    output=tmp_path/'continued'
+    run(next_config,stage='train',output=output,client=TestModel(),limit=2)
+    intermediate=json.loads((output/'pool-iteration-0002.json').read_text())
+    assert intermediate['training_completed'] is False
+    assert intermediate['segment_completed_iterations']==1
+    assert json.loads((output/'episode-0000.json').read_text())['input_pool_sha256']==digest(previous['pool'])
+    run(next_config,stage='train',output=output,client=TestModel(),resume=True)
     continued=json.loads((tmp_path/"continued/checkpoint.json").read_text())
-    assert continued["training_seeds"]==[100,101]
-    assert continued["total_training_episodes"]==2
-    assert continued["episodes_completed"]==1
+    assert [entry['iteration'] for entry in continued['history']]==[1,2,3]
+    assert continued['inherited_optimizer_iterations']==1
+    assert continued['segment_completed_iterations']==2
+    assert continued['total_committed_iterations']==3
+    assert continued['training_seeds']==[100,101,102,103,104]
+    assert continued['total_training_episodes']==5
+    assert continued['segment_training_episodes']==continued['episodes_completed']==4
+    assert json.loads((output/'episode-0002.json').read_text())['input_pool_sha256']==digest(intermediate['pool'])
     assert json.loads((tmp_path/"continued/initial_pool.json").read_text())["pool"]==previous["pool"]
     assert len(continued["experience"]["fifo"])>=len(previous["experience"]["fifo"])
 

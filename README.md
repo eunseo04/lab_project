@@ -84,6 +84,20 @@ seed plan은 `purpose`(`final_evaluation`/`development`/`reproduction`), `train`
 
 훈련 episode 수는 명시적 `train` 목록 길이다. `--train-episodes`를 주면 그 길이와 일치해야 한다. 작은 계획은 2 episode/1 iteration, full 6/3은 train 시드 6개와 `--iterations 3`으로 구분한다. 모든 계획은 호출 전에 저장한다. B4 예산은 iteration별 최대 검증 후보 수 × 20쌍/40episode와 평가를 포함한다.
 
+### B2 회차별 동결 평가
+
+`--continue-from`은 검증된 B2 완료 체크포인트에서 새 훈련 구간을 시작한다. `--iterations`와 seed plan의 `train`에는 이번 구간의 횟수와 새 시드만 지정한다. `--checkpoint-iterations`에는 평가할 누적 회차를 지정한다. B0와 B1은 각 평가 시드에서 한 번씩 실행하고 B2의 모든 등록 회차와 짝짓는다.
+
+```bash
+.venv/bin/python scripts/run_campaign.py --output "$CAMPAIGN" \
+  --seed-plan "$SEED_PLAN" --authorization "$GPU_AUTHORIZATION" --usage-ledger "$PRIOR_COMPLETION" \
+  --gpu-hours "$CAMPAIGN_GPU_HOURS" --wall-hours "$CAMPAIGN_WALL_HOURS" --max-gpus 1 \
+  --continue-from "$B2_CHECKPOINT" --iterations 2 --train-episodes 4 \
+  --checkpoint-iterations 1 2 3 --test-episodes 2 --plan-only
+```
+
+1회차를 상속하면 훈련 구간 2회와 누적 3회를 원장에 기록한다. 각 훈련 기록의 입력 Pool 해시로 직전 업데이트와 다음 배치를 연결한다. 동결 평가에는 커밋된 회차, 훈련 시드와 lineage, 체크포인트 및 Pool 해시를 고정한다. `B2@1`, `B2@2`, `B2@3`은 각자 집계되고 하나의 lineage를 공유한다. 처음부터 진행하는 경우에는 새 훈련 시드 6개와 `--iterations 3 --checkpoint-iterations 1 2 3`을 지정한다. 이전 B0–B3 실측 시드 1932869656과 1509568777은 노출 이력에 등록돼 있다.
+
 GPU 절약용 pilot은 한 GPU에서 요청을 순차 처리한다. KEEP·MiniLM·시뮬레이터는 CPU다. 실험용 batch scorer는 기본 비활성화이며 실제 수치 동등성 실패 시 reference 경로를 유지한다. BF16, 500 nominal-step, 원래 입력·chunk·Best-of-N·보상·승인 기준을 줄이지 않는다. 2-seed pilot은 full 평가를 대신하지 않는다.
 
 full 설정과 작은 pilot 계획을 같은 실험으로 합산하지 않는다. 학습·후보 검증·최종 test seed는 분리돼 있다. 실험 설정은 `research_configs/`, 현재 경로용 생성 설정은 `.local-configs/`에 있다.
@@ -129,6 +143,10 @@ B1−B0의 평균 차이는 +71.5점이며, Green LocalWork 실패 페널티 감
 B2는 후보 14개를 PPO로 채점해 2개를 채택했다. B3의 진단 응답 135건은 모두 원본 `semantic_gradient` 형식을 따랐다. `interventions` 필드가 빠져 사실에 연결된 가설이 0건이었다. 후보 생성과 PPO 채점도 각각 0건이었으며 B3는 `completed_unchanged`로 기록됐다. 이번 결과는 FiniteState 두 시드와 학습군별 한 번의 업데이트에 한정된다.
 
 GPU 점유는 초기 예약 8.091 GPU-hour 대비 5.545 GPU-hour였다. 완료된 B2 체크포인트와 같은 사용량 원장을 사용해 중단 이후 재개했으며, 종료 후 등록된 GPU 프로세스와 로컬 포트의 해제를 확인했다. 실행 ID는 `required-b0-b3-real-88362444`다.
+
+이 실행의 B2 1회차에서 채택한 `RapidProcessResponse_v2`와 `SelectiveDeception_v2`는 양수 PPO를 기록했다. 같은 표본에서 원본 Skill을 유지했을 때와의 진단 차이 ΔJ는 각각 −1.8603과 −9.2972였다. 두 새 Skill은 첫 시드에서 각각 26회와 12회 자유 결정에 활성 상태였고 두 번째 시드에서는 활성 0회였다. 이 기록은 기존 1회차의 결과다.
+
+후속 B2 곡선은 기존 1회차를 상속해 신규 훈련 4회·update 2회·동결 평가 10회를 등록했다. CPU에서 누적 3회 연결과 중간 동결 평가를 검증했다. 초기 GPU 예약은 9.020 GPU-hour이며, 실측은 후속 실행 승인 대기 상태다. 로컬 계획 ID는 `b2-curve-plan-ff8b6911`이다.
 
 ### 이전 실험
 

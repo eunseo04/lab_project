@@ -44,8 +44,8 @@ def split_seeds(config,split):
 def seed_exposure_history(directory):
     """Read actual episode records, partial traces and registrations without editing them."""
     directory=Path(directory);events=[];registered=[]
-    known={s:'historical_development_test' for s in [*range(101000,101100),102000,58000,201000,201001,211000,211001,215000,788380683]}
-    known.update({s:'historical_training' for s in (91000,91001)})
+    known={s:'historical_development_test' for s in [*range(101000,101100),102000,58000,201000,201001,211000,211001,215000,788380683,1932869656,1509568777]}
+    known.update({s:'historical_training' for s in (91000,91001,1472770597,45322659)})
     known.update({s:'historical_candidate_validation' for s in (213000,213001)})
     events.extend({'seed':s,'role':role,'state':'exposed','source':'provided research history'} for s,role in known.items())
     for path in sorted(directory.rglob('manifest.json')):
@@ -465,3 +465,84 @@ def compatible_digest(config):
         c['model'].pop(key,None)
     if 'rollout_validation' in c:c['rollout_validation'].pop('ports',None)
     return digest(c)
+
+
+def training_boundary(episodes, iterations, update):
+    """Number of segment episodes collected through an update boundary."""
+    return (episodes * update + iterations - 1) // iterations
+
+
+def core_evaluation_labels(protocol):
+    checkpoints = protocol.get('checkpoint_evaluations')
+    if checkpoints:
+        return ['B0', 'B1', *checkpoints]
+    return protocol['core_evaluation_labels']
+
+
+def training_counts(history, episodes, inherited_iterations=0, inherited_episodes=0):
+    return {
+        'inherited_optimizer_iterations': inherited_iterations,
+        'segment_completed_iterations': len(history) - inherited_iterations,
+        'total_committed_iterations': len(history),
+        'inherited_training_episodes': inherited_episodes,
+        'segment_training_episodes': episodes,
+        'total_training_episodes': inherited_episodes + episodes,
+    }
+
+
+def checkpoint_method_digest(config):
+    """Bind actor and optimizer settings across seed sets and run directories."""
+    method = deepcopy(config)
+    for key in ('output', 'pool', 'pool_manifest', 'continuation', 'checkpoint_evaluation',
+                'experiment_id', 'comparison_run_id', 'protocol_digest', 'execution_stage',
+                'evaluation_role', 'evaluation_disabled', 'journal_path', 'seed_plan',
+                'seed_exposure_history', 'seed_use', 'train_episodes', 'episodes', 'iterations',
+                'train_seed', 'train_seeds', 'eval_seed', 'eval_seeds',
+                'validation_seed', 'validation_seeds', 'comparison_id', 'base_comparison_id'):
+        method.pop(key, None)
+    for key in ('endpoint', 'scoring_endpoints', 'generation_endpoints', 'sg_workers',
+                'score_batch_size', 'timeout_seconds', 'deadline_unix'):
+        method['model'].pop(key, None)
+    return digest(method)
+
+
+def verify_completed_update(checkpoint, expected, config, manifest):
+    """Verify the committed prefix that a registered learning-curve evaluation uses."""
+    if manifest is None:
+        raise ValueError('Checkpoint evaluation requires the original training manifest')
+    history = checkpoint.get('history', [])
+    iteration = expected['iteration']
+    if (type(iteration) is not int or iteration < 1
+            or checkpoint.get('stage') != 'train' or checkpoint.get('validation_only')
+            or checkpoint.get('pending_experiences') or checkpoint.get('pending_results')
+            or [entry.get('iteration') for entry in history] != list(range(1, iteration + 1))
+            or any(entry.get('optimizer_status') not in COMPLETED_OPTIMIZER_STATUSES for entry in history)
+            or checkpoint.get('optimizer_status') != history[-1]['optimizer_status']):
+        raise ValueError('Checkpoint evaluation requires a complete optimizer commit prefix')
+    original = manifest['config']
+    method = checkpoint_method_digest(config)
+    if (comparison_metadata(original)['base_comparison_id'] != 'B2'
+            or checkpoint.get('algorithm') != config['evolution']
+            or checkpoint_method_digest(original) != method):
+        raise ValueError('Checkpoint training method differs from the registered B2 method')
+    check_pool_interface(checkpoint, config, manifest=manifest)
+    inherited = original.get('continuation') or {}
+    offset = inherited.get('iteration', 0)
+    local = iteration - offset
+    episodes = checkpoint.get('episodes_completed', 0)
+    counts = training_counts(history, episodes, offset, inherited.get('total_training_episodes', 0))
+    if (not 1 <= local <= original['iterations']
+            or episodes != training_boundary(original['train_episodes'], original['iterations'], local)
+            or checkpoint.get('training_completed') != (local == original['iterations'])
+            or any(checkpoint.get(key, value) != value for key, value in counts.items())
+            or counts['total_training_episodes'] != expected['total_training_episodes']
+            or checkpoint.get('training_seeds') != expected['training_seeds']
+            or len(expected['training_seeds']) != counts['total_training_episodes']):
+        raise ValueError('Checkpoint does not match the registered training episode boundary')
+    identity = checkpoint.get('training_lineage_id')
+    if not identity or identity != expected.get('training_lineage_id', identity):
+        raise ValueError('Checkpoint training lineage differs from the registered lineage')
+    if checkpoint.get('initial_pool_sha256') != expected['initial_pool_sha256']:
+        raise ValueError('Checkpoint does not descend from the registered initial Pool')
+    return {**counts, 'training_lineage_id': identity, 'method_sha256': method,
+            'pool_sha256': digest(checkpoint['pool'])}

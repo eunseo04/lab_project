@@ -6,6 +6,7 @@ import json
 import math
 from pathlib import Path
 import random
+import re
 import statistics
 import sys
 import hashlib
@@ -17,9 +18,10 @@ import sqlite3
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from scripts.recompute_public_metrics import recompute,paired_episodes,episode_group,GROUP_FIELDS
-from research.progress import Journal,atomic_json
-from research.config import (comparison_metadata,VERIFICATION_VARIANTS,CONTROLLER_VARIANTS,
-    COMPLETED_OPTIMIZER_STATUSES,check_pool_interface,policy_interface,read_policy_manifest,read_training_manifest)
+from research.progress import Journal,atomic_json,file_sha256
+from research.config import (comparison_metadata,VERIFICATION_VARIANTS,CONTROLLER_VARIANTS,digest as config_digest,
+    COMPLETED_OPTIMIZER_STATUSES,check_pool_interface,policy_interface,read_policy_manifest,read_training_manifest,
+    verify_completed_update,training_boundary,split_seeds)
 from acd.config import LEGACY_ENCODER
 
 
@@ -27,7 +29,7 @@ def load(path):
     return json.loads(path.read_text())
 
 
-def training_evidence(config,summary,run,cache,*,fixed_source=None):
+def training_evidence(config,summary,run,cache,*,fixed_source=None,checkpoint=None,resolve=None):
     """Classify a frozen policy using a completed, hash-matched training artifact."""
     metadata=comparison_metadata(config)
     if not metadata['policy_type_known'] or not metadata['policy_label_consistent']:
@@ -39,6 +41,12 @@ def training_evidence(config,summary,run,cache,*,fixed_source=None):
     p=summary.get('training_provenance') or {}
     result={'state':'unknown_provenance','verified':False,'requires_training':True,
             'training_run_id':None,'training_identity':None}
+    if config.get('checkpoint_evaluation') != checkpoint:
+        result['state']='unregistered_checkpoint_evaluation';return result
+    if checkpoint and (p.get('checkpoint_evaluation')!=checkpoint
+            or p.get('path')!=checkpoint['path'] or p.get('sha256')!=checkpoint['checkpoint_sha256']
+            or p.get('training_manifest')!=checkpoint['training_manifest']):
+        result['state']='checkpoint_evaluation_identity_mismatch';return result
     if not p.get('episodes_completed'):
         result['state']='initial_pool' if p.get('episodes_completed')==0 else 'unknown_provenance'
         return result
@@ -46,16 +54,26 @@ def training_evidence(config,summary,run,cache,*,fixed_source=None):
         result['state']='incomplete_or_unknown_optimizer';return result
     path=Path(p.get('path',''))
     if not path.is_absolute():path=run/path
+    if resolve:path=resolve(path)
     if not path.is_file() or not p.get('sha256'):
         result['state']='missing_training_artifact';return result
     key=(str(path.resolve()),p['sha256'])
     if key not in cache:
-        raw=path.read_bytes();cache[key]=(hashlib.sha256(raw).hexdigest(),json.loads(raw))
+        sha=file_sha256(path)
+        snapshot=load(path) if sha==p['sha256'] else {}
+        for field in ('experience','baselines','rng_state','text_model_state'):
+            snapshot.pop(field,None)
+        if 'history' in snapshot:
+            snapshot['history']=[{k:h.get(k) for k in ('iteration','episodes','optimizer_status')} for h in snapshot['history']]
+        cache[key]=sha,snapshot
     actual,trained=cache[key]
     if actual!=p['sha256']:
         result['state']='training_artifact_hash_mismatch';return result
     try:
-        original=read_training_manifest(path,trained,manifest_ref=p.get('training_manifest'))
+        manifest_ref=p.get('training_manifest')
+        if resolve and manifest_ref:
+            manifest_ref={**manifest_ref,'path':str(resolve(Path(manifest_ref['path'])))}
+        original=read_training_manifest(path,trained,manifest_ref=manifest_ref)
         if original is None and trained.get('policy_interface') is None and fixed_source:
             # A fixed-update study archived an exact copy of a previously trained Pool.
             directory,source=fixed_source
@@ -88,17 +106,28 @@ def training_evidence(config,summary,run,cache,*,fixed_source=None):
     if any(algorithm.get(k,False if isinstance(value,bool) else 0)!=value for k,value in expected.items()):
         result['state']='training_method_mismatch';return result
     history=trained.get('history',[]);status=trained.get('optimizer_status')
-    if (trained.get('stage')!='train' or trained.get('pending_experiences') or
+    if (trained.get('stage')!='train' or trained.get('pending_experiences') or trained.get('pending_results') or
             status not in COMPLETED_OPTIMIZER_STATUSES or status!=p['optimizer_status'] or not history or
             any(h.get('optimizer_status') not in COMPLETED_OPTIMIZER_STATUSES for h in history)):
         result['state']='incomplete_training_commit';return result
-    if (trained.get('training_completed') is False or
-            trained.get('episodes_completed',0)<trained.get('planned_training_episodes',0) or
-            len(history)<trained.get('planned_optimizer_iterations',0)):
-        result['state']='incomplete_training_plan';return result
-    if (config.get('train_episodes',0)>trained.get('episodes_completed',0) or
-            config.get('iterations',0)>len(history)):
-        result['state']='training_plan_does_not_match_evaluation';return result
+    if checkpoint:
+        try:
+            proof=verify_completed_update(trained,checkpoint,config,original)
+        except (KeyError,ValueError):
+            result['state']='invalid_completed_update';return result
+        if (any(checkpoint.get(k)!=v for k,v in proof.items())
+                or checkpoint['training_run_id']!=trained.get('training_run_id')
+                or trained.get('model_identity')!=summary.get('model_identity')):
+            result['state']='checkpoint_training_provenance_mismatch';return result
+    else:
+        completed=trained.get('segment_completed_iterations',len(history))
+        if (trained.get('training_completed') is False or
+                trained.get('episodes_completed',0)<trained.get('planned_training_episodes',0) or
+                completed<trained.get('planned_optimizer_iterations',0)):
+            result['state']='incomplete_training_plan';return result
+        if (config.get('train_episodes',0)>trained.get('episodes_completed',0) or
+                config.get('iterations',0)>completed):
+            result['state']='training_plan_does_not_match_evaluation';return result
     if not trained.get('planned_training_episodes') and not config.get('train_episodes'):
         result['state']='unknown_training_plan';return result
     seeds=trained.get('training_seeds');initial=trained.get('initial_pool_sha256')
@@ -121,12 +150,13 @@ def training_evidence(config,summary,run,cache,*,fixed_source=None):
             (p.get('final_pool_sha256') is not None and p['final_pool_sha256']!=final)):
         result['state']='unverified_pool_or_training_identity';return result
     identity=trained.get('training_lineage_id') or trained.get('training_run_id') or 'historical:'+actual
-    return {**result,'state':'verified_completed_training','verified':True,
+    return {**result,'state':'verified_completed_update' if checkpoint else 'verified_completed_training','verified':True,
         'training_run_id':trained.get('training_run_id') or 'historical:'+actual,'training_identity':identity,
         'training_seeds':seeds,'initial_pool_sha256':initial,'final_pool_sha256':final,
         'optimizer_status':status,'committed_iterations':len(history),
         'training_episodes_completed':trained['episodes_completed'],
-        'origin':'recorded_training_run' if trained.get('training_run_id') else 'verified_historical_update'}
+        'origin':'recorded_training_run' if trained.get('training_run_id') else 'verified_historical_update',
+        **({'checkpoint_iteration':checkpoint['iteration'],'checkpoint_sha256':actual,**proof} if checkpoint else {})}
 
 
 def training_summary(items):
@@ -139,16 +169,30 @@ def training_summary(items):
             'note':'Environment seeds and repeated evaluation of one artifact are not independent training repetitions.'}
 
 
+def campaign_file(directory, protocol, path):
+    """Use immutable archived dependencies when reporting a restored bundle."""
+    path=Path(path)
+    embedded=directory/'bundle_manifest.json'
+    if not embedded.is_file():return path
+    mapping=load(embedded).get('historical_dependencies',{})
+    if str(path) in mapping:return directory/mapping[str(path)]['relative_path']
+    if path.is_absolute() and protocol.get('experiment_id'):
+        original=Path(protocol['experiment_id'])
+        if original in path.parents:return directory/path.relative_to(original)
+    return path
+
+
 def collect(directory, include_trace=False, *, include_trace_paths=False):
     directory = Path(directory).resolve()
     if directory == ROOT or not directory.is_dir():
         raise ValueError('Pass a specific experiment output directory')
     runs = sorted({p.parent for name in ('summary.json', 'manifest.json') for p in directory.rglob(name)
-                   if not {'report','rollout-verification'}.intersection(p.relative_to(directory).parts)})
+                   if not {'report','rollout-verification','historical_inputs','checkout'}.intersection(p.relative_to(directory).parts)})
     episodes, statuses, signatures, policy_signatures, initial_pools = [], [], {}, {}, {}
     provenance_cache={};protocol_signatures={};controller_signatures={}
     protocol_path=directory/'protocol.json'
     fixed_source=(directory,load(protocol_path).get('fixed_update_source',{})) if protocol_path.is_file() else None
+    campaigns={}
     for run in runs:
         summary = load(run/'summary.json') if (run/'summary.json').exists() else {}
         manifest = load(run/'manifest.json') if (run/'manifest.json').exists() else {}
@@ -180,7 +224,32 @@ def collect(directory, include_trace=False, *, include_trace_paths=False):
         elif stage=='eval' and seed_use in ('development','reproduction','legacy_reproduction'):
             split='development' if seed_use=='development' else 'reproduction'
         evaluation_scope=split
-        provenance=training_evidence(config,summary,run,provenance_cache,fixed_source=fixed_source) if stage=='eval' else {}
+        campaign=run.parent.parent if run.parent.name=='runs' else directory
+        if campaign not in campaigns:
+            registration=load(campaign/'protocol.json') if (campaign/'protocol.json').is_file() else {}
+            bindings_path=campaign/'frozen/checkpoints.json'
+            campaigns[campaign]=(registration,load(bindings_path) if bindings_path.is_file() else {})
+        registration,bindings=campaigns[campaign]
+        curve=registration.get('checkpoint_evaluations',{})
+        checkpoint=None
+        if stage=='eval' and curve and (label in ('B0','B1') or label in curve):
+            evaluation_scope='completed_update_curve'
+            if (config.get('protocol_digest')!=registration['comparison_protocol_digest']
+                    or recorded_config.get('protocol_digest')!=config.get('protocol_digest')
+                    or not set(config.get('eval_seeds',[]))<=set(registration['pilot_test_seeds'])):
+                raise ValueError('Learning-curve evaluation differs from its registered protocol')
+            if label in curve:
+                checkpoint=bindings.get(label)
+                if (not checkpoint or any(checkpoint.get(k)!=v for k,v in curve[label].items())
+                        or recorded_config.get('checkpoint_evaluation')!=checkpoint
+                        or config.get('checkpoint_evaluation')!=checkpoint):
+                    raise ValueError('Learning-curve evaluation differs from its locked checkpoint')
+                read_policy_manifest(run/'manifest.json')
+        if stage=='eval' and label.startswith('B2@') and checkpoint is None:
+            raise ValueError('Checkpoint label requires a registered evaluation binding')
+        resolve=lambda path:campaign_file(campaign,registration,path)
+        provenance=training_evidence(config,summary,run,provenance_cache,fixed_source=fixed_source,
+                                     checkpoint=checkpoint,resolve=resolve if checkpoint else None) if stage=='eval' else {}
         if stage=='eval' and not provenance['verified']:split='untrained_control'
         implicit_run='.' if run==directory else str(run.parent.relative_to(directory))
         comparison_run=summary.get('comparison_run_id') or config.get('comparison_run_id') or config.get('experiment_id') or implicit_run
@@ -212,6 +281,10 @@ def collect(directory, include_trace=False, *, include_trace_paths=False):
                 raise ValueError('Episode communication encoder differs from its config')
             if episode.get('policy_interface') is not None and episode['policy_interface'] != interface:
                 raise ValueError('Episode policy interface differs from its config')
+            if evaluation_scope=='completed_update_curve' and episode['seed'] not in config.get('eval_seeds',[]):
+                raise ValueError('Learning-curve result has an unregistered seed')
+            if checkpoint and episode.get('input_pool_sha256')!=checkpoint['pool_sha256']:
+                raise ValueError('Learning-curve episode did not use the registered Pool')
             identity = episode.get('model_identity') or summary.get('model_identity') or {}
             signature = json.dumps({
                 'conditions': {k: config.get(k) for k in ('steps', 'composition', 'profile', 'scoring',
@@ -256,15 +329,32 @@ def collect(directory, include_trace=False, *, include_trace_paths=False):
                         reward_components=episode.get('reward_components'),
                         scored_step_rewards=episode.get('scored_step_rewards'), model_identity=identity,
                         source=str(run.relative_to(directory)), episode_id=episode.get('episode_id', 0))
+            if 'calls' in episode:
+                item['inference_tokens']={field:sum(c.get(field,0) for c in episode['calls'])
+                                          for field in ('input_tokens','output_tokens','actual_model_calls')}
+            if stage=='train' and curve:
+                offset=(config.get('continuation') or {}).get('iteration',0)
+                local=next(k for k in range(1,config['iterations']+1) if
+                           item['episode_id']<training_boundary(config['train_episodes'],config['iterations'],k))
+                item.update(training_collection_iteration=offset+local,input_pool_sha256=episode.get('input_pool_sha256'))
+            if checkpoint:
+                item.update(base_arm='B2',checkpoint_iteration=checkpoint['iteration'],
+                    checkpoint_sha256=checkpoint['checkpoint_sha256'],method_sha256=checkpoint['method_sha256'],
+                    training_lineage_id=checkpoint['training_lineage_id'],pool_sha256=checkpoint['pool_sha256'])
             if (include_trace or include_trace_paths) and episode.get('trace'):
                 path = Path(episode['trace'])
                 if not path.is_absolute():
                     path = run/path
+                path=resolve(path)
                 if include_trace_paths:
                     item['trace'] = str(path)
                 counts, flags, busy = Counter(), Counter(), 0
                 if include_trace and path.is_file():
+                    if checkpoint and file_sha256(path)!=episode.get('trace_sha256'):
+                        raise ValueError('Checkpoint evaluation trace differs from its completed record')
                     visible_rows=[]
+                    selection_counts,termination_counts=Counter(),Counter()
+                    offered_stats={}
                     for line in path.open():
                         row = json.loads(line)
                         if row.get('policy') != 'llm':
@@ -276,10 +366,28 @@ def collect(directory, include_trace=False, *, include_trace_paths=False):
                             busy += 1
                         for key in ('repeated_analysis_same_evidence', 'duplicate_successful_decoy', 'sleep_with_open_case'):
                             flags[key] += bool((row.get('behavior_outcome') or {}).get(key))
+                        controller=row.get('skill_controller') or {}
+                        selection=controller.get('selection_audit')
+                        if selection is not None:
+                            selection_counts['decisions']+=1
+                            selection_counts['gain_filter_veto']+=bool(selection.get('gain_filter_veto'))
+                            selection_counts['none_selected']+=not selection.get('selected')
+                            selection_counts['epsilon_exploration']+=selection.get('source')=='epsilon_exploration'
+                            if selection.get('selected'):selection_counts['selected:'+selection['selected']]+=1
+                            calls=selection.get('model_calls') or []
+                            if calls:
+                                choice=re.search(r'<choice>\s*(.*?)\s*</choice>',calls[-1].get('response',''),re.I|re.S)
+                                if choice:selection_counts['nominated:'+choice[1].strip()]+=1
+                            for skill in selection.get('offered_skills',[]):
+                                offered_stats[skill['name']]={k:skill[k] for k in ('avg_gain','maturity') if k in skill}
+                        termination=controller.get('termination_audit')
+                        if termination:termination_counts[termination.get('status','unknown')]+=1
+                        termination_counts['maximum_age']+=sum(e.get('reason')=='maximum_age' for e in controller.get('events',[]))
                     from research.attribution import response_opportunity_audit
                     audit=response_opportunity_audit(visible_rows)
                     item['response_opportunities']={k:v for k,v in audit.items() if k!='cases'}
                     item['llm_behavior'] = {'free_actions': dict(counts), 'automatic_busy_ticks': busy, 'observable_flags': dict(flags)}
+                    item['llm_behavior'].update(selection=dict(selection_counts),termination=dict(termination_counts),offered_skill_stats=offered_stats)
             episodes.append(item); completed += 1
         statuses.append({'directory': str(run.relative_to(directory)), 'label': label, 'red': config.get('red'),
                          'stage': stage, 'status': summary.get('status', 'not_committed'),
@@ -289,6 +397,9 @@ def collect(directory, include_trace=False, *, include_trace_paths=False):
                          'pool_changes':sum(h.get('pool_changed',False) for h in summary.get('history',[])),
                          'failure':load(run/'failure.json') if (run/'failure.json').exists() else None})
         statuses[-1].update(comparison_run_id=comparison_run,training_evidence=provenance)
+        for field in ('inherited_optimizer_iterations','segment_completed_iterations','total_committed_iterations',
+                      'inherited_training_episodes','segment_training_episodes','total_training_episodes'):
+            if field in summary:statuses[-1][field]=summary[field]
     return episodes, statuses
 
 
@@ -300,14 +411,24 @@ COMPARISONS=(('B1','B0'),('B2','B1'),('B2','B0'),('B4','B2'),('B4','B0'),
              *[(name,'B1' if base=='B1' else 'B1'+name[2:]) for name,base in CONTROLLER_VARIANTS.items()])
 
 
-def paired_comparisons(episodes):
+def paired_comparisons(episodes, checkpoint_labels=()):
     groups=defaultdict(lambda:defaultdict(list))
     for e in episodes:groups[episode_group(e)][e['label']].append(e)
     output=[]
     for group,arms in sorted(groups.items()):
-        comparisons=list(dict.fromkeys([*COMPARISONS,*[(name,'B0') for name in arms if name!='B0']]))
+        curve=group[GROUP_FIELDS.index('evaluation_scope')]=='completed_update_curve'
+        if curve:
+            labels=checkpoint_labels or sorted((name for name in arms if name.startswith('B2@')),key=lambda x:int(x[3:]))
+            comparisons=[('B1','B0')]
+            for index,label in enumerate(labels):
+                comparisons.extend((label,previous) for previous in ('B0','B1',*labels[:index]))
+        else:
+            comparisons=list(dict.fromkeys([*COMPARISONS,*[(name,'B0') for name in arms if name!='B0']]))
         for new,old in comparisons:
             keys,before,after=paired_episodes(arms.get(old,[]),arms.get(new,[]))
+            if curve and new.startswith('B2@') and old.startswith('B2@') and any(
+                    a.get('training_lineage_id')!=b.get('training_lineage_id') for a,b in zip(before,after)):
+                raise ValueError('Learning-curve pairs must share their training lineage')
             seeds=[k[1] for k in keys];delta=[b['joint_return']-a['joint_return'] for a,b in zip(before,after)]
             reps={label:training_summary(items) for label,items in ((old,before),(new,after))}
             learned=[v for v in reps.values() if v['status']!='not_applicable']
@@ -387,55 +508,115 @@ def rollout_progress(validation, admission_mode=None):
             'rollout_required_pairs':required}
 
 
-def optimizer_report(directory,output,statuses):
-    states=[];changes=[];diagnoses=[];tasks=[];usage=None;candidate_stages=[]
-    db=directory/'journal.sqlite3'
-    if db.exists():
-        journal=Journal(db);tasks=journal.tasks();usage=journal.budget_usage()
+def recorded_updates(directory, protocol, journal):
+    previous=protocol.get('continuation_source')
+    if previous:
+        path=campaign_file(directory,protocol,previous['path'])
+        if file_sha256(path)!=previous['checkpoint_sha256']:
+            raise ValueError('Inherited optimizer history differs from the registered source')
+        for entry in load(path)['history']:
+            yield f"inherited:B2:{entry['iteration']}", {
+                'context':{'arm':'B2'},'iteration':entry['iteration'],
+                'status':entry['optimizer_status'],'result':entry}, True
+    if journal:
         keys=[r[0] for r in journal.db.execute("SELECT key FROM checkpoints WHERE key LIKE 'optimizer:%'").fetchall() if r[0].count(':')==1]
         for key in keys:
-            state=journal.restore(key);result=state.get('result') or {}
-            states.append({'loop_id':key,'arm':state.get('context',{}).get('arm'),'iteration':state.get('iteration'),
-                           'status':state['status'],'pool_changed':result.get('pool_changed'),
-                           'attempts':state['attempts'],'error':state.get('error')})
-            for record in result.get('evolution',[]):
-                for sg in record.get('semantic_gradients',[]):
-                    for item in sg.get('evidence_audits',[]):diagnoses.append(item)
-                for candidate in record.get('candidates',[]):
-                    validation=candidate.get('rollout_validation')
-                    candidate_stages.append({'loop_id':key,'arm':state.get('context',{}).get('arm'),
-                        'name':(candidate.get('skill') or {}).get('name'),
-                        'planned':True,'collected':True,'grounded':(candidate.get('semantic_support') or {}).get('passed'),
-                        'candidates_generated':bool(candidate.get('skill')),'scored':candidate.get('score') is not None,
-                        'ppo_passed':candidate.get('score',0)>0 if candidate.get('score') is not None else None,
-                        **rollout_progress(validation,candidate.get('admission_mode')),
-                        'committed_changed':bool(candidate.get('accepted')) and state['status'] in COMPLETED_OPTIMIZER_STATUSES,
-                        'used_next_batch':None,'frozen_evaluated':None,
-                        'admission_mode':candidate.get('admission_mode'),'efficacy_verified':candidate.get('efficacy_verified'),
+            yield key,journal.restore(key),False
+
+
+def next_batch_evidence(directory, statuses, change):
+    matched=[run for run in statuses if run['stage']=='train' and run['label']==change['arm']]
+    verified=[];active=Counter();requests=Counter();completions=Counter();complete=bool(matched)
+    for run in matched:
+        path=directory/run['directory'];manifest=path/'manifest.json'
+        if not manifest.is_file():complete=False;continue
+        cfg=load(manifest)['config'];seeds=split_seeds(cfg,'train');loops=cfg['iterations']
+        local=change['iteration']-(cfg.get('continuation') or {}).get('iteration',0)
+        if not 0<=local<loops:complete=False;continue
+        first=training_boundary(len(seeds),loops,local)
+        last=training_boundary(len(seeds),loops,local+1)
+        for episode in range(first,last):
+            trace=path/f'episode-{episode:04d}.jsonl';record_path=trace.with_suffix('.json')
+            if not trace.is_file() or not record_path.is_file():complete=False;continue
+            record=load(record_path)
+            input_hash=record.get('input_pool_sha256')
+            expected_pool=change.get('post_update_pool_sha256')
+            if (record.get('status')!='completed' or record.get('kind')!='real_cage4'
+                    or record.get('seed')!=seeds[episode] or file_sha256(trace)!=record.get('trace_sha256')
+                    or (expected_pool and (input_hash is not None or cfg.get('continuation')) and input_hash!=expected_pool)):
+                complete=False;continue
+            verified.append({'seed':seeds[episode],'trace_sha256':record['trace_sha256'],'input_pool_sha256':input_hash})
+            starts=set();completed=set()
+            for line in trace.open():
+                row=json.loads(line)
+                if row.get('policy')!='llm':continue
+                child=change['after']
+                if row.get('skill_id')==child['name'] and row.get('skill_version')==child['version']:
+                    for event in (row.get('skill_controller') or {}).get('events',[]):
+                        active['activations']+=event.get('activated')==child['name'] and event.get('version')==child['version']
+                    if row.get('policy_invoked') and row.get('request_applied') and not row.get('parse_error'):
+                        active['free_decisions']+=1
+                        action=(row.get('requested_action') or '').split()
+                        if action:requests[action[0]]+=1;starts.add((row['agent'],row['step'],action[0]))
+                outcome=(row.get('behavior_outcome') or {}).get('completed_action') or {}
+                operation=(row['agent'],outcome.get('started_at'),outcome.get('name'))
+                if operation in starts and operation not in completed and outcome.get('status') in ('TRUE','FALSE'):
+                    completed.add(operation);completions[outcome['status']]+=1
+    return {'verified_episodes':verified,'complete':complete,'activations':active['activations'],
+            'free_decisions':active['free_decisions'],'requested_primitives':dict(requests),
+            'observed_completion_status':dict(completions),
+            'used':True if sum(active.values()) else False if complete else None}
+
+
+def optimizer_report(directory,output,statuses):
+    states=[];changes=[];diagnoses=[];tasks=[];usage=None;candidate_stages=[]
+    protocol=load(directory/'protocol.json') if (directory/'protocol.json').is_file() else {}
+    db=directory/'journal.sqlite3';journal=None
+    if db.exists():
+        journal=Journal(db);tasks=journal.tasks();usage=journal.budget_usage()
+    for key,state,inherited in recorded_updates(directory,protocol,journal):
+        result=state.get('result') or {}
+        pool=result.get('pool_snapshot') or (state.get('final') or {}).get('pool')
+        pool_hash=config_digest(pool) if pool else None
+        arm=state.get('context',{}).get('arm')
+        iteration=state.get('iteration')
+        loop_candidates=[]
+        for record in result.get('evolution',[]):
+            for sg in record.get('semantic_gradients',[]):
+                diagnoses.extend(sg.get('evidence_audits',[]))
+            for candidate in record.get('candidates',[]):
+                scored=candidate.get('score') is not None
+                details={'loop_id':key,'arm':arm,'iteration':iteration,
+                    'name':(candidate.get('skill') or {}).get('name'),
+                    'planned':True,'collected':True,'grounded':(candidate.get('semantic_support') or {}).get('passed'),
+                    'candidates_generated':bool(candidate.get('skill')),'scored':scored,
+                    'ppo_passed':candidate['score']>0 if scored else None,
+                    **rollout_progress(candidate.get('rollout_validation'),candidate.get('admission_mode')),
+                    'committed_changed':bool(candidate.get('accepted')) and state['status'] in COMPLETED_OPTIMIZER_STATUSES,
+                    'used_next_batch':None,'frozen_evaluated':None,
+                    'admission_mode':candidate.get('admission_mode'),'efficacy_verified':candidate.get('efficacy_verified'),
+                    'surrogate_diagnostics':candidate.get('surrogate_diagnostics'),
+                    'unknown_is_not_zero':True}
+                candidate_stages.append(details);loop_candidates.append(details)
+                if details['committed_changed']:
+                    changes.append({'loop_id':key,'arm':arm,'iteration':iteration,
+                        'parent':record['old_skill'],'after':candidate['skill'],
+                        'semantic_gradients':record.get('semantic_gradients',[]),'gate':candidate.get('diagnostics'),
                         'surrogate_diagnostics':candidate.get('surrogate_diagnostics'),
-                        'unknown_is_not_zero':True})
-                    if candidate.get('accepted'):
-                        changes.append({'loop_id':key,'arm':state.get('context',{}).get('arm'),'iteration':state.get('iteration'),
-                            'parent':record['old_skill'],'after':candidate['skill'],
-                            'semantic_gradients':record.get('semantic_gradients',[]),'gate':candidate.get('diagnostics'),
-                            'rollout':candidate.get('rollout_validation'),'next_loop_used':None,
-                            'next_loop_note':'Unknown until a later trace proves the new skill was invoked.'})
+                        'post_update_pool_sha256':pool_hash,'inherited':inherited,
+                        'rollout':candidate.get('rollout_validation'),'next_loop_used':None})
+        states.append({'loop_id':key,'arm':arm,'iteration':iteration,
+                       'status':state['status'],'pool_changed':result.get('pool_changed'),
+                       'attempts':state.get('attempts'),'error':state.get('error'),'inherited':inherited,
+                       'optimizer_seconds':result.get('seconds'),'pool_size':result.get('pool_size'),
+                       'pool_sha256':pool_hash,
+                       'candidate_counts':{field:sum(bool(c[field]) for c in loop_candidates) for field in
+                                           ('candidates_generated','scored','ppo_passed','committed_changed')} if result else None})
     for change in changes:
-        matching=[r for r in statuses if r['stage']=='train' and r['label']==change['arm']]
-        observed=[];complete=True
-        for run in matching:
-            path=directory/run['directory'];manifest=path/'manifest.json'
-            if not manifest.exists() or change['iteration'] is None:complete=False;continue
-            cfg=load(manifest)['config'];planned=cfg['train_episodes'];loops=cfg['iterations'];iteration=change['iteration']
-            first=(iteration*planned+loops-1)//loops;last=((iteration+1)*planned+loops-1)//loops
-            if first>=planned:complete=False;continue
-            for episode in range(first,min(last,planned)):
-                trace=path/f'episode-{episode:04d}.jsonl';record_path=trace.with_suffix('.json')
-                if not trace.exists() or not record_path.exists():complete=False;continue
-                observed.extend(json.loads(line) for line in trace.open())
-        used=any(r.get('policy')=='llm' and r.get('skill_id')==change['after']['name'] for r in observed)
-        change['next_loop_used']=True if used else False if matching and complete else None
-        change['next_loop_note']='Based on completed next-batch raw traces; missing/unfinished future experience remains unknown.'
+        evidence=next_batch_evidence(directory,statuses,change)
+        change['next_loop_used']=evidence['used']
+        change['next_batch']=evidence
+        change['next_loop_note']='Verified next-batch seeds, trace hashes and child version; absent experience is unknown.'
         for item in candidate_stages:
             if item['loop_id']==change['loop_id'] and item['name']==change['after']['name']:item['used_next_batch']=change['next_loop_used']
     atomic_json(output/'optimizer_progress.json',{'loops':states,'environment_runs':statuses,'tasks':tasks,
@@ -443,6 +624,8 @@ def optimizer_report(directory,output,statuses):
         'resource_phases':journal.restore('resource_phases') if db.exists() else None,
         'budget':usage,'unknown_is_not_zero':True,
         'completed_optimizer_loops':sum(s['status'].startswith('completed_') for s in states),
+        'inherited_optimizer_loops':sum(s['inherited'] for s in states),
+        'segment_completed_optimizer_loops':sum(not s['inherited'] and s['status'].startswith('completed_') for s in states),
         'pool_change_loops':sum(s['pool_changed'] is True for s in states),
         'phase_costs':'See bottleneck_report; GPU intervals include startup/idle/cleanup, test episode seconds remain separate.'})
     atomic_json(output/'skill_changes.json',{'committed_changes':changes,'accepted_count':len(changes) if states and all(s['status'].startswith('completed_') for s in states) else None})
@@ -467,14 +650,18 @@ def reproduction_bundle(directory,output):
                  and p.name!='reproducibility_manifest.json']
     archive=output/'reproduction_bundle.tar.gz';temporary=output/'reproduction_bundle.tmp.gz';manifest=[];by_hash={};by_name={};dependencies={}
     protocol=load(directory/'protocol.json') if (directory/'protocol.json').exists() else {}
-    source_info=protocol.get('fixed_update_source') or {}
+    continuation=protocol.get('continuation_source')
+    source_info=continuation or protocol.get('fixed_update_source') or {}
     required=source_info.get('files_sha256',{})
     def dependency_path(value):
         p=Path(value);return p if p.is_absolute() else directory/p
-    referenced=[source_info[k] for k in ('checkpoint','journal','initial_pool','training_manifest') if source_info.get(k)]+source_info.get('training_traces',[])
+    if continuation:
+        referenced=[continuation['path'],continuation['source_protocol'],continuation['training_manifest']['path']]
+    else:
+        referenced=[source_info[k] for k in ('checkpoint','journal','initial_pool','training_manifest') if source_info.get(k)]+source_info.get('training_traces',[])
     if any(str(p) not in required for p in referenced):raise ValueError('Historical dependency lacks a registered file hash')
     for path,expected in required.items():
-        if not dependency_path(path).is_file() or hashlib.sha256(dependency_path(path).read_bytes()).hexdigest()!=expected:
+        if not dependency_path(path).is_file() or file_sha256(dependency_path(path))!=expected:
             raise ValueError('Historical dependency missing or changed: '+path)
     with tempfile.TemporaryDirectory(prefix='lab-bundle-') as temp, tarfile.open(temporary,'w:gz') as bundle:
         def add(name,raw,kind,**metadata):
@@ -553,9 +740,11 @@ def restore_reproduction_bundle(archive,destination):
 def report_experiment(directory, output=None, include_trace=False, include_bundle=True, *, include_legacy_tables=False):
     directory = Path(directory).resolve()
     output = Path(output).resolve() if output else directory/'report'
+    protocol=load(directory/'protocol.json') if (directory/'protocol.json').exists() else {}
+    checkpoint_labels=list(protocol.get('checkpoint_evaluations',{}))
     episodes, statuses = collect(directory, include_trace, include_trace_paths=include_legacy_tables)
     metrics = recompute(episodes)
-    metrics['paired_comparisons']=paired_comparisons(episodes)
+    metrics['paired_comparisons']=paired_comparisons(episodes,checkpoint_labels)
     for pair in metrics['paired_vs_B0']:
         checked=next(p for p in metrics['paired_comparisons'] if p['comparison']==pair['label']+'-B0' and
             episode_group(p)==episode_group(pair))
@@ -565,6 +754,9 @@ def report_experiment(directory, output=None, include_trace=False, include_bundl
         group['mean_execution_time_s']=group['total_execution_time_s']/group['n']
         items=[e for e in episodes if e['label']==group['label'] and episode_group(e)==episode_group(group)]
         group['training_repetitions']=training_summary(items)
+        if all('inference_tokens' in e for e in items):
+            group['inference_tokens']={field:sum(e['inference_tokens'][field] for e in items)
+                                       for field in ('input_tokens','output_tokens','actual_model_calls')}
         if all(e.get('reward_components') is not None for e in items):
             components=set().union(*(e['reward_components'] for e in items))
             group['mean_reward_components']={k:statistics.mean(e['reward_components'].get(k,0) for e in items) for k in components}
@@ -591,13 +783,14 @@ def report_experiment(directory, output=None, include_trace=False, include_bundl
     for case in cases:
         groups = {g['label']: g for g in metrics['groups'] if episode_group(g)==case}
         paired = {g['label']: g for g in metrics['paired_vs_B0'] if episode_group(g)==case}
-        for label in sorted(set(groups)|set(('B0', 'B1', 'B2', 'B3', 'B4'))):
+        displayed=('B0','B1',*checkpoint_labels) if checkpoint_labels else ('B0','B1','B2','B3','B4')
+        for label in sorted(set(groups)|set(displayed)):
             group, pair = groups.get(label, {}), paired.get(label, {})
             row = [*case, label, group.get('n', 0), group.get('mean'), group.get('sample_std'), group.get('total_execution_time_s'),
                    pair.get('mean_difference'), pair.get('win_rate'), pair.get('median_difference'), pair.get('paired_bootstrap_95ci')]
             lines.append('| '+' | '.join(fmt(v).replace('|', '/') for v in row)+' |')
     if not cases:
-        for label in ('B0','B1','B2','B3-no-support','B3','B4'):
+        for label in (('B0','B1',*checkpoint_labels) if checkpoint_labels else ('B0','B1','B2','B3-no-support','B3','B4')):
             lines.append('| registered | finite | test | N/A | N/A | test | '+label+' | 0 | N/A | N/A | N/A | N/A | N/A | N/A | N/A |')
         lines += ['', 'No completed real episodes. Mock or partial runs are not performance samples.']
     lines += ['', 'Small samples and bootstrap intervals do not establish a general performance gain. Environment completion and committed optimizer iterations are reported separately in run_status.json.', '']
@@ -606,7 +799,6 @@ def report_experiment(directory, output=None, include_trace=False, include_bundl
     for pair in metrics['paired_comparisons']:
         lines.append('| '+' | '.join(fmt(pair.get(k)).replace('|','/') for k in
             ('comparison',*GROUP_FIELDS,'paired_n','mean_difference','median_difference','win_tie_loss','paired_bootstrap_95ci'))+' |')
-    protocol=load(directory/'protocol.json') if (directory/'protocol.json').exists() else {}
     reference=protocol.get('historical_performance_reference')
     if reference:
         raw=Path(reference['path']).read_bytes()

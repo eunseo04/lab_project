@@ -14,7 +14,7 @@ import time
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 from research.progress import Journal,atomic_json,digest,IncompleteOptimization,optimizer_batch_identity
-from research.config import REDS
+from research.config import REDS, core_evaluation_labels
 from research.rollout import approval_seeds
 
 
@@ -51,7 +51,7 @@ def campaign_reservation(protocol, replicas, *, progress=None, usage=None, start
         return {'status':'deferred','reason':'Comparable completed environment episode cost is missing',
                 'projected_occupied_gpu_hours':None,'projected_upper_wall_seconds':None}
     n=len(protocol['pilot_test_seeds'])
-    blocks={'core':core}
+    blocks={'core':core_evaluation_labels(protocol)}
     for label in labels:
         if label not in core:
             static=protocol.get('controller_baselines',{}).get(label)
@@ -70,7 +70,8 @@ def campaign_reservation(protocol, replicas, *, progress=None, usage=None, start
             raise ValueError('Committed work exceeds the registered training plan')
         forecast=progress.get('profiles',{}).get(label) or {}
         optimizer=forecast.get('parts_seconds') or HISTORICAL_OPTIMIZER_SECONDS
-        profiled_current=int(bool(iterations and forecast.get('iteration')==config['iterations']-iterations+1))
+        offset=(config.get('continuation') or {}).get('iteration',0)
+        profiled_current=int(bool(iterations and forecast.get('iteration')==offset+config['iterations']-iterations+1))
         profiles=iterations-profiled_current
         pairs,attempts=rollout_work(config,iterations)
         auxiliary=config.get('validation_episodes',0)*iterations
@@ -85,6 +86,7 @@ def campaign_reservation(protocol, replicas, *, progress=None, usage=None, start
         seconds['paired_candidate_validation']+=2*math.ceil(pairs/replicas)*attempts*episode
         seconds['iteration_validation']+=auxiliary*episode
         by_arm[label]={'training_episodes':training,'optimizer_updates':iterations,'optimizer_profiles':profiles,
+            'inherited_optimizer_iterations':offset,
             'rollout_pairs_per_candidate':pairs,'rollout_candidates_reserved':attempts,
             'paired_validation_episodes':2*pairs*attempts,'iteration_validation_episodes':auxiliary,
             'optimizer_cost_per_update_seconds':optimizer,
@@ -92,6 +94,9 @@ def campaign_reservation(protocol, replicas, *, progress=None, usage=None, start
     for key,block in blocks.items():
         if key not in evaluated:
             count=len(block)*n
+            if key=='core' and protocol.get('checkpoint_evaluations'):
+                count-=len(progress.get('curve_evaluation_receipts',{}))
+                if count<0:raise ValueError('Checkpoint evaluation receipts exceed the registered block')
             counts['frozen_test_episodes']+=count
             seconds['frozen_paired_test']+=math.ceil(count/replicas)*episode
     evaluation_labels=list(dict.fromkeys(label for block in blocks.values() for label in block))

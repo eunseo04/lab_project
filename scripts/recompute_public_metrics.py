@@ -8,6 +8,7 @@ import statistics
 
 ROOT=Path(__file__).resolve().parents[1]
 GROUP_FIELDS=('version','red','split','communication_encoder','action_contract','evaluation_scope')
+CHECKPOINT_FIELDS=('base_arm','checkpoint_iteration','method_sha256','training_lineage_id','checkpoint_sha256','pool_sha256')
 
 
 def episode_group(episode):
@@ -41,19 +42,33 @@ def recompute(episodes):
         seeds=[e['seed'] for e in items]
         identities=[(e.get('comparison_run_id','legacy'),e.get('training_run_id'),e['seed']) for e in items]
         if len(identities)!=len(set(identities)):raise ValueError('Duplicate episode seed within one evaluation/training run')
+        checkpoint_scope={}
+        if any(e.get('checkpoint_iteration') is not None for e in items):
+            scopes={(e.get('base_arm'),e.get('checkpoint_iteration'),e.get('method_sha256')) for e in items}
+            if len(scopes)!=1:
+                raise ValueError('Different checkpoint methods or iterations cannot share one evaluation group')
+            checkpoint_scope=dict(zip(CHECKPOINT_FIELDS[:3],scopes.pop()))
+            if key[-1]!=f"B2@{checkpoint_scope['checkpoint_iteration']}" or checkpoint_scope['base_arm']!='B2':
+                raise ValueError('Checkpoint evaluation label does not match its iteration')
+            by_run={}
+            for episode in items:
+                policy=tuple(episode.get(field) for field in CHECKPOINT_FIELDS)
+                if None in policy or by_run.setdefault(episode.get('comparison_run_id','legacy'),policy)!=policy:
+                    raise ValueError('Different or unidentified checkpoint Pools share one comparison run')
         rewards=[e['joint_return'] for e in items]
         for episode in items:
             series=episode.get('scored_step_rewards')
             if series is not None and sum(series)!=episode['joint_return']:raise ValueError('Step reward total mismatch')
             components=episode.get('reward_components')
             if components is not None and sum(components.values())!=episode['joint_return']:raise ValueError('Component total mismatch')
-        rows.append(dict(zip((*GROUP_FIELDS,'label'),key),n=len(items),mean=statistics.mean(rewards),
+        rows.append(dict(zip((*GROUP_FIELDS,'label'),key),**checkpoint_scope,n=len(items),mean=statistics.mean(rewards),
             sample_std=statistics.stdev(rewards) if len(items)>1 else None,
             total_execution_time_s=sum(e['execution_time_s'] for e in items),
             rewards_by_seed={e['seed']:e['joint_return'] for e in items} if len(seeds)==len(set(seeds)) else None,
             unique_eval_seed_count=len(set(seeds)),
             rewards_by_run_seed=[{'comparison_run_id':e.get('comparison_run_id','legacy'),
-                'training_run_id':e.get('training_run_id'),'seed':e['seed'],'reward':e['joint_return']} for e in items]))
+                'training_run_id':e.get('training_run_id'),'seed':e['seed'],'reward':e['joint_return'],
+                **{field:e[field] for field in CHECKPOINT_FIELDS if field in e}} for e in items]))
         incumbent=(*key[:-1],'B0')
         if key[-1]=='B0' or incumbent not in grouped:continue
         common,before,after=paired_episodes(grouped[incumbent],items)
