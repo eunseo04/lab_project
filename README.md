@@ -113,6 +113,25 @@ loop 상태는 `completed_changed`, `completed_unchanged`, `completed_no_eligibl
 
 ## 확인된 성능과 진행 범위
 
+### 2026-11-26 Qwen B0–B3 실측
+
+소스 `bf13247`에서 Qwen3-8B BF16과 KEEP 4개로 CAGE4 FiniteState를 실행했다. 네 군에 `acd_original_v1`, `explicit_zone_pair_v1`, upstream selector와 같은 두 평가 시드를 적용했다. B2와 B3는 각각 훈련 2회와 Skill Pool 업데이트 1회를 완료했다. 동결 평가 8회에 공식 500 nominal-step 조건을 적용했고, 각 평가에서 공동 전이 499개와 채점 전이 498개를 기록했다.
+
+| 군 | 평가 1 | 평가 2 | 평균 공동 보상 | 표본 SD | 평균 평가 초 |
+|---|---:|---:|---:|---:|---:|
+| B0 ACD | −191 | −257 | −224.0 | 46.67 | 696.53 |
+| B1 고정 Skill | −119 | −186 | −152.5 | 47.38 | 939.55 |
+| B2 원본 Skill-Pro | −120 | −178 | −149.0 | 41.01 | 945.19 |
+| B3 fact-ID 검증 | −119 | −186 | −152.5 | 47.38 | 932.54 |
+
+B1−B0의 평균 차이는 +71.5점이며, Green LocalWork 실패 페널티 감소가 그중 64점을 차지했다. B2−B1은 시드별 −1점과 +8점으로 평균 +3.5점이었다. 같은 증거를 반복 `Analyse`한 요청은 99회에서 106회로 증가했다. B3−B2는 평균 −3.5점이며 B1과 B3의 요청·실행 행동과 공동 보상 궤적은 두 시드에서 일치했다.
+
+B2는 후보 14개를 PPO로 채점해 2개를 채택했다. B3의 진단 응답 135건은 모두 원본 `semantic_gradient` 형식을 따랐다. `interventions` 필드가 빠져 사실에 연결된 가설이 0건이었다. 후보 생성과 PPO 채점도 각각 0건이었으며 B3는 `completed_unchanged`로 기록됐다. 이번 결과는 FiniteState 두 시드와 학습군별 한 번의 업데이트에 한정된다.
+
+GPU 점유는 초기 예약 8.091 GPU-hour 대비 5.545 GPU-hour였다. 완료된 B2 체크포인트와 같은 사용량 원장을 사용해 중단 이후 재개했으며, 종료 후 등록된 GPU 프로세스와 로컬 포트의 해제를 확인했다. 실행 ID는 `required-b0-b3-real-88362444`다.
+
+### 이전 실험
+
 | 과거 동결 평가 | N | B0 ACD | B1 Static | B2 Skill-Pro | B2−B1 |
 |---|---:|---:|---:|---:|---:|
 | FiniteState 211000/211001 | 2 | −164.0 | −193.0 | −201.5 | −8.5 |
@@ -165,7 +184,7 @@ B3의 영구 보류와 cross-host observation 거부를 수정했다. 기존 SG 
 
 후속 실제 정적 paired pilot(seed 788380683, development)은 B1 -121 / B1-selector-contract -122, 차이 -1이었다. N=1의 SD/CI는 N/A이며 개선이나 자동 Skill 최적화 효과를 입증하지 못했다. LWF/ASF/RIA 합계는 같고 공동 action cost만 -1이었다. 모델 호출은 698→733회였고 전체 평가 시간은 각각 906.69/899.15초다. 이 차이를 처리속도 개선이나 특정 Qwen 행동의 인과 효과로 해석하지 않는다. 다음 최종 holdout에는 이 seed를 쓰지 않는다.
 
-위 정적 실측 직후의 CPU 회귀는 329개였다. 최신 원본 정렬 작업에서는 실제 CybORG와 테스트 모델로 B4 동결 1 episode를 CPU에서 마쳤다. 같은 보고서 맨 위에 최신 검사와 과거 실측을 구분해 기록했다. 기존 승인 누적 사용량은 7.388473/8 GPU-hour이며 잔여는 0.611527 GPU-hour다. 새 공통 조건의 Qwen 점수와 학습 후 B3/B4 점수는 N/A다.
+위 정적 실측 직후의 CPU 회귀는 329개였다. 당시 원본 정렬 작업에서는 실제 CybORG와 테스트 모델로 B4 동결 1 episode를 CPU에서 마쳤다. 당시 GPU 원장은 누적 7.388473/8 GPU-hour, 잔여 0.611527 GPU-hour를 기록했다.
 
 공개 개발 seed `788380683`의 노출 이력은 원시 출력이 없는 checkout에서도 확인된다. 새 final/transfer 등록에서는 거부하고, development/reproduction에서는 노출된 재사용으로 기록한다.
 
